@@ -1,0 +1,33 @@
+lowdefy: '4'
+name: Lowdefy CI
+
+plugins:
+  - name: '@lowdefy/connection-shell-runner'
+    version: 'workspace:*'
+
+connections:
+  - id: runner
+    type: ShellRunner
+    properties:
+      # Allow write requests (CreateJob/TriggerJob/Cancel/Rerun/Delete). The
+      # framework rejects requests whose meta.checkWrite is true unless the
+      # connection sets write: true (see api checkConnectionWrite).
+      write: true
+      # Absolute path so job/execution/log data persists across dev-server rebuilds
+      # (the isolated _server/dev working directory is wiped on each rebuild).
+      dbPath: /projects/sandbox/lowdefy/.lowdefy-jenkins/jenkins.sqlite
+
+menus:
+  - id: default
+    links:
+      - id: jobs
+        type: MenuLink
+        pageId: jobs
+        properties:
+          title: Jobs
+          icon: AiOutlineUnorderedList
+
+pages:
+  - _ref: pages/jobs.yaml
+  - _ref: pages/executions.yaml
+  - _ref: pages/execution.yaml

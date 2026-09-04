@@ -1,0 +1,261 @@
+id: jobs
+type: Box
+properties:
+  title: Jobs
+requests:
+  - id: listJobs
+    type: ListJobs
+    connectionId: runner
+  - id: createJob
+    type: CreateJob
+    connectionId: runner
+    payload:
+      name:
+        _state: newJobName
+      command:
+        _state: newJobCommand
+    properties:
+      name:
+        _payload: name
+      command:
+        _payload: command
+  - id: triggerJob
+    type: TriggerJob
+    connectionId: runner
+    payload:
+      jobId:
+        _state: jobList.$.id
+    properties:
+      jobId:
+        _payload: jobId
+  - id: deleteJob
+    type: DeleteJob
+    connectionId: runner
+    payload:
+      jobId:
+        _state: jobList.$.id
+    properties:
+      jobId:
+        _payload: jobId
+events:
+  onInit:
+    - id: fetchJobs
+      type: Request
+      params: listJobs
+blocks:
+  - id: header
+    type: Title
+    properties:
+      content: Lowdefy CI - Pipelines
+      level: 2
+
+  - id: createCard
+    type: Card
+    properties:
+      title: Create job
+    blocks:
+      - id: newJobName
+        type: TextInput
+        required: true
+        properties:
+          label:
+            title: Job name
+          placeholder: e.g. hello-world
+      - id: newJobCommand
+        type: TextArea
+        required: true
+        properties:
+          label:
+            title: Bash command
+          placeholder: 'echo hello world'
+          autoSize:
+            minRows: 2
+            maxRows: 6
+      - id: createActions
+        type: Box
+        layout:
+          gap: 8
+          justify: flex-end
+        blocks:
+          - id: createBtn
+            type: Button
+            layout:
+              flex: 0 0 auto
+            properties:
+              title: Create job
+              icon: AiOutlinePlus
+              color: primary
+              variant: solid
+            events:
+              onClick:
+                - id: validateCreate
+                  type: Validate
+                  params:
+                    - newJobName
+                    - newJobCommand
+                - id: doCreate
+                  type: Request
+                  params: createJob
+                - id: clearName
+                  type: SetState
+                  params:
+                    newJobName: null
+                    newJobCommand: null
+                - id: resetValidation
+                  type: ResetValidation
+                - id: refreshAfterCreate
+                  type: Request
+                  params: listJobs
+                - id: createdMsg
+                  type: DisplayMessage
+                  params:
+                    content: Job created
+                    status: success
+
+  - id: jobsCard
+    type: Card
+    properties:
+      title: Jobs
+      extra: '&#128260; Refresh from the button on each row'
+    blocks:
+      - id: refreshJobsBtn
+        type: Button
+        layout:
+          flex: 0 0 auto
+        properties:
+          title: Refresh list
+          icon: AiOutlineReload
+          color: default
+          variant: outlined
+        events:
+          onClick:
+            - id: refreshJobs
+              type: Request
+              params: listJobs
+      - id: jobList
+        type: List
+        properties:
+          data:
+            _request: listJobs
+        blocks:
+          - id: jobRow
+            type: Card
+            properties:
+              size: small
+              title:
+                _state: jobList.$.name
+            blocks:
+              - id: jobCommand
+                type: Html
+                properties:
+                  html:
+                    _string.concat:
+                      - '<code style="background:#f5f5f5;padding:2px 6px;border-radius:4px;">'
+                      - _state: jobList.$.command
+                      - '</code>'
+              - id: jobStatus
+                type: Tag
+                layout:
+                  flex: 0 0 auto
+                properties:
+                  title:
+                    _if_none:
+                      - _state: jobList.$.latest_status
+                      - never run
+                  color:
+                    _switch:
+                      branches:
+                        - if:
+                            _eq:
+                              - _state: jobList.$.latest_status
+                              - success
+                          then: success
+                        - if:
+                            _eq:
+                              - _state: jobList.$.latest_status
+                              - failed
+                          then: error
+                        - if:
+                            _eq:
+                              - _state: jobList.$.latest_status
+                              - running
+                          then: processing
+                        - if:
+                            _eq:
+                              - _state: jobList.$.latest_status
+                              - queued
+                          then: warning
+                        - if:
+                            _eq:
+                              - _state: jobList.$.latest_status
+                              - cancelled
+                          then: default
+                      default: default
+              - id: jobActions
+                type: Box
+                layout:
+                  gap: 8
+                  justify: flex-start
+                blocks:
+                  - id: runBtn
+                    type: Button
+                    layout:
+                      flex: 0 0 auto
+                    properties:
+                      title: Run
+                      icon: AiOutlinePlayCircle
+                      color: primary
+                      variant: solid
+                    events:
+                      onClick:
+                        - id: doTrigger
+                          type: Request
+                          params: triggerJob
+                        - id: refreshAfterTrigger
+                          type: Request
+                          params: listJobs
+                        - id: triggeredMsg
+                          type: DisplayMessage
+                          params:
+                            content: Execution queued
+                            status: success
+                  - id: historyBtn
+                    type: Button
+                    layout:
+                      flex: 0 0 auto
+                    properties:
+                      title: History
+                      icon: AiOutlineHistory
+                      color: default
+                      variant: outlined
+                    events:
+                      onClick:
+                        - id: goToExecutions
+                          type: Link
+                          params:
+                            pageId: executions
+                            urlQuery:
+                              jobId:
+                                _state: jobList.$.id
+                  - id: deleteBtn
+                    type: Button
+                    layout:
+                      flex: 0 0 auto
+                    properties:
+                      title: Delete
+                      icon: AiOutlineDelete
+                      color: danger
+                      variant: outlined
+                    events:
+                      onClick:
+                        - id: doDelete
+                          type: Request
+                          params: deleteJob
+                        - id: refreshAfterDelete
+                          type: Request
+                          params: listJobs
+                        - id: deletedMsg
+                          type: DisplayMessage
+                          params:
+                            content: Job deleted
+                            status: success
