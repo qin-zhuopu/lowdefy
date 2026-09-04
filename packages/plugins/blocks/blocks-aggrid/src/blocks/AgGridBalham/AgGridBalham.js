@@ -1,5 +1,5 @@
 /*
-  Copyright 2021 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,28 +15,32 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+
+import antdStyles from '../../ag-grid-antd.module.css';
+import { themeBalhamAntd, useGridTheme } from '../../theme/themeLowdefy.js';
 
 import AgGrid from '../../AgGrid.js';
 
-const AgGridBalham = ({ blockId, events, loading, methods, properties }) => (
-  <div
-    id={blockId}
-    className={`ag-theme-balham ${methods.makeCssClass({
-      width: '100%',
-      height: properties.height ?? 500,
-      ...properties.style,
-    })}`}
-  >
-    <AgGrid events={events} loading={loading} methods={methods} properties={properties} />
-  </div>
-);
+const AgGridBalham = ({ blockId, components, events, loading, methods, properties, styles }) => {
+  const theme = useGridTheme(themeBalhamAntd, properties.themeParams);
 
-AgGridBalham.defaultProps = blockDefaultProps;
-AgGridBalham.meta = {
-  category: 'display',
-  icons: [],
-  styles: ['blocks/AgGridBalham/style.less'],
+  return (
+    <div
+      id={blockId}
+      className={`ag-theme-balham ${antdStyles.antdTheme}`}
+      style={{ width: '100%', height: properties.height ?? 500, ...styles?.element }}
+    >
+      <AgGrid
+        components={components}
+        events={events}
+        loading={loading}
+        methods={methods}
+        properties={properties}
+        theme={theme}
+      />
+    </div>
+  );
 };
 
-export default AgGridBalham;
+export default withBlockDefaults(AgGridBalham);

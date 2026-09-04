@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ test('SetGlobal data to global', async () => {
     pageConfig,
   });
   expect(context._internal.lowdefy.lowdefyGlobal).toEqual({ x: 'old', init: 'init' });
-  const button = context._internal.RootBlocks.map['button'];
+  const button = context._internal.RootSlots.map['button'];
   await button.triggerEvent({ name: 'onClick' });
   expect(context._internal.lowdefy.lowdefyGlobal).toEqual({
     init: 'init',
@@ -96,7 +96,7 @@ test('SetGlobal calls context update', async () => {
   });
   context._internal.update = updateFunction;
   expect(updateFunction).toHaveBeenCalledTimes(0);
-  const button = context._internal.RootBlocks.map['button'];
+  const button = context._internal.RootSlots.map['button'];
   await button.triggerEvent({ name: 'onClick' });
   expect(updateFunction).toHaveBeenCalledTimes(3); // TODO: Should this not be 1? Investigate.
 });
@@ -138,7 +138,7 @@ test('SetGlobal changed block properties', async () => {
     lowdefy,
     pageConfig,
   });
-  const button = context._internal.RootBlocks.map['button'];
+  const button = context._internal.RootSlots.map['button'];
   expect(button.eval.properties).toEqual({ a: 'old' });
   await button.triggerEvent({ name: 'onClick' });
   expect(button.eval.properties).toEqual({ a: 'new' });

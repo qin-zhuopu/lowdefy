@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -21,16 +21,9 @@ import schema from './schema.js';
 async function MongodbFind({ request, connection }) {
   const deserializedRequest = deserialize(request);
   const { query, options } = deserializedRequest;
-  const { collection, client } = await getCollection({ connection });
-  let res;
-  try {
-    const cursor = await collection.find(query, options);
-    res = await cursor.toArray();
-  } catch (error) {
-    await client.close();
-    throw error;
-  }
-  await client.close();
+  const { collection } = await getCollection({ connection });
+  const cursor = await collection.find(query, options);
+  const res = await cursor.toArray();
   return serialize(res);
 }
 

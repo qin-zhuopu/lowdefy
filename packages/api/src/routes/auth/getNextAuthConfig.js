@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 */
 
 import { ServerParser } from '@lowdefy/operators';
-import { _secret } from '@lowdefy/operators-js/operators/server';
+import { _app, _secret } from '@lowdefy/operators-js/operators/server';
 
 import createAdapter from './createAdapter.js';
 import createCallbacks from './callbacks/createCallbacks.js';
@@ -26,12 +26,12 @@ import createProviders from './createProviders.js';
 const nextAuthConfig = {};
 let initialized = false;
 
-function getNextAuthConfig({ authJson, logger, plugins, secrets }) {
+function getNextAuthConfig({ appMeta, authJson, logger, plugins, secrets }) {
   if (initialized) return nextAuthConfig;
 
   const operatorsParser = new ServerParser({
-    operators: { _secret },
-    payload: {},
+    lowdefyApp: appMeta,
+    operators: { _app, _secret },
     secrets,
     user: {},
   });
@@ -39,10 +39,11 @@ function getNextAuthConfig({ authJson, logger, plugins, secrets }) {
   const { output: authConfig, errors: operatorErrors } = operatorsParser.parse({
     input: authJson,
     location: 'auth',
+    payload: {},
   });
 
   if (operatorErrors.length > 0) {
-    throw new Error(operatorErrors[0]);
+    throw operatorErrors[0];
   }
 
   nextAuthConfig.adapter = createAdapter({ authConfig, logger, plugins });

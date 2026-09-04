@@ -1,0 +1,11 @@
+name: Shared
+
+components:
+  - id: card
+    type: Component
+    component:
+      id: card-title
+      type: Title
+      properties:
+        content:
+          _var: title

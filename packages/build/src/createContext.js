@@ -1,7 +1,5 @@
-/* eslint-disable no-console */
-
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,31 +16,44 @@
 
 import { mergeObjects } from '@lowdefy/helpers';
 
+import createBuildHandleError from './utils/createBuildHandleError.js';
 import createCounter from './utils/createCounter.js';
+import createHandleWarning from './utils/createHandleWarning.js';
 import createReadConfigFile from './utils/readConfigFile.js';
 import createWriteBuildArtifact from './utils/writeBuildArtifact.js';
+import defaultMessagesMap from './defaultMessagesMap.js';
+import defaultPackages from './defaultPackages.js';
 import defaultTypesMap from './defaultTypesMap.js';
 
 function createContext({
+  customMessagesMap,
   customTypesMap,
   directories,
-  entitlements = [],
   logger,
   refResolver,
   stage = 'prod',
 }) {
   const context = {
+    defaultPackageNames: new Set(defaultPackages),
+    agentIds: new Set(),
+    connectionIds: new Set(),
     directories,
-    entitlements,
+    errors: [],
     jsMap: {},
+    warnings: [],
     keyMap: {},
     logger,
+    // Null prototype prevents pollution via attacker-controlled entry.id.
+    modules: Object.create(null),
     readConfigFile: createReadConfigFile({ directories }),
     refMap: {},
     refResolver,
+    unresolvedRefVars: {},
+    seenSourceLines: new Set(),
     stage,
     typeCounters: {
       actions: createCounter(),
+      agents: createCounter(),
       auth: {
         adapters: createCounter(),
         callbacks: createCounter(),
@@ -52,14 +63,22 @@ function createContext({
       blocks: createCounter(),
       connections: createCounter(),
       requests: createCounter(),
+      controls: createCounter(),
       operators: {
-        client: createCounter(),
-        server: createCounter(),
+        client: createCounter('client'),
+        server: createCounter('server'),
       },
     },
     typesMap: mergeObjects([defaultTypesMap, customTypesMap]),
+    messagesMap: mergeObjects([defaultMessagesMap, customMessagesMap]),
     writeBuildArtifact: createWriteBuildArtifact({ directories }),
   };
+
+  context.blockMetas = context.typesMap.blockMetas ?? {};
+
+  context.handleError = createBuildHandleError({ context });
+  context.handleWarning = createHandleWarning({ context });
+
   return context;
 }
 

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,24 +16,18 @@
 
 import React from 'react';
 import { Layout } from 'antd';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
 const Footer = Layout.Footer;
 
-const FooterBlock = ({ blockId, content, methods, properties }) => (
+const FooterBlock = ({ blockId, classNames = {}, content, properties, styles = {} }) => (
   <Footer
     id={blockId}
-    className={`${methods.makeCssClass([{ margin: 'auto' }, properties.style])} hide-on-print`}
+    className={classNames.element ? `${classNames.element} hide-on-print` : 'hide-on-print'}
+    style={{ margin: 'auto', ...styles.element }}
   >
     {content.content && content.content()}
   </Footer>
 );
 
-FooterBlock.defaultProps = blockDefaultProps;
-FooterBlock.meta = {
-  category: 'container',
-  icons: [],
-  styles: ['blocks/Footer/style.less'],
-};
-
-export default FooterBlock;
+export default withBlockDefaults(FooterBlock);

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,100 +15,139 @@
 */
 
 import React from 'react';
-import { Checkbox, Space } from 'antd';
+import { Checkbox, Col, ConfigProvider, Row, Space, theme } from 'antd';
 import { type } from '@lowdefy/helpers';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
 
 import Label from '../Label/Label.js';
-import getValueIndex from '../../getValueIndex.js';
-import getUniqueValues from '../../getUniqueValues.js';
+import getSelectedIndex from '../../getSelectedIndex.js';
+import useSelectorOptions from '../../useSelectorOptions.js';
+import withTheme from '../withTheme.js';
 
 const CheckboxSelector = ({
   blockId,
+  classNames = {},
   components,
   events,
   loading,
   properties,
   required,
+  styles = {},
   validation,
   value,
   methods,
 }) => {
-  const uniqueValueOptions = getUniqueValues(properties.options || []);
+  const { token } = theme.useToken();
+  const uniqueValueOptions = useSelectorOptions({ properties, methods });
+  const selectedIndexes = new Set(
+    type.isNone(value) ? [] : getSelectedIndex(value, uniqueValueOptions, { properties, multiple: true })
+  );
+  const grid = !type.isNone(properties.columns);
+  // Col takes spans, not counts, so a breakpoint map of counts converts per key.
+  const colProps = type.isObject(properties.columns)
+    ? Object.fromEntries(
+        Object.entries(properties.columns).map(([breakpoint, columns]) => [
+          breakpoint,
+          { span: 24 / columns },
+        ])
+      )
+    : { span: 24 / properties.columns };
+  const renderOption = (opt, i) => {
+    if (type.isPrimitive(opt)) {
+      return (
+        <Checkbox id={`${blockId}_${i}`} key={i} value={`${i}`}>
+          {renderHtml({ html: `${opt}`, methods })}
+        </Checkbox>
+      );
+    }
+    const isSelected = selectedIndexes.has(`${i}`);
+    const checkbox = (
+      <Checkbox
+        id={`${blockId}_${i}`}
+        key={i}
+        value={`${i}`}
+        disabled={opt.disabled}
+        style={{ ...opt.style, ...(isSelected && opt.color ? { color: opt.color } : {}) }}
+      >
+        {type.isNone(opt.label)
+          ? renderHtml({ html: `${opt.value}`, methods })
+          : renderHtml({ html: opt.label, methods })}
+      </Checkbox>
+    );
+    if (type.isNone(opt.color)) return checkbox;
+    // Per-option color: token override colors this checkbox's checked tick.
+    return (
+      <ConfigProvider key={i} theme={{ token: { colorPrimary: opt.color } }}>
+        {checkbox}
+      </ConfigProvider>
+    );
+  };
+  const checkboxGroup = (
+    <Checkbox.Group
+      id={`${blockId}_input`}
+      className={classNames.element}
+      disabled={properties.disabled || loading}
+      // Checkbox.Group is inline-flex and shrink-wraps, so the Row inside it can
+      // only fill a group that has been given a width.
+      style={grid ? { width: '100%', ...styles.element } : styles.element}
+      onChange={(newVal) => {
+        const val = [];
+        newVal.forEach((nv) => {
+          val.push(
+            type.isPrimitive(uniqueValueOptions[nv])
+              ? uniqueValueOptions[nv]
+              : uniqueValueOptions[nv].value
+          );
+        });
+        methods.setValue(val);
+        methods.triggerEvent({ name: 'onChange', event: { value: val } });
+      }}
+      value={getSelectedIndex(value, uniqueValueOptions, { properties, multiple: true })}
+    >
+      {grid ? (
+        <Row gutter={type.isNone(properties.gutter) ? [token.paddingXS, 0] : properties.gutter}>
+          {uniqueValueOptions.map((opt, i) => (
+            <Col key={i} {...colProps}>
+              {renderOption(opt, i)}
+            </Col>
+          ))}
+        </Row>
+      ) : (
+        <Space
+          direction={properties.direction}
+          wrap={type.isNone(properties.wrap) ? true : properties.wrap}
+          align={type.isNone(properties.align) ? 'start' : properties.align}
+        >
+          {uniqueValueOptions.map(renderOption)}
+        </Space>
+      )}
+    </Checkbox.Group>
+  );
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={components}
       events={events}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       validation={validation}
       required={required}
+      styles={styles}
       content={{
-        content: () => (
-          <Checkbox.Group
-            id={`${blockId}_input`}
-            className={methods.makeCssClass([
-              properties.color && {
-                '& > label > span.ant-checkbox-checked:not(.ant-checkbox-disabled) > span': {
-                  backgroundColor: `${properties.color} !important`,
-                  borderColor: `${properties.color} !important`,
-                },
-              },
-              properties.inputStyle,
-            ])}
-            disabled={properties.disabled || loading}
-            onChange={(newVal) => {
-              const val = [];
-              newVal.forEach((nv) => {
-                val.push(
-                  type.isPrimitive(uniqueValueOptions[nv])
-                    ? uniqueValueOptions[nv]
-                    : uniqueValueOptions[nv].value
-                );
-              });
-              methods.setValue(val);
-              methods.triggerEvent({ name: 'onChange' });
-            }}
-            value={getValueIndex(value, uniqueValueOptions, true)}
-          >
-            <Space
-              direction={properties.direction}
-              wrap={type.isNone(properties.wrap) ? true : properties.wrap}
-              align={type.isNone(properties.align) ? 'start' : properties.align}
+        content: () =>
+          properties.color ? (
+            <ConfigProvider
+              theme={{ components: { Checkbox: { colorPrimary: properties.color } } }}
             >
-              {uniqueValueOptions.map((opt, i) =>
-                type.isPrimitive(opt) ? (
-                  <Checkbox id={`${blockId}_${i}`} key={i} value={`${i}`}>
-                    {renderHtml({ html: `${opt}`, methods })}
-                  </Checkbox>
-                ) : (
-                  <Checkbox
-                    id={`${blockId}_${i}`}
-                    key={i}
-                    value={`${i}`}
-                    disabled={opt.disabled}
-                    className={methods.makeCssClass(opt.style)}
-                  >
-                    {type.isNone(opt.label)
-                      ? renderHtml({ html: `${opt.value}`, methods })
-                      : renderHtml({ html: opt.label, methods })}
-                  </Checkbox>
-                )
-              )}
-            </Space>
-          </Checkbox.Group>
-        ),
+              {checkboxGroup}
+            </ConfigProvider>
+          ) : (
+            checkboxGroup
+          ),
       }}
     />
   );
 };
 
-CheckboxSelector.defaultProps = blockDefaultProps;
-CheckboxSelector.meta = {
-  valueType: 'array',
-  category: 'input',
-  icons: [...Label.meta.icons],
-  styles: ['blocks/CheckboxSelector/style.less'],
-};
-
-export default CheckboxSelector;
+export default withTheme('Checkbox', withBlockDefaults(CheckboxSelector));

@@ -1,5 +1,517 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 3ead269: feat(helpers): Reject prototype-pollution key names in dot paths and key maps.
+
+  `__proto__`, `constructor`, `prototype`, `__defineGetter__`, `__defineSetter__`,
+  `__lookupGetter__` and `__lookupSetter__` are no longer accepted as path segments or as keys
+  in maps built from user-supplied values.
+
+  Previously these names were silently _filtered_ on write, which was worse than rejecting
+  them: `SetState: { 'a.__proto__.b': 1 }` quietly wrote to `a.b` instead — a different
+  location than the one you asked for. Reads could also walk up the prototype chain.
+
+  What you will see now:
+
+  - `:set_state` and the `SetState` action raise a config error naming the offending key and
+    pointing at the line in your YAML.
+  - Data-reading operators (`_state`, `_get`, `_user`, `_payload`, ...) return their default
+    instead of a value.
+  - A module entry id, an agent or endpoint id, or a `LOWDEFY_SECRET_*` environment variable
+    using one of these names now fails at build or boot with a message naming it, instead of
+    silently vanishing.
+
+  Apps that do not use these names are unaffected. If you have a form field, state key, or API
+  response property named `constructor`, rename it.
+
+  Deep merges of configuration are hardened the same way, but skip reserved keys rather than
+  raising — a reserved name arriving inside a merged _value_ is dropped so a single poisoned
+  field can't abort an otherwise valid merge.
+
+  `@lowdefy/helpers` also now exports `isReserved(key)`, so plugin and connection authors can
+  test a key against this policy directly instead of catching a `ReservedKeyError`.
+
+- b09ad62: fix: Allow dependency build scripts via pnpm-workspace.yaml so installs succeed on pnpm 11.
+
+  `lowdefy dev` and `lowdefy build` failed with `Dependency installation failed.` on pnpm 11 (`ERR_PNPM_IGNORED_BUILDS`), because dependency build scripts (sharp, better-sqlite3) were only allowed via the `pnpm.onlyBuiltDependencies` field in the server package.json — a field pnpm no longer reads (and strips at publish), while pnpm 11 turns ignored build scripts into a hard install error. The CLI now writes a `pnpm-workspace.yaml` with the build allowlist into the server directory before installing, covering pnpm 9 (`packages`), pnpm 10 (`onlyBuiltDependencies`), and pnpm 10.29+/11 (`allowBuilds`). An existing file is never overwritten, so users can extend the allowlist for their own plugins' native dependencies. When the app lives inside a pnpm workspace (e.g. `apps/*/.lowdefy/*` in the workspace globs, plugins pinned as `workspace:*`), the CLI writes nothing — the server installs as part of the parent workspace, where isolating it would break `workspace:*` plugin resolution and the root's `overrides`/`packageExtensions`, and build allowlists belong in the workspace root's `pnpm-workspace.yaml`. `lowdefy-e2e init` used the same dead mechanism for mongodb-memory-server and now writes the same allowlist to `pnpm-workspace.yaml` (the workspace root's if the app is inside a workspace, otherwise a new file in the app directory). The dead `pnpm` fields were removed from the server packages. Fixes #2191.
+
+- 824f4be: fix(helpers): Dot paths resolve own properties only, and prefer a nested match to a literal dotted key.
+
+  A key that contains dots still resolves without escaping, at every depth. `_url_query:
+my_object.subfield` against `?my_object.subfield=x` reads as before, and a JWT `claimMapping` of
+  `resource_access.com.example.api.roles` against `{ resource_access: { 'com.example.api': { roles:
+['admin'] } } }` still returns `['admin']`. **No path needs a `\.` added unless a plain key or a
+  shorter dotted key overlaps the dotted key it resolves through; where one does, escaping is now the
+  way — see below.**
+  What changed is how ties and misses resolve: `get`, `set` and `unset` now walk the path in a single
+  forward pass, look only at own properties, and no longer try the whole path as one key ahead of the
+  walk. The accepted breaks:
+
+  **A nested match now wins over a literal dotted key.** With both present,
+  `get({ a: { b: 2 }, 'a.b': 1 }, 'a.b')` was `1` and is now `2`, and `unset` deletes the nested `b`
+  rather than the literal `'a.b'` key. A present segment also blocks the join even when it cannot be
+  descended: `get({ a: 1, 'a.b': 2 }, 'a.b')` was `2` and is now the default. Where two dotted keys
+  overlap the shorter one wins: `get({ 'a.b': {}, 'a.b.c': 1 }, 'a.b.c')` was `1` and is now the
+  default. Escaping (`a\.b`) is the way to address a literal dotted key past a nested match.
+
+  **Reads and writes see own properties only, never anything inherited from a prototype.** A data
+  operator whose key was `toString`, `valueOf` or `hasOwnProperty` used to reach the built-in
+  `Object.prototype` function and then fail while copying it, raising `SyntaxError: "undefined" is not
+valid JSON`; `_state: toString` now returns the operator default instead. Writes were worse off:
+  `SetState: { 'toString.x': 1 }` wrote `x` onto `Object.prototype.toString` — making `x` readable on
+  every object in the process — and left state untouched. It now writes `{ toString: { x: 1 } }` into
+  state, as asked. Own-only applies to every prototype, not just `Object.prototype`, so any value
+  reached through an inherited accessor is now unreachable — the realistic case being a class getter.
+  Given a `Thing` class whose `derived` getter returns `'g'`, `get({ t: new Thing() }, 't.derived')` was
+  `'g'` and is now the default. YAML config holds no class instances, so that shape reaches a path only
+  from a custom plugin or connection.
+
+  **A path no longer steps _through_ a function value.** Given an `f` carrying an `f.z` of `3`,
+  `get({ f }, 'f.z')` was `3` and is now the default. Config data holds no functions, so this is
+  reachable only from a custom plugin.
+
+  **`get` no longer accepts `separator`, `split`, `join` or `isValid`, and paths must be strings.**
+  `get({ a: { b: 1 } }, 'a/b', { separator: '/' })` was `1` and is now the default, and `isValid` is
+  ignored rather than consulted. Array paths are gone from all three helpers:
+  `get({ a: { b: 1 } }, ['a', 'b'])` was `1` and is now the default, `set({}, ['a', 'b'], 1)` wrote
+  `{ a: { b: 1 } }` and is now a no-op, and `unset(obj, ['a', 'b'])` threw a `TypeError` and is now a
+  no-op. Nothing in Lowdefy passed any of these, so this too is a custom-plugin concern. (`set`'s
+  `options` parameter is removed outright — see its own entry.)
+
+  **`unset` no longer skips a delete because the value looks empty, and no longer throws on a dotted
+  key at depth.** Hiding a block clears its state field, so both are reachable from config. A hidden
+  _nested_ block whose value was an empty string or `undefined` used to keep its field —
+  `unset({ parent: { child: '' } }, 'parent.child')` left `child` in place and now removes it — so a
+  cleared, hidden input no longer leaves a stale key behind in `_state`. The same applied to an empty
+  `Map` or `Set`, an empty-source `RegExp`, and a blank-message `Error`. And a block id written with an
+  escaped dot used to crash the delete: `unset({ 'a.b': { c: 1 } }, 'a\.b.c')` threw
+  `TypeError: Cannot read properties of undefined` and now deletes `c`.
+
+  **The dot-path escape grammar now covers the backslash itself.** `\.` remains a literal dot and `\\`
+  is now a literal backslash, so `joinPath` can escape a segment that ends in a backslash — before, it
+  only escaped dots, and `joinPath(['a\\', 'b'])` produced a path `splitPath` read back as the single
+  key `a.b`. Any other backslash is still an ordinary character, so a key such as `a\b` needs no
+  escaping. The one observable change is a doubled backslash directly before a dot:
+  `splitPath('a\\\\.b')` used to yield `['a\\.b']` and now yields `['a\\', 'b']`.
+
+- 824f4be: fix(helpers): Serialized errors mark the values they cannot carry instead of dropping them.
+
+  An error is turned into plain data in three places: the `err` field of a server log line, an error
+  sent to a browser or API caller, and — new in this release — a dot-path read of an error value from
+  config. That conversion used to lose fields silently and let a few live values through. Every own
+  field of an error now appears, with anything unserializable replaced by a marker string:
+
+  - A field holding a class instance no longer vanishes. A Node error carrying a `socket`, `agent` or
+    similar field had that key dropped from the log line altogether, which is indistinguishable from
+    the error not having the field; it now logs as `'[Object: Socket]'`. The instance's internals are
+    still never expanded.
+  - A field holding a function, a bigint or a symbol was passed through live. That leaked a closure
+    over server state into serialized output, and a bigint field made `JSON.stringify` of the result
+    throw `TypeError: Do not know how to serialize a BigInt`. These are now `'[Function: handler]'`,
+    `'[BigInt: 10]'` and `'[Symbol: s]'`.
+  - A circular `cause`, or an own field pointing back at the error itself, had its key dropped. Both
+    are now `'[Circular]'`.
+  - A `cause` chain longer than three levels ended with the fourth `cause` key simply absent. It is
+    now `'[Truncated]'`.
+
+  The markers are literal strings, so they show up wherever the serialized error does: a log line's
+  `err.agent` reads `[Object: Socket]`, and `_actions: someAction.error.someField` can now resolve to
+  `'[Object: Socket]'` rather than to the operator default.
+
+  `extractErrorProps` also takes a new `omit` option — `extractErrorProps(error, { omit: (error) =>
+['stack'] })`, called once per error node in the `cause` walk so a policy can key on the node it is
+  looking at. `serializer.serialize` accepts the same function as `omitErrorProps` and passes it down.
+  This is plugin and server API; app config is unaffected by it.
+
+- 3ead269: fix(helpers): Deep merges replace arrays instead of merging them index-by-index.
+
+  Wherever Lowdefy deep-merges configuration — block property defaults, `AxiosHttp` connection
+  and request config, theme tokens, i18n message catalogs — an array value is now treated as a
+  single value. A later array replaces an earlier one; it no longer merges element-by-element
+  at matching indices.
+
+  This is what most overrides already assumed, and it matches a plain object spread. Two
+  places where the old behaviour was visible:
+
+  - `RatingSlider`'s `CheckboxInput.options` — overriding it previously inherited the default
+    element's `label: 'N/A'`. It no longer does; specify the full option object.
+  - The layout blocks (`PageHeaderMenu`, `PageSiderMenu`, `PageSidebarLayout`, `MobileMenu`) —
+    if you set the same array (`selectedKeys`, `defaultOpenKeys`, `links`) on both `menu` and a
+    breakpoint variant such as `menuLg` or `menuMd`, the breakpoint value now replaces the base
+    value outright rather than overlaying it index-by-index.
+
+  Two smaller semantic changes come with this. A later `undefined` now replaces an earlier value
+  instead of being skipped — `mergeObjects([{ a: 1 }, { a: undefined }])` was `{ a: 1 }` and is now
+  `{ a: undefined }`, so a caller that means "no override" must omit the key rather than set it to
+  `undefined`. And a single-object merge no longer passes its input through: `mergeObjects([x]) === x`
+  was `true` and is now `false`, so memoise at the call site if a stable reference is needed across
+  renders. Both are reachable only from code that calls `mergeObjects` — plugin and connection authors
+  — not from YAML, which has no `undefined`; a config `null` merges as it always did.
+
+  Also fixed: merging no longer mutates its inputs. `AxiosHttp` previously wrote merged request
+  config back into the shared connection config, leaking values such as the HTTP agent between
+  requests.
+
+  `lodash.merge`, the last remaining lodash dependency in Lowdefy, has been removed.
+
+- 3ead269: fix(operators): Read fields inside an error value by dot path.
+
+  Dot-path reads stopped at an error, so a field on it silently returned the operator default even
+  though the value was there. Mapping a sign-in failure to a friendly message with `_actions:
+login.error.cause.code` always fell through to the default branch; it now reads the code.
+  `_actions: login.error.message` was the default and now returns the message.
+
+  Errors are the only kind of value this opens up. `Date`, `URL`, `Map`, `Set`, `RegExp`, `Promise`,
+  `Buffer` and typed arrays are still not traversable — a path into one returns the default, exactly
+  as before — and a class instance's own fields were already readable, so nothing changed there.
+
+  A lookup on an error reads the error's serializable form, which brings that form's limits with it:
+
+  - An own field holding a class instance or a function arrives as a marker string —
+    `'[Object: Socket]'`, `'[Function: handler]'` — not as a live object.
+  - The `cause` chain resolves three levels. `_actions: x.error.cause.cause.cause.message` reads; a
+    fourth `cause` is the literal string `'[Truncated]'`. Lowdefy's own wrap (`ActionError` →
+    `RequestError` → `ServiceError` → driver error) fits inside that.
+  - A non-enumerable own property is not readable. `AggregateError`'s `errors` array is
+    non-enumerable, so `_actions: x.error.errors` returns the default.
+
+  An error that is the _end_ of the path is unchanged — `_actions: x.error` still hands over the error
+  itself, not its extracted form. This entry only adds readable values; for the reads that this
+  release does change, see the dot-path resolution entry.
+
+  Also in this release, `@lowdefy/helpers`' `type` utility identifies `Date` and `Error` with
+  `instanceof` rather than duck-typing, so a `Date` or `Error` constructed in another JavaScript realm
+  (a `vm` context, iframe, or worker) is no longer detected as one; `type.isRegExp` is unchanged and
+  still detects a foreign `RegExp`. Lowdefy itself never constructs a value in another realm, so this
+  is reachable only from a custom plugin that introduces one. No `type` predicate was removed.
+  `type.typeOf` returns coarser answers for four kinds of value: a generator function is now
+  `'function'` (was `'generatorfunction'`), a generator object and an `arguments` object are now
+  `'object'` (were `'generator'` and `'arguments'`), and the map, set, array and string iterators are
+  all now `'iterator'` (were `'mapiterator'`, `'setiterator'`, `'arrayiterator'` and
+  `'stringiterator'`). `typeOf(Buffer.from('x'))` still returns `'buffer'`.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/node-utils@5.6.0
+  - @lowdefy/logger@5.6.0
+  - @lowdefy/errors@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.1
+- @lowdefy/helpers@5.5.1
+- @lowdefy/logger@5.5.1
+- @lowdefy/node-utils@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.0
+- @lowdefy/helpers@5.5.0
+- @lowdefy/logger@5.5.0
+- @lowdefy/node-utils@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- 134792b: fix: Unblock Playwright e2e for v5+ Lowdefy apps.
+
+  **`@lowdefy/server-e2e`**
+
+  - `next.config.js` now declares `turbopack: {}` and drops the legacy `webpack` polyfill block, so Next 16 (Turbopack-by-default) no longer errors with `This build is using Turbopack, with a webpack config and no turbopack config`. The `transpilePackages` list is now built from the same `build/blockPackages.json` artifact used by `@lowdefy/server`.
+  - Plugin `types` modules are now correctly unwrapped from their ESM default export, so apps using custom plugins (blocks, actions, operators, connections, requests, etc.) no longer fail with `Action/Block/... type "Foo" was used but is not defined`.
+  - Plugin `blockMetas` are now collected on the e2e server, matching the behaviour of `@lowdefy/server` and `@lowdefy/server-dev`.
+  - `lowdefy build --server e2e` no longer crashes when the project has no `lowdefy.yaml` or `lowdefy.yml` (returns an empty plugin set instead of `YAML.parse(undefined)`).
+  - Page and API routes now use catch-all segments (`pages/[[...pageId]].js`, `pages/api/endpoints/[...endpointId].js`, `pages/api/request/[...path].js`), so apps with nested page paths (e.g. `pages: [{ id: 'foo/bar' }]`) render correctly under `--server e2e` instead of returning 404.
+  - `_app.js` and `_document.js` now mirror `@lowdefy/server`'s dark-mode handling — `useDarkMode` from `@lowdefy/client`, a `ThemeTokenResolver` that exposes the resolved antd token on `lowdefy.theme._resolvedAntdToken`, and a pre-hydration background-colour script that prevents the light/dark flash on page navigation.
+  - `pages/api/client-error.js` now enforces the same-origin host check and strips `~e.received` from incoming payloads, matching `@lowdefy/server`.
+  - `lowdefy/build.mjs` now uses `instanceof BuildError` for the formatted-error shortcut (matches `@lowdefy/server`) and drops the obsolete `mixin` logger config.
+  - Runtime dependency set now includes `@lowdefy/blocks-antd-x`, and `tailwindcss` / `@tailwindcss/postcss` are declared in `dependencies` (not just `devDependencies`). The unused `process` browser polyfill has been removed.
+
+  **`@lowdefy/e2e-utils`**
+
+  - `extractBlockMap` now traverses `slots.<name>.blocks` alongside `areas.<name>.blocks` and `blocks`. Compiled page artifacts under `.lowdefy/server/build/pages/<pageId>.json` use the `slots` container shape, which `extractBlockMap` was not walking — so `generateManifest` produced a `blockMap` containing only the page root and `ldf.block('<any-nested-id>')` threw `Block "<id>" not found on page. Available blocks: <pageId>` for every non-root block, reducing the e2e framework to root-block assertions and raw `ldf.page.locator(...)` fallbacks.
+
+  **`lowdefy` CLI**
+
+  - `lowdefy build --server <name>` now re-fetches the server package when the version matches but the name differs. Both `lowdefy build` and `lowdefy build --server e2e` write to the same `.lowdefy/server/` directory, so the previous version-only cache check meant flipping between them (in either order) would silently reuse whichever server package was fetched first.
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/errors@5.4.0
+  - @lowdefy/logger@5.4.0
+  - @lowdefy/node-utils@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.3.0
+- @lowdefy/helpers@5.3.0
+- @lowdefy/logger@5.3.0
+- @lowdefy/node-utils@5.3.0
+
+## 5.2.0
+
+### Patch Changes
+
+- Updated dependencies [e3fc007]
+  - @lowdefy/logger@5.2.0
+  - @lowdefy/errors@5.2.0
+  - @lowdefy/helpers@5.2.0
+  - @lowdefy/node-utils@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.1.0
+- @lowdefy/helpers@5.1.0
+- @lowdefy/logger@5.1.0
+- @lowdefy/node-utils@5.1.0
+
+## 5.0.0
+
+### Minor Changes
+
+- deac108c66: feat: Add `lowdefy upgrade` command with prompt-based codemod system
+
+  New CLI command that guides version migrations using markdown prompts. Resolves a chain of upgrade phases from current to target version, presents migration prompts in order, and tracks progress for `--resume` support.
+
+  **CLI (`lowdefy`)**
+
+  - `lowdefy upgrade` command with `--to`, `--plan`, `--resume` options
+  - Version chain resolver computes ordered upgrade phases from semver ranges
+  - Fetches `@lowdefy/codemods` package from npm, presents migration prompts
+  - Each prompt can be copied to clipboard for AI tools, viewed as a manual guide, or skipped
+  - Upgrade state persistence in `.lowdefy/upgrade-state.json` for interrupted upgrades
+  - Build-time warning when skipped codemods are detected
+
+  **Codemods (`@lowdefy/codemods`)**
+
+  - v5.0 entry with 20 migration prompts
+  - Covers antd v6 upgrade (14 prompts), layout grid migration (4 prompts), dayjs migration (2 prompts)
+  - Self-contained markdown prompts with context, examples, edge cases, and verification steps
+
+### Patch Changes
+
+- Updated dependencies [905d5d406]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/helpers@5.0.0
+  - @lowdefy/node-utils@5.0.0
+  - @lowdefy/logger@5.0.0
+  - @lowdefy/errors@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.3
+- @lowdefy/helpers@4.7.3
+- @lowdefy/logger@4.7.3
+- @lowdefy/node-utils@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.2
+- @lowdefy/helpers@4.7.2
+- @lowdefy/logger@4.7.2
+- @lowdefy/node-utils@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.1
+- @lowdefy/helpers@4.7.1
+- @lowdefy/logger@4.7.1
+- @lowdefy/node-utils@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- cbd74a72b: fix(cli): Exit process and stop spinner on build errors.
+
+  The CLI error handler logged errors but never called `process.exit(1)`, so the process continued running with a spinning indicator after a build failure. Added `process.exit(1)` to `runCommand` after error handling, and added `{ spin: 'fail' }` to stop the spinner in `runLowdefyBuild`, `runNextBuild`, and `installServer` catch blocks.
+
+- 5716be2c8: fix(cli): Remove install skip for local builds
+
+  Removed the early return in `installServer.js` when `lowdefyVersion === 'local'`. The build pipeline adds custom plugins to server's `package.json` via `addCustomPluginsAsDeps`, then runs `pnpm install` to link them. Skipping install for local versions meant plugins were never linked, breaking deploys (e.g. Vercel docs deploy failing with `ERR_MODULE_NOT_FOUND`).
+
+- e2666d58c: fix(cli): Fix port availability check for start command
+
+  The CLI's `checkPortAvailable` was called with `undefined` port when no `--port` flag was passed, causing `net.listen(undefined)` to bind a random port instead of checking port 3000. Added default `port: 3000` in `getOptions`. Removed redundant `checkPortAvailable` from server-dev manager since the CLI now catches port conflicts before the server starts.
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/logger@4.7.0
+  - @lowdefy/node-utils@4.7.0
+  - @lowdefy/errors@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- 5e03091ee: Add e2e testing package for Lowdefy apps
+
+  **@lowdefy/e2e-utils** (new package)
+
+  - Locator-first API via `ldf` Playwright fixture: `ldf.block('id').do.*`, `ldf.block('id').expect.*`
+  - Request mocking with static YAML files (`mocks.yaml`) and inline per-test overrides
+  - Request assertion API: `ldf.request('id').expect.toFinish()`, `.toHaveResponse()`, `.toHavePayload()`
+  - State and URL assertions: `ldf.state('key').expect.toBe()`, `ldf.url().expect.toBe()`
+  - Manifest generation from build artifacts for block type resolution and helper loading
+  - `createConfig()` and `createMultiAppConfig()` for Playwright config with automatic build/server management
+  - Scaffold command (`npx @lowdefy/e2e-utils`) for project setup with templates and dependency management
+  - Block helper factory with auto-provided expect methods (visible, hidden, disabled, validation)
+
+  **@lowdefy/cli**
+
+  - Add `--server` option to `lowdefy build` for server variant selection (e.g., `--server e2e`)
+
+  **@lowdefy/client**
+
+  - Expose `window.lowdefy` when `stage="e2e"` for e2e state/validation access
+
+  **@lowdefy/blocks-antd**
+
+  - Flatten e2e helper APIs for polymorphic proxy compatibility
+  - Add TextArea e2e helper
+
+  **@lowdefy/block-dev-e2e**
+
+  - Remove unused srcDir variable
+
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+- f673e3ab3d: feat(logger): Add centralized @lowdefy/logger package and standardize logging
+
+  **New @lowdefy/logger Package**
+
+  - Centralized logging with environment-specific subpaths: `/node`, `/cli`, `/browser`
+  - `createNodeLogger` — pino factory with custom error serializer preserving Lowdefy error metadata (source, configKey, isServiceError)
+  - `createCliLogger` — wraps `createPrint` (ora spinners, colored output) with standard logger interface
+  - `createBrowserLogger` — maps to `console.*` with error formatting
+  - `wrapErrorLogger` — formats Lowdefy errors, emits source as separate `{ print: 'link' }` line for blue clickable links
+
+  **Standardized `.ui` Interface**
+
+  All logger variants expose `logger.ui` with consistent methods: `log`, `dim`, `info`, `warn`, `error`, `debug`, `link`, `spin`, `succeed`. This allows any component to emit structured output without knowing the runtime environment.
+
+  - `dim` renders as dimmed text in the CLI — useful for low-priority trace lines (e.g., request logs) that shouldn't compete visually with build output
+
+  **CLI Logger Migration**
+
+  - CLI now uses `createCliLogger` instead of raw `createPrint`
+  - `context.print` replaced with `context.logger` / `context.logger.ui`
+  - `createPrint` and `createStdOutLineHandler` moved from CLI to `@lowdefy/logger/cli`
+
+  **Server-Dev stdio:inherit**
+
+  - Server process spawned with `stdio: ['ignore', 'inherit', 'pipe']`
+  - Server pino JSON flows directly to manager stdout (inherited by CLI) — eliminates dev stdout line handler
+  - Only stderr piped for error formatting through manager logger
+  - Server `createLogger` includes `print` mixin so CLI can render each line correctly
+
+### Patch Changes
+
+- bb3222a5a: fix(errors): Preserve error cause chains in catch-and-rethrow blocks across plugins and CLI
+- 7e7343473: Fix env vars not being passed to Next.js build subprocess. The `env` object was passed as a separate parameter to `spawnProcess` instead of inside `processOptions`, so `NEXT_TELEMETRY_DISABLED` was silently ignored during `next build`.
+- Add port-in-use check with clear error message before starting server.
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+- Updated dependencies [f673e3ab3d]
+- Updated dependencies [f673e3ab3]
+  - @lowdefy/errors@4.6.0
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/node-utils@4.6.0
+  - @lowdefy/logger@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.2
+- @lowdefy/node-utils@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.1
+- @lowdefy/node-utils@4.5.1
+
+## 4.5.0
+
+### Minor Changes
+
+- abc90f3f7: Change to Apache 2.0 license for all packages. All license checks and restrictions have been removed.
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.0
+- @lowdefy/node-utils@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

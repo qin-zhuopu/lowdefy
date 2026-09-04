@@ -1,0 +1,598 @@
+# Build Pipeline Architecture
+
+How Lowdefy transforms YAML configuration into a running Next.js application.
+
+## Overview
+
+The build pipeline is an 8-phase process (Phases 0–7) that:
+1. Fetches module sources (GitHub tarballs, local paths)
+2. Parses module manifests and resolves module-level operators
+3. Loads and resolves all `_ref` operators recursively (including module refs)
+4. Scopes module IDs and merges modules into app components
+5. Validates configuration against schemas
+6. Processes pages, blocks, connections, and auth
+7. Extracts and hashes JavaScript code, generates type manifests
+8. Outputs JSON artifacts for the Next.js server
+
+## Entry Points
+
+### CLI Build Command
+
+**File:** `packages/cli/src/commands/build/build.js`
+
+```
+1. getServer() - Fetch @lowdefy/server package
+2. resetServerPackageJson() - Reset to clean state
+3. addCustomPluginsAsDeps() - Register custom plugins
+4. installServer() - Run npm install
+5. runLowdefyBuild() - Execute core build (pnpm run build:lowdefy)
+6. installServer() - Second install for updated deps
+7. runNextBuild() - Build Next.js app
+```
+
+### Dev Command
+
+**File:** `packages/cli/src/commands/dev/dev.js`
+
+Uses `@lowdefy/server-dev` instead of `@lowdefy/server`, outputs to `directories.dev`.
+
+## Directory Structure
+
+**File:** `packages/cli/src/utils/getDirectories.js`
+
+```
+.lowdefy/
+├── server/
+│   └── build/                    # Production build output
+│       ├── config.json
+│       ├── app.json
+│       ├── auth.json
+│       ├── global.json
+│       ├── menus.json
+│       ├── keyMap.json
+│       ├── refMap.json
+│       ├── types.json
+│       ├── pages/
+│       │   ├── {pageId}.json
+│       │   └── {pageId}/requests/{requestId}.json
+│       ├── connections/{connectionId}.json
+│       ├── api/{endpointId}.json
+│       └── plugins/
+│           ├── actionSchemas.json     # Action param schemas (for runtime validation)
+│           ├── blockSchemas.json      # Block property schemas (for runtime validation)
+│           ├── blockMetas.json        # Block runtime metadata (category, valueType, initValue)
+│           ├── operatorSchemas.json   # Operator param schemas (for runtime validation)
+│           └── operators/
+│               ├── clientJsMap.js
+│               └── serverJsMap.js
+└── dev/                          # Development output
+```
+
+## Core Build Pipeline
+
+**File:** `packages/build/src/index.js`
+
+### Phase 0: Fetch Modules
+
+```javascript
+fetchModules()      // Download GitHub tarballs, resolve local file: paths
+```
+
+Runs inside the build process. GitHub modules are cached in `.lowdefy/modules/`. Local `file:` sources resolve to disk paths. See [module-fetching.md](module-fetching.md).
+
+### Phase 1: Build Module Definitions
+
+```javascript
+buildModuleDefs()   // Three-phase module processing:
+                    // 1a. Local resolve — _ref + _module.var, extract exports/deps
+                    // 1b. Validate wiring — auto-wire + validate dependency mappings
+                    // 1c. Full resolve — cross-module _ref + _module.*Id operators
+```
+
+Processes modules in three steps to support mutual dependencies (e.g., contacts ↔ companies):
+
+1. **Local resolve** — For each module, walk `module.lowdefy.yaml` with `shouldStop` preserving pages, API, connections, and menu link content. Local `_ref`s, `_module.var`, and `_build.*` resolve, producing concrete `components` and `menus` arrays. Extract `dependencies` and `exports` declarations.
+2. **Validate wiring** — `resolveModuleDependencies` auto-wires dependencies by exact name match, then validates all mappings (no unmapped deps, no unknown keys, targets exist, no self-references).
+3. **Full resolve** — Walk each manifest again with `moduleDependencies` set. Cross-module `_ref: { module, component }` looks up content in concrete arrays from step 1. `_module.*Id: { id, module }` operators validate against target exports.
+
+After Phase 1, `context.modules` contains fully resolved manifests with all cross-module refs inlined and all `_module.*Id` operators resolved to concrete string IDs. See [module-system.md](module-system.md) for details.
+
+### Phase 2: Ref Resolution
+
+```javascript
+createContext()     // Initialize build context
+buildRefs()         // Load and resolve all _ref operators
+                    // EXTENDED: handles _ref { module, component/menu }
+```
+
+When the walker encounters `_ref: { module, component }`, it calls `getModuleRefContent` to look up the export in the already-resolved manifest from Phase 1.
+
+### Phase 3: Build Modules
+
+```javascript
+buildModules()      // Scope IDs, merge into app components
+```
+
+By Phase 3, all `_module.*Id` operators have already been resolved to concrete string IDs by the walker (Phase 1 full resolve and Phase 2 component/menu refs). Phase 3 only does structural work: prefixes page/connection/API/menu IDs with `{entryId}/` and appends module content to the app's `components`. See [module-system.md](module-system.md).
+
+### Phase 4: Schema Validation
+
+```javascript
+testSchema()        // Validate against schema (unchanged)
+```
+
+### Phase 5: Domain Building
+
+```javascript
+buildApp()          // Process app.html, app.git_sha
+validateConfig()    // Validate basePath and config
+addDefaultPages()   // Generate 404 if missing
+buildAuth()         // Process authentication (MODIFIED: wildcard auth matching)
+buildConnections()  // Process data connections
+buildApi()          // Process API endpoints
+buildPages()        // Process pages, blocks, requests
+buildMenu()         // Build navigation structure
+```
+
+Auth matching now supports wildcard glob patterns (`team-users/*`) for module page access rules.
+
+### Phase 6: Finalization
+
+```javascript
+buildJs()           // Extract and hash JS functions
+addKeys()           // Add path tracking metadata
+buildTypes()        // Create types manifest
+buildImports()      // Generate import statements
+```
+
+### Phase 7: File Writing
+
+```javascript
+cleanBuildDirectory()
+writeApp(), writeAuth(), writeConfig()
+writeConnections(), writePages(), writeRequests()
+writeApi(), writeGlobal(), writeMenus()
+writeMaps(), writeTypes(), writePluginImports()
+// writePluginImports includes:
+//   - Import files (blocks.js, actions.js, operators/*.js, etc.)
+//   - Schema maps (blockSchemas.json, actionSchemas.json, operatorSchemas.json)
+```
+
+## The buildRefs System
+
+**File:** `packages/build/src/build/buildRefs/buildRefs.js`
+
+The `_ref` operator system resolves all configuration file references in a single async tree walk.
+
+### How It Works: Single-Pass Walker
+
+**File:** `packages/build/src/build/buildRefs/walker.js`
+
+The walker replaces the old multi-pass `recursiveBuild` pipeline (which used 5+ `serializer.copy` JSON round-trips per ref) with a single `resolve()` function that handles `_ref`, `_var`, `_module.var`, and `_build.*` operators in one traversal.
+
+**Traversal order:**
+- **Top-down:** `_ref` is detected _before_ descending into children (intercepts the whole subtree)
+- **Bottom-up:** `_var`, `_module.var`, `_module.*Id`, and `_build.*` operators evaluate _after_ all children have resolved
+
+**Core `resolve(node, ctx)` flow:**
+
+1. Primitives pass through unchanged
+2. `_ref` objects → `resolveRef()` (or create `~shallow` marker if `ctx.shouldStop` matches)
+   - For `_ref: { module, component/menu }` → `getModuleRefContent()` looks up the export in the resolved manifest
+3. Arrays/objects → walk children in-place, then:
+   a. `_var` → `resolveVar()`, re-walk result
+   b. `_module.var` → `resolveModuleVar()` (reads consumer value from `ctx.moduleEntry.consumerVars`, otherwise lazy-resolves the manifest default and caches on `ctx.moduleEntry.resolvedVarCache`)
+   c. `_module.*Id` → `resolveModuleIdOperator()` (reads from `ctx.moduleEntry`, validates against exports)
+   d. `_build.*` → `evaluateOperators()` with `_build.` prefix
+
+**`resolveRef()` steps:**
+
+1. Create ref definition and register in `refMap`
+2. Store unresolved vars (before mutation) for JIT rebuild
+3. Resolve dynamic path/vars/key via recursive `resolve()` in parent context
+4. Update `refMap` with resolved path
+5. Circular reference detection via `ctx.refChain`
+6. Load content via `getRefContent()`
+7. Create child context with `forRef()` (new vars, refChain copy)
+8. Walk content recursively
+9. Run transformer (optional)
+10. Extract key (`_ref.key`)
+11. Tag all result nodes with `~r` provenance via `tagRefDeep()`
+12. Propagate `~ignoreBuildChecks` marker
+
+**`WalkContext`** carries immutable context through the walk:
+- `child(segment)` — appends to JSON path for stop-path matching
+- `forRef()` — creates child context for entering a new file (new vars, fresh refChain Set copy); for cross-module refs, switches `moduleEntry`, `moduleDependencies`, and `packageRoot` to the target module's values
+- `moduleEntry` — the module entry object, propagated through both `child()` and `forRef()` (constant across all nesting depths within a module). Carries `id`, `connections` (remapping), `exports` (validation), `consumerVars` (raw vars passed by the app), `varDefs` (raw manifest declarations including unresolved `default` expressions), and `resolvedVarCache` (lazy resolution cache)
+- `moduleDependencies` — maps abstract dependency names to concrete entry IDs
+- `moduleRoot` — module root directory; used by `resolveRef` to resolve relative `_ref` paths against the module root in every module-context walk. During Phase 1a (when `moduleEntry` is not yet populated) it also signals the walker to preserve `_module.var` for the full-resolve pass instead of throwing
+- Path tracks through ref boundaries, enabling `shouldStop` to match `pages.*.blocks` paths
+
+**`evaluateStaticOperators`** runs once at the end (not per-file) using `evaluateOperators` from `@lowdefy/operators`.
+
+### _ref Object Structure
+
+```yaml
+_ref:
+  path: "blocks/header.yaml"    # File path
+  vars:                         # Template variables
+    title: "My Title"
+  key: "blocks[0]"              # Extract specific key
+  resolver: "./customResolver"  # Custom resolver function
+  transformer: "./transform"    # Custom transformer
+```
+
+### File Parsing
+
+**File:** `packages/build/src/build/buildRefs/parseRefContent.js`
+
+| Extension | Parser |
+|-----------|--------|
+| `.yaml`, `.yml` | yaml library |
+| `.json` | JSON5 (supports comments) |
+| `.njk` | Nunjucks → detect final extension |
+
+## Component Building
+
+### Connections
+
+**File:** `packages/build/src/build/buildConnections.js`
+
+- Rename `id` to `connectionId`
+- Set `id` to `connection:{connectionId}`
+- Count operator types in properties
+
+### Pages
+
+**File:** `packages/build/src/build/buildPages/buildPages.js`
+
+For each page:
+- Validate pageId
+- Process nested blocks via `buildBlock()`
+- Collect requests from blocks
+
+### buildBlock
+
+**File:** `packages/build/src/build/buildPages/buildBlock/buildBlock.js`
+
+```javascript
+validateBlock()             // Check structure
+setBlockId()                // Assign unique ID
+normalizeLayout()           // Normalize layout config
+moveAreasToSlots()          // Deprecation: areas → slots
+countBlockOperators()       // Count operator usage
+buildEvents()               // Process on* handlers
+buildRequests()             // Extract requests
+normalizeClassAndStyles()   // Normalize class/style to canonical form
+moveSubBlocksToSlot()       // blocks → slots.content.blocks
+moveSkeletonBlocksToSlot()  // Handle skeleton block markers
+validateSlots()             // Validate slot structure
+countBlockTypes()           // Track usage
+buildSubBlocks()            // Recurse into children
+```
+
+### Menus
+
+**File:** `packages/build/src/build/buildMenu.js`
+
+- Generate default menu from pages if none specified
+- Validate referenced pages exist
+- Set menu item auth from page auth
+
+## JavaScript Extraction
+
+**File:** `packages/build/src/build/buildJs/buildJs.js`
+
+1. Scan component tree for `_js` operators
+2. Hash each function body (SHA1 for deduplication)
+3. Store in `context.jsMap.client` or `context.jsMap.server`
+4. Replace `_js` value with hash in config
+5. Generate import files:
+   - `plugins/operators/clientJsMap.js`
+   - `plugins/operators/serverJsMap.js`
+
+### Generated Code Template
+
+```javascript
+export default {
+  'hash1': ({ actions, event, input, ... }) => { /* function body */ },
+  'hash2': ({ item, payload, secrets, ... }) => { /* function body */ },
+};
+```
+
+## Key Mapping & Tracking
+
+**File:** `packages/build/src/build/addKeys.js`
+
+After all components are built:
+1. Traverse entire tree recursively
+2. Create `keyMap` entries with dot-notation paths
+3. Attach `~k` property pointing to keyMap entry
+4. Remove `~r` property (no longer needed)
+
+Arrays use the `~arr` serializer wrapper to preserve `~k`, `~r`, and `~l` through JSON round-trips. Servers deserialize build artifacts with `serializer.deserialize()` to restore these markers at runtime.
+
+**Purpose:** Enable runtime error messages with exact YAML locations.
+
+## Types Manifest
+
+**File:** `packages/build/src/build/buildTypes.js`
+
+Builds manifest of used component types:
+- Count all types via `context.typeCounters`
+- Add mandatory types (Message, validators)
+- Add default blocks (loaders, basic)
+
+Output: `types.json` - used by server for validation and plugin loading.
+
+## Context Object
+
+**File:** `packages/build/src/createContext.js`
+
+```javascript
+context = {
+  directories: { config, build, server, dev },
+  jsMap: { client: {}, server: {} },
+  keyMap: {},
+  refMap: {},
+  logger,               // Wrapped with ConfigWarning/ConfigError formatting
+  readConfigFile,
+  writeBuildArtifact,
+  refResolver,
+  seenSourceLines,       // Set for deduplicating warnings by source:line
+  stage: 'prod' | 'dev',
+  typeCounters: {
+    actions, auth, blocks, connections,
+    requests, operators: { client, server }
+  },
+  typesMap
+}
+```
+
+`createContext` wraps `logger.warn` and `logger.error` to handle `ConfigWarning`/`ConfigError` formatting with deduplication. It detects Pino loggers (via `logger.child`) vs console loggers and formats output accordingly:
+- **Pino**: `logger.warn({ source }, message)` (structured JSON)
+- **Console**: `logger.warn('message\n    at source')` (plain text)
+
+## Build Flow Diagram
+
+```
+CLI: build command
+     ↓
+getServer() → resetServerPackageJson() → addCustomPluginsAsDeps()
+     ↓
+installServer() → runLowdefyBuild()
+     ↓
+[packages/build/src/index.js] build()
+     ↓
+fetchModules() → buildModuleDefs()
+  ├─ Fetch GitHub tarballs / resolve local paths
+  ├─ Local resolve: parse each module.lowdefy.yaml, resolve local _ref + _module.var
+  ├─ Extract exports + dependencies, validate plugin deps + secret allowlists
+  ├─ Validate wiring: auto-wire dependencies by name match, validate mappings
+  └─ Full resolve: resolve cross-module _ref + _module.*Id operators
+     ↓
+createContext() → buildRefs()
+  ├─ Start with lowdefy.yaml
+  ├─ Recursively scan for _ref (incl. _ref { module, component/menu })
+  ├─ Load/parse files
+  ├─ Process _var templates
+  ├─ Apply transformers
+  └─ Evaluate _build.* operators
+     ↓
+buildModules()
+  ├─ Scope IDs (prefix pages, connections, APIs, menus with entryId/)
+  ├─ Scope menu item IDs (scopeMenuItemIds)
+  └─ Merge into app components
+     ↓
+testSchema() → buildApp() → buildAuth() → buildConnections()
+     ↓
+buildApi() → buildPages() → buildMenu()
+     ↓
+buildJs() → addKeys() → buildTypes() → buildImports()
+     ↓
+cleanBuildDirectory() → Write all artifacts
+     ↓
+.lowdefy/server/build/ populated
+     ↓
+installServer() → runNextBuild()
+     ↓
+Complete Next.js app in .lowdefy/server/
+```
+
+## Data Transformation Stages
+
+**Stage 1: Raw YAML**
+```yaml
+pages:
+  - id: home
+    blocks:
+      - _ref: blocks/header.yaml
+```
+
+**Stage 2: After buildRefs**
+```javascript
+{
+  pages: [{
+    id: 'home',
+    blocks: [{ type: 'Header', properties: {...} }],
+    '~r': refId1,  // Track original file
+  }]
+}
+```
+
+**Stage 3: After buildPages**
+```javascript
+{
+  pages: [{
+    pageId: 'home',
+    id: 'page:home',
+    blocks: [{
+      blockId: 'block0',
+      id: 'page:home:block:block0',
+      type: 'Header'
+    }],
+    requests: [...]
+  }]
+}
+```
+
+**Stage 4: Final Output**
+```json
+{
+  "pageId": "home",
+  "id": "page:home",
+  "blocks": [...],
+  "~k": "keyId123"
+}
+```
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `packages/cli/src/commands/build/build.js` | CLI orchestration |
+| `packages/build/src/index.js` | Main pipeline |
+| `packages/build/src/build/fetchModules.js` | Module source fetching (GitHub tarballs, local paths) |
+| `packages/build/src/build/buildModuleDefs.js` | Module manifest parsing, var resolution, validation |
+| `packages/build/src/build/buildModules.js` | ID scoping (prefix with entryId), merging into components |
+| `packages/build/src/build/resolveModuleOperators.js` | `scopeMenuItemIds` — prefixes menu item IDs with entry ID |
+| `packages/build/src/build/resolveDepTarget.js` | Shared utility for cross-module dependency name resolution |
+| `packages/build/src/build/buildRefs/buildRefs.js` | _ref resolution entry point |
+| `packages/build/src/build/buildRefs/walker.js` | Single-pass async tree walker (`resolve`, `resolveRef`, `resolveVar`, `resolveModuleVar`, `resolveModuleIdOperator`, `WalkContext`) |
+| `packages/build/src/build/buildRefs/getModuleRefContent.js` | Resolve `_ref: { module, component/menu }` |
+| `packages/operators/src/evaluateOperators.js` | In-place operator evaluator (replaces `BuildParser`) |
+| `packages/build/src/build/buildRefs/evaluateStaticOperators.js` | Post-walk static operator pass |
+| `packages/build/src/createContext.js` | Context initialization |
+| `packages/build/src/build/buildPages/buildPages.js` | Page processing |
+| `packages/build/src/build/buildMenu.js` | Menu building |
+| `packages/build/src/build/buildJs/buildJs.js` | JS extraction |
+| `packages/build/src/build/addKeys.js` | Path tracking |
+| `packages/build/src/build/buildTypes.js` | Type manifest |
+| `packages/build/src/build/writePluginImports/writeBlockSchemaMap.js` | Block schema collection |
+| `packages/build/src/build/writePluginImports/writeActionSchemaMap.js` | Action schema collection |
+| `packages/build/src/build/writePluginImports/writeOperatorSchemaMap.js` | Operator schema collection |
+
+## Dev Mode: Shallow Build + JIT Page Build
+
+In development, the build uses a two-phase strategy for faster rebuilds.
+
+### Phase 1: Shallow Build (`shallowBuild`)
+
+**File:** `packages/build/src/build/jit/shallowBuild.js`
+
+Runs the full build pipeline but stops `_ref` resolution at page content boundaries. The walker's `shouldStop` callback uses semantic path matching:
+
+**File:** `packages/build/src/build/jit/isPageContentPath.js`
+
+```javascript
+const PAGE_CONTENT_KEYS = ['blocks', 'areas', 'slots', 'events', 'requests', 'layout'];
+
+function isPageContentPath(jsonPath) {
+  if (!jsonPath.startsWith('pages.')) return false;
+  const segments = jsonPath.split('.');
+  for (let i = 1; i < segments.length; i++) {
+    if (PAGE_CONTENT_KEYS.includes(segments[i])) return true;
+  }
+  return false;
+}
+```
+
+When the walker encounters a `_ref` at a matching path, it creates a `~shallow` marker instead of resolving:
+
+```javascript
+{ '~shallow': true, _ref: { path: 'components/header.yaml' }, _refId: 'ref123' }
+```
+
+The walker also deletes page content keys (`blocks`, `areas`, `events`, `requests`, `layout`) from page objects during traversal, preventing unnecessary `_build.*` evaluation on content that will be resolved later by JIT.
+
+The shallow build then:
+1. Collects **skeleton source files** from `~r` markers on non-page components (before `addKeys` removes them)
+2. Collects all string content from pages via `collectPageContent()` into `context.tailwindContentMap` (before stripping)
+3. Strips page content keys from pages (`stripPageContent`)
+4. Runs skeleton build steps (buildApp, buildAuth, buildConnections, buildApi, buildMenu)
+5. Creates a **page registry** with page metadata and source file references
+6. Adds all types from installed packages (since page-level types aren't counted)
+7. Writes skeleton artifacts + `pageRegistry.json` + `jsMap.json` + `skeletonSourceFiles.json`
+8. Writes per-page tailwind HTML files via `writeGlobalsCss` (from `tailwindContentMap`)
+
+**Output:** `{ components, pageRegistry, context }`
+
+### Phase 2: JIT Page Build (`buildPageJit`)
+
+**File:** `packages/build/src/build/jit/buildPageJit.js`
+
+When a page is requested, uses the walker to resolve page content:
+
+```
+1. Look up page in pageRegistry
+2. Resolve unresolved vars (if any) via walker's resolve() with fresh WalkContext
+3. Load page file content via getRefContent/makeRefDefinition
+4. Walk content with resolve() (shouldStop: null — JIT resolves everything)
+5. evaluateStaticOperators()
+6. tagRefDeep() on result
+7. addKeys() — add ~k tracking metadata
+8. buildPage() — validate blocks, process events, extract requests
+9. validatePageTypes() — check block/action/operator types exist
+10. validateLinkReferences(), validateStateReferences(), etc.
+11. jsMapParser() — extract _js functions (client + server)
+12. writePageJit() — write page JSON, request JSONs, updated keyMap/refMap/jsMap, per-page tailwind HTML
+```
+
+### Supporting Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| `collectSkeletonSourceFiles` | `jit/collectSkeletonSourceFiles.js` | Walks `~r` markers to derive skeleton source file set for watcher |
+| `createPageRegistry` | `jit/createPageRegistry.js` | Extracts page metadata + raw content from shallow-built components |
+| `createFileDependencyMap` | `jit/createFileDependencyMap.js` | Maps config files → page IDs for targeted invalidation |
+| `writePageRegistry` | `jit/writePageRegistry.js` | Serializes page registry to `pageRegistry.json` |
+| `writePageJit` | `jit/writePageJit.js` | Writes page/request JSONs + updated maps + JS files + per-page tailwind HTML |
+| `collectPageContent` | `collectPageContent.js` | Extracts all string content from page blocks for Tailwind scanning |
+| `isPageContentPath` | `jit/isPageContentPath.js` | Semantic segment matching for stop paths |
+| `pageContentKeys` | `jit/pageContentKeys.js` | List of page content keys (`blocks`, `areas`, etc.) |
+
+### Dev Entry Point
+
+**File:** `packages/build/src/indexDev.js`
+
+```javascript
+export { default as shallowBuild } from './build/shallowBuild.js';
+export { default as buildPageJit } from './build/buildPageJit.js';
+export { default as createPageRegistry } from './build/createPageRegistry.js';
+export { default as createFileDependencyMap } from './build/createFileDependencyMap.js';
+export { default as createContext } from './createContext.js';
+```
+
+Imported by the dev server as `@lowdefy/build/dev`.
+
+### Build Output (Dev Mode)
+
+In dev mode, the build directory contains additional JIT artifacts:
+
+```
+.lowdefy/dev/
+├── build/
+│   ├── pageRegistry.json      # Page metadata + source refs for JIT
+│   ├── jsMap.json             # JS hash maps (restored by JIT build context)
+│   ├── skeletonSourceFiles.json # Source files that affect skeleton (for watcher)
+│   ├── invalidatePages        # Timestamp file — triggers JIT cache invalidation
+│   ├── globals.css            # Generated CSS with @source, @theme, layer order
+│   ├── tailwind-candidates.css # Trigger file for CSS recompilation
+│   ├── pages/{pageId}/        # Written by JIT build on first request
+│   │   ├── {pageId}.json
+│   │   └── requests/{requestId}.json
+│   └── ... (standard skeleton artifacts)
+├── lowdefy-build/
+│   └── tailwind/              # Per-page content files for Tailwind scanning
+│       ├── {pageId1}.html     # Written by skeleton build + updated by JIT/watcher
+│       └── {pageId2}.html
+└── public/
+    └── tailwind-jit.css       # Compiled CSS output (PostCSS + Tailwind)
+```
+
+## Customization Points
+
+1. **Custom Ref Resolvers**: `--refResolver` or `LOWDEFY_BUILD_REF_RESOLVER`
+2. **Custom Transformers**: Define in `_ref` object
+3. **Custom Plugins**: Via dependencies in package.json
+4. **Build Operators**: `_build.*` operators during buildRefs

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,7 +17,9 @@
 import createAuthorize from '../context/createAuthorize.js';
 
 function testContext({
+  appMeta = {},
   config = {},
+  configDirectory,
   connections = {},
   headers = {},
   logger = {
@@ -34,15 +36,26 @@ function testContext({
   session,
 } = {}) {
   return {
+    appMeta,
     authorize: createAuthorize({ session }),
     config,
+    configDirectory,
     connections,
+    // Mirrors the servers' createHandleError contract: the sink logs the error
+    // and marks it handled, which is what runRoutine's guard and the client's
+    // already-logged check both read.
+    handleError: async (error) => {
+      logger.error(error);
+      error.handled = true;
+    },
     headers,
     logger,
     operators,
     readConfigFile,
     secrets,
     session,
+    steps: {},
+    user: session?.user,
   };
 }
 

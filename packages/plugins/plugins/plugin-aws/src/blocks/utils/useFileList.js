@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -90,7 +90,7 @@ const useFileList = ({ properties, methods, value = {} }) => {
     setValue(nextState);
     methods.setValue(nextState);
   };
-  const loadFileList = (file, nextFiles) => {
+  const loadFileList = async (file, nextFiles) => {
     if (
       properties.singleFile === true &&
       nextFiles.filter((f) => type.isString(f.uid)).length > 1
@@ -103,10 +103,33 @@ const useFileList = ({ properties, methods, value = {} }) => {
     ) {
       return false;
     }
-    setValue({
-      file,
-      fileList: [...nextFiles, ...state.fileList],
+    // Extract file properties into a serialization-safe plain object.
+    // Raw File/Blob objects are destroyed by serializer.copy() in _event resolution.
+    const fileData = {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      lastModified: file.lastModified,
+      uid: file.uid,
+    };
+    if (file instanceof Blob || file instanceof File) {
+      fileData.url = URL.createObjectURL(file);
+    }
+    const result = await methods.triggerEvent({
+      name: 'onBeforeUpload',
+      event: {
+        file: fileData,
+      },
     });
+    if (result.success === false) {
+      return false;
+    }
+    const nextState = {
+      file: fileData,
+      fileList: [...nextFiles, ...state.fileList],
+    };
+    setValue(nextState);
+    methods.setValue(nextState);
   };
   const removeFile = (file) => {
     state.fileList.splice(

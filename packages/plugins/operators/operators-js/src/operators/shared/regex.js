@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,50 +14,53 @@
   limitations under the License.
 */
 
-import { get, type } from '@lowdefy/helpers';
+import { ReservedKeyError, get, type } from '@lowdefy/helpers';
 
 function _regex({ location, params, state }) {
   const pattern = type.isObject(params) ? params.pattern : params;
   if (!type.isString(pattern)) {
-    throw new Error(
-      `Operator Error: _regex.pattern must be a string. Received: ${JSON.stringify(
-        params
-      )} at ${location}.`
-    );
+    throw new Error(`_regex.pattern must be a string.`);
   }
-  let on = !type.isUndefined(params.on) ? params.on : get(state, location);
+  let on = params.on;
+  if (type.isUndefined(on)) {
+    try {
+      on = get(state, location);
+    } catch (error) {
+      // A runtime read: the key comes from app data or an author keypath evaluated at render time,
+      // and there is no config location to attach in the browser. The reserved rule's job — refusing
+      // the read — is already done, so degrade to the miss value rather than crashing the page.
+      if (!(error instanceof ReservedKeyError)) throw error;
+    }
+  }
   if (!type.isUndefined(params.key)) {
     if (!type.isString(params.key)) {
-      throw new Error(
-        `Operator Error: _regex.key must be a string. Received: ${JSON.stringify(
-          params
-        )} at ${location}.`
-      );
+      throw new Error(`_regex.key must be a string.`);
     }
-    on = get(state, params.key);
+    try {
+      on = get(state, params.key);
+    } catch (error) {
+      // A runtime read: the key comes from app data or an author keypath evaluated at render time,
+      // and there is no config location to attach in the browser. The reserved rule's job — refusing
+      // the read — is already done, so degrade to the miss value rather than crashing the page.
+      if (!(error instanceof ReservedKeyError)) throw error;
+      on = undefined;
+    }
   }
 
   if (type.isNone(on)) {
     return false;
   }
   if (!type.isString(on)) {
-    throw new Error(
-      `Operator Error: _regex.on must be a string. Received: ${JSON.stringify(
-        params
-      )} at ${location}.`
-    );
+    throw new Error(`_regex.on must be a string.`);
   }
   try {
     const re = new RegExp(pattern, params.flags || 'gm');
     return re.test(on);
   } catch (e) {
-    // log e to LowdefyError
-    throw new Error(
-      `Operator Error: _regex failed to execute RegExp.test. Received: ${JSON.stringify(
-        params
-      )} at ${location}.`
-    );
+    throw new Error('_regex failed to execute RegExp.test.', { cause: e });
   }
 }
+
+_regex.dynamic = true;
 
 export default _regex;

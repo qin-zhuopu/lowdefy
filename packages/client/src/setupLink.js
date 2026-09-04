@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -26,8 +26,7 @@ function setupLink(lowdefy) {
       const handle = window.open(`${url}${query ? `?${query}` : ''}`, '_blank');
       if (!handle) {
         lowdefy._internal.displayMessage({
-          content:
-            'A popup blocker may be preventing the application from opening the page. Approve the popup to continue.',
+          content: lowdefy._internal.translate('client.popupBlocked'),
           status: 'info',
           duration: 10,
         });

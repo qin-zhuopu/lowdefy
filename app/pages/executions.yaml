@@ -1,0 +1,259 @@
+id: executions
+type: Box
+properties:
+  title: Executions
+requests:
+  - id: listExecutions
+    type: ListExecutions
+    connectionId: runner
+    payload:
+      jobId:
+        _url_query: jobId
+    properties:
+      jobId:
+        _payload: jobId
+  - id: cancelExecution
+    type: CancelExecution
+    connectionId: runner
+    payload:
+      executionId:
+        _state: executionList.$.id
+    properties:
+      executionId:
+        _payload: executionId
+  - id: rerunExecution
+    type: RerunExecution
+    connectionId: runner
+    payload:
+      executionId:
+        _state: executionList.$.id
+    properties:
+      executionId:
+        _payload: executionId
+  - id: deleteExecution
+    type: DeleteExecution
+    connectionId: runner
+    payload:
+      executionId:
+        _state: executionList.$.id
+    properties:
+      executionId:
+        _payload: executionId
+events:
+  onInit:
+    - id: fetchExecutions
+      type: Request
+      params: listExecutions
+blocks:
+  - id: header
+    type: Title
+    properties:
+      content: Execution history
+      level: 2
+
+  - id: toolbar
+    type: Box
+    layout:
+      gap: 8
+      justify: flex-start
+    blocks:
+      - id: backBtn
+        type: Button
+        layout:
+          flex: 0 0 auto
+        properties:
+          title: Back to jobs
+          icon: AiOutlineArrowLeft
+          color: default
+          variant: outlined
+        events:
+          onClick:
+            - id: goToJobs
+              type: Link
+              params:
+                pageId: jobs
+      - id: refreshExecBtn
+        type: Button
+        layout:
+          flex: 0 0 auto
+        properties:
+          title: Refresh
+          icon: AiOutlineReload
+          color: default
+          variant: outlined
+        events:
+          onClick:
+            - id: refreshExecutions
+              type: Request
+              params: listExecutions
+
+  - id: executionList
+    type: List
+    properties:
+      data:
+        _request: listExecutions
+    blocks:
+      - id: execRow
+        type: Card
+        properties:
+          size: small
+          title:
+            _string.concat:
+              - 'Execution '
+              - _state: executionList.$.id
+        blocks:
+          - id: execStatus
+            type: Tag
+            layout:
+              flex: 0 0 auto
+            properties:
+              title:
+                _state: executionList.$.status
+              color:
+                _switch:
+                  branches:
+                    - if:
+                        _eq:
+                          - _state: executionList.$.status
+                          - success
+                      then: success
+                    - if:
+                        _eq:
+                          - _state: executionList.$.status
+                          - failed
+                      then: error
+                    - if:
+                        _eq:
+                          - _state: executionList.$.status
+                          - running
+                      then: processing
+                    - if:
+                        _eq:
+                          - _state: executionList.$.status
+                          - queued
+                      then: warning
+                  default: default
+          - id: execMeta
+            type: Html
+            properties:
+              html:
+                _string.concat:
+                  - '<div style="font-family:monospace;font-size:12px;color:#555;">exit_code: '
+                  - _if_none:
+                      - _state: executionList.$.exit_code
+                      - '-'
+                  - ' | queued_at: '
+                  - _if_none:
+                      - _state: executionList.$.queued_at
+                      - '-'
+                  - ' | started_at: '
+                  - _if_none:
+                      - _state: executionList.$.started_at
+                      - '-'
+                  - ' | finished_at: '
+                  - _if_none:
+                      - _state: executionList.$.finished_at
+                      - '-'
+                  - '</div>'
+          - id: execActions
+            type: Box
+            layout:
+              gap: 8
+              justify: flex-start
+            blocks:
+              - id: viewBtn
+                type: Button
+                layout:
+                  flex: 0 0 auto
+                properties:
+                  title: Console
+                  icon: AiOutlineCode
+                  color: primary
+                  variant: solid
+                events:
+                  onClick:
+                    - id: goToExecution
+                      type: Link
+                      params:
+                        pageId: execution
+                        urlQuery:
+                          executionId:
+                            _state: executionList.$.id
+              - id: cancelBtn
+                type: Button
+                layout:
+                  flex: 0 0 auto
+                properties:
+                  title: Cancel
+                  icon: AiOutlineStop
+                  color: danger
+                  variant: outlined
+                  disabled:
+                    _and:
+                      - _ne:
+                          - _state: executionList.$.status
+                          - running
+                      - _ne:
+                          - _state: executionList.$.status
+                          - queued
+                events:
+                  onClick:
+                    - id: doCancel
+                      type: Request
+                      params: cancelExecution
+                    - id: refreshAfterCancel
+                      type: Request
+                      params: listExecutions
+                    - id: cancelMsg
+                      type: DisplayMessage
+                      params:
+                        content: Cancellation requested
+                        status: info
+              - id: rerunBtn
+                type: Button
+                layout:
+                  flex: 0 0 auto
+                properties:
+                  title: Rerun
+                  icon: AiOutlineRedo
+                  color: default
+                  variant: outlined
+                events:
+                  onClick:
+                    - id: doRerun
+                      type: Request
+                      params: rerunExecution
+                    - id: refreshAfterRerun
+                      type: Request
+                      params: listExecutions
+                    - id: rerunMsg
+                      type: DisplayMessage
+                      params:
+                        content: Rerun queued
+                        status: success
+              - id: deleteExecBtn
+                type: Button
+                layout:
+                  flex: 0 0 auto
+                properties:
+                  title: Delete
+                  icon: AiOutlineDelete
+                  color: danger
+                  variant: outlined
+                  disabled:
+                    _eq:
+                      - _state: executionList.$.status
+                      - running
+                events:
+                  onClick:
+                    - id: doDeleteExec
+                      type: Request
+                      params: deleteExecution
+                    - id: refreshAfterDeleteExec
+                      type: Request
+                      params: listExecutions
+                    - id: deleteExecMsg
+                      type: DisplayMessage
+                      params:
+                        content: Execution deleted
+                        status: success

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -13,8 +13,6 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
-
-import { makeCssClass } from '@lowdefy/block-utils';
 
 import stubBlockProps from './stubBlockProps.js';
 
@@ -32,7 +30,6 @@ const mockBlock = ({ meta, schema }) => {
   const triggerEvent = jest.fn();
   const unshiftItem = jest.fn();
   const methods = {
-    makeCssClass,
     moveItemDown,
     moveItemUp,
     pushItem,

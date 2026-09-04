@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,51 +16,61 @@
 
 import React from 'react';
 import { AutoComplete } from 'antd';
-import { blockDefaultProps } from '@lowdefy/block-utils';
 import { type } from '@lowdefy/helpers';
 
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
 
 const Option = AutoComplete.Option;
 
 const AutoCompleteInput = ({
   blockId,
+  classNames = {},
   components,
   events,
   loading,
   methods,
   properties,
   required,
+  styles = {},
   validation,
   value,
 }) => {
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={components}
       events={events}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       validation={validation}
       required={required}
+      styles={styles}
       content={{
         content: () => (
           <AutoComplete
             id={`${blockId}_input`}
             autoFocus={properties.autoFocus}
             backfill={properties.backfill}
-            bordered={properties.bordered}
-            className={methods.makeCssClass([{ width: '100%' }, properties.inputStyle])}
+            variant={properties.bordered === false ? 'borderless' : properties.variant}
+            className={classNames.element}
+            classNames={{ content: classNames.selector }}
+            style={{ width: '100%', ...styles.element }}
+            styles={{ content: styles.selector }}
             defaultOpen={properties.defaultOpen}
             disabled={properties.disabled || loading}
             placeholder={properties.placeholder ?? 'Type or select item'}
             allowClear={properties.allowClear !== false}
             size={properties.size}
+            status={validation.status}
             filterOption={(input, option) =>
               `${option.value}`.toLowerCase().indexOf(input.toLowerCase()) >= 0
             }
             onChange={(newVal) => {
               methods.setValue(newVal);
-              methods.triggerEvent({ name: 'onChange' });
+              methods.triggerEvent({ name: 'onChange', event: { value: newVal } });
             }}
             onFocus={() => {
               methods.triggerEvent({ name: 'onFocus' });
@@ -78,7 +88,8 @@ const AutoCompleteInput = ({
           >
             {(properties.options || []).map((opt, i) => (
               <Option
-                className={methods.makeCssClass(properties.optionsStyle)}
+                style={styles.options}
+                className={classNames.options}
                 id={`${blockId}_${i}`}
                 key={i}
                 value={`${opt}`}
@@ -93,12 +104,4 @@ const AutoCompleteInput = ({
   );
 };
 
-AutoCompleteInput.defaultProps = blockDefaultProps;
-AutoCompleteInput.meta = {
-  valueType: 'string',
-  category: 'input',
-  icons: [...Label.meta.icons],
-  styles: ['blocks/AutoComplete/style.less'],
-};
-
-export default AutoCompleteInput;
+export default withTheme('AutoComplete', withBlockDefaults(AutoCompleteInput));

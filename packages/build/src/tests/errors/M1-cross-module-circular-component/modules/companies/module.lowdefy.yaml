@@ -1,0 +1,10 @@
+name: Companies
+
+dependencies:
+  - id: contacts
+
+components:
+  - id: company-selector
+    type: Component
+    component:
+      _ref: components/company-selector.yaml

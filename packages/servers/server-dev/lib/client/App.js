@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,27 +14,34 @@
   limitations under the License.
 */
 
-import React from 'react';
+import React, { Suspense } from 'react';
 
 import { useRouter } from 'next/router';
 
 import Head from 'next/head';
 import Link from 'next/link';
 
+import BuildingPage from './BuildingPage.js';
 import Reload from './Reload.js';
 import Page from './Page.js';
 import setPageId from './setPageId.js';
+import { getReloadVersion } from './utils/useMutateCache.js';
 import useRootConfig from './utils/useRootConfig.js';
 
 import actions from '../../build/plugins/actions.js';
+import blockMetas from '../../build/plugins/blockMetas.json';
 import blocks from '../../build/plugins/blocks.js';
 import icons from '../../build/plugins/icons.js';
 import operators from '../../build/plugins/operators/client.js';
-import jsMap from '../../build/plugins/operators/clientJsMap.js';
+import staticJsMap from '../../build/plugins/operators/clientJsMap.js';
 
 const App = ({ auth, lowdefy }) => {
   const router = useRouter();
   const { data: rootConfig } = useRootConfig(router.basePath);
+
+  if (rootConfig?.theme) {
+    lowdefy.theme = rootConfig.theme;
+  }
 
   const { redirect, pageId } = setPageId(router, rootConfig);
   if (redirect) {
@@ -44,24 +51,27 @@ const App = ({ auth, lowdefy }) => {
   return (
     <Reload basePath={router.basePath} lowdefy={lowdefy}>
       {(resetContext) => (
-        <Page
-          auth={auth}
-          Components={{ Head, Link }}
-          config={{
-            rootConfig,
-          }}
-          jsMap={jsMap}
-          lowdefy={lowdefy}
-          pageId={pageId}
-          resetContext={resetContext}
-          router={router}
-          types={{
-            actions,
-            blocks,
-            icons,
-            operators,
-          }}
-        />
+        <Suspense key={`${pageId}_${getReloadVersion()}`} fallback={<BuildingPage />}>
+          <Page
+            auth={auth}
+            Components={{ Head, Link }}
+            config={{
+              rootConfig,
+            }}
+            jsMap={staticJsMap}
+            lowdefy={lowdefy}
+            pageId={pageId}
+            resetContext={resetContext}
+            router={router}
+            types={{
+              actions,
+              blockMetas,
+              blocks,
+              icons,
+              operators,
+            }}
+          />
+        </Suspense>
       )}
     </Reload>
   );

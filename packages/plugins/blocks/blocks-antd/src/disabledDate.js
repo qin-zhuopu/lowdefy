@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,28 +14,37 @@
   limitations under the License.
 */
 
-import moment from 'moment';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import isSameOrBefore from 'dayjs/plugin/isSameOrBefore.js';
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter.js';
 import { type } from '@lowdefy/helpers';
+
+dayjs.extend(utc);
+dayjs.extend(isSameOrBefore);
+dayjs.extend(isSameOrAfter);
 
 const disabledDate = (disabledDates = {}) => {
   const min = type.isNone(disabledDates.min)
     ? undefined
-    : moment(disabledDates.min).utc().startOf('day');
+    : dayjs(disabledDates.min).utc().startOf('day');
   const max = type.isNone(disabledDates.max)
     ? undefined
-    : moment(disabledDates.max).utc().endOf('day');
-  const dates = (disabledDates.dates || []).map((date) => moment(date).utc().startOf('day'));
+    : dayjs(disabledDates.max).utc().endOf('day');
+  const dates = (disabledDates.dates || []).map((date) => dayjs(date).utc().startOf('day'));
   const ranges = (disabledDates.ranges || [])
     .map((range) => {
       if (type.isArray(range) && range.length === 2) {
-        return [moment(range[0]).utc().startOf('day'), moment(range[1]).utc().endOf('day')];
+        return [dayjs(range[0]).utc().startOf('day'), dayjs(range[1]).utc().endOf('day')];
       }
       return null;
     })
     .filter((range) => range !== null);
 
   return (currentDate) => {
-    const utcCurrentData = currentDate.clone().utc();
+    // Wrap with our dayjs to ensure utc plugin is available — antd v6's internal
+    // dayjs instance may not have it loaded.
+    const utcCurrentData = dayjs(currentDate).utc();
     if (min && utcCurrentData.isBefore(min)) return true;
     if (max && utcCurrentData.isAfter(max)) return true;
     let match = dates.find((date) => date.isSame(utcCurrentData.startOf('day')));

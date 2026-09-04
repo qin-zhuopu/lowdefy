@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,31 +14,23 @@
   limitations under the License.
 */
 
-import knex from 'knex';
 import { type } from '@lowdefy/helpers';
+import createKnex from '../createKnex.js';
 import schema from './schema.js';
 
 async function KnexBuilder({ request, connection }) {
-  let client = knex(connection);
+  let client = createKnex(connection);
   if (request.tableName) {
     client = client(request.tableName);
   }
   for (const method of request.query) {
     if (Object.keys(method).length !== 1) {
-      throw new Error(
-        `Invalid query, more than one method defined in a method object, received ${JSON.stringify(
-          Object.keys(method)
-        )}.`
-      );
+      throw new Error('Invalid query, more than one method defined in a method object.');
     }
     const methodName = Object.keys(method)[0];
     const methodArgs = method[methodName];
     if (!type.isArray(methodArgs)) {
-      throw new Error(
-        `Invalid query, method "${methodName}" arguments should be an array, received ${JSON.stringify(
-          methodArgs
-        )}.`
-      );
+      throw new Error(`Invalid query, method "${methodName}" arguments should be an array.`);
     }
     if (!type.isFunction(client[methodName])) {
       throw new Error(`Invalid query builder method "${methodName}".`);

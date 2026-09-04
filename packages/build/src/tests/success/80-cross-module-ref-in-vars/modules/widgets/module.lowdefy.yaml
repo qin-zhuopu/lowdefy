@@ -1,0 +1,7 @@
+name: Widgets
+
+components:
+  - id: nav-widget
+    type: Component
+    component:
+      _ref: components/nav-widget.yaml

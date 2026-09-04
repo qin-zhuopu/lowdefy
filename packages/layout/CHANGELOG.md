@@ -1,5 +1,185 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- bb02f06: fix(layout): Stop grid layout custom properties from inheriting into nested blocks.
+
+  The grid emitted column-span, gap, offset, order, push/pull and display values as plain CSS custom properties, which inherit by default. A nested row or column with no value of its own therefore picked up an ancestor's value instead of falling through its `var(…, fallback)` chain — so a box's `gap` leaked as row-gap into every nested box (inflating stacked content), and a column's breakpoint span leaked into nested columns. Registered these properties with `inherits: false` (universal syntax, no initial value) so each block resolves its own value while the existing fallback chains and `calc()` usage are unchanged.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/block-utils@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.5.1
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/block-utils@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.2.0
+- @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.1.0
+- @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Rename `areas` to `slots` throughout the framework.
+
+  ### Breaking Changes
+
+  - **`areas` renamed to `slots`**: All block area definitions use `slots` instead of `areas`. The build pipeline auto-migrates `areas` to `slots` with a deprecation warning in dev mode (error in production).
+  - **Engine internals**: `Areas.js` renamed to `Slots.js`. Block instances expose `.slots` instead of `.areas`.
+  - **Layout internals**: `layoutParamsToArea` renamed to `layoutParamsToSlot`.
+  - **Custom blocks**: Blocks that render child areas must use `content.slotName()` — the API is unchanged but the terminology in config and docs is now `slots`.
+
+- f430f02dde: Replace antd Row/Col grid with a pure CSS grid layout system.
+
+  ### Breaking Changes
+
+  - **antd Grid dependency removed**: `@lowdefy/layout` no longer imports antd's `Row`, `Col`, or `Grid` components.
+  - **CSS Grid implementation**: Layout uses a 24-column CSS grid with CSS custom properties and media queries. Responsive breakpoints align with Tailwind CSS v4.
+  - **`span: 0` hides block**: Setting `layout.span: 0` now applies `display: none` instead of making the block full-width.
+  - **Responsive `style` breakpoints removed**: `style.sm`, `style.md` etc. no longer work. Use Tailwind classes via `class: "p-16 sm:p-8"` instead.
+  - **`_media` operator**: Returns `"2xl"` instead of `"xxl"` for the largest breakpoint (1536px instead of 1600px).
+
+  ### Renamed Layout Properties
+
+  The `content*` prefix is dropped. Build normalizes old names with a deprecation warning.
+
+  | Old                       | New                | Purpose                        |
+  | ------------------------- | ------------------ | ------------------------------ |
+  | `layout.contentGutter`    | `layout.gap`       | Spacing between child blocks   |
+  | `layout.contentAlign`     | `layout.align`     | Vertical alignment of children |
+  | `layout.contentJustify`   | `layout.justify`   | Horizontal distribution        |
+  | `layout.contentDirection` | `layout.direction` | Flex direction                 |
+  | `layout.contentWrap`      | `layout.wrap`      | Flex wrap                      |
+  | `layout.contentOverflow`  | `layout.overflow`  | Overflow behavior              |
+  | `slots.*.gutter`          | `slots.*.gap`      | Gap within a slot              |
+  | `xxl` breakpoint          | `2xl`              | Aligns with Tailwind v4        |
+
+- f430f02dde: Migrate all blocks from `defaultProps` to `withBlockDefaults` wrapper for React 19 compatibility.
+
+  ### Breaking Changes
+
+  - **`defaultProps` removed**: React 19 silently ignores `defaultProps` on function components. All ~101 block components now use a `withBlockDefaults` wrapper from `@lowdefy/block-utils`.
+  - **`withBlockDefaults` API**: New export from `@lowdefy/block-utils` that wraps block components with default property injection. Antd blocks use `withTheme` which absorbs defaults; non-antd blocks use the generic wrapper.
+
+### Patch Changes
+
+- Updated dependencies [29eb199c7f]
+- Updated dependencies [130a569d36]
+- Updated dependencies [905d5d406]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/block-utils@5.0.0
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.3
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.1
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/block-utils@4.7.0
+
+## 4.6.0
+
+### Patch Changes
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/block-utils@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.2
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.1
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.0
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

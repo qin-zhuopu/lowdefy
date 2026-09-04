@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,10 @@
 */
 
 import { type } from '@lowdefy/helpers';
-import moment from 'moment';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+
+dayjs.extend(utc);
 
 const readTransformers = {
   string: (value) => value,
@@ -26,7 +29,10 @@ const readTransformers = {
   },
   boolean: (value) => value === 'TRUE',
   date: (value) => {
-    const date = moment.utc(value);
+    // Reject short strings that aren't meaningful dates (e.g. "1", "01")
+    // but dayjs would parse timezone-dependently.
+    if (typeof value === 'string' && value.length < 4) return null;
+    const date = dayjs.utc(value);
     if (!date.isValid()) return null;
     return date.toDate();
   },

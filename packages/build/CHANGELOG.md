@@ -1,5 +1,1317 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 3ead269: feat(helpers): Reject prototype-pollution key names in dot paths and key maps.
+
+  `__proto__`, `constructor`, `prototype`, `__defineGetter__`, `__defineSetter__`,
+  `__lookupGetter__` and `__lookupSetter__` are no longer accepted as path segments or as keys
+  in maps built from user-supplied values.
+
+  Previously these names were silently _filtered_ on write, which was worse than rejecting
+  them: `SetState: { 'a.__proto__.b': 1 }` quietly wrote to `a.b` instead — a different
+  location than the one you asked for. Reads could also walk up the prototype chain.
+
+  What you will see now:
+
+  - `:set_state` and the `SetState` action raise a config error naming the offending key and
+    pointing at the line in your YAML.
+  - Data-reading operators (`_state`, `_get`, `_user`, `_payload`, ...) return their default
+    instead of a value.
+  - A module entry id, an agent or endpoint id, or a `LOWDEFY_SECRET_*` environment variable
+    using one of these names now fails at build or boot with a message naming it, instead of
+    silently vanishing.
+
+  Apps that do not use these names are unaffected. If you have a form field, state key, or API
+  response property named `constructor`, rename it.
+
+  Deep merges of configuration are hardened the same way, but skip reserved keys rather than
+  raising — a reserved name arriving inside a merged _value_ is dropped so a single poisoned
+  field can't abort an otherwise valid merge.
+
+  `@lowdefy/helpers` also now exports `isReserved(key)`, so plugin and connection authors can
+  test a key against this policy directly instead of catching a `ReservedKeyError`.
+
+- 9e19a21: fix: Anonymous calls to protected agents are rejected.
+
+  The `/api/agent` route ran agents without checking the session: on an app with `auth.api.protected: true`, a session-less caller could still execute any agent — tool calls failed endpoint auth, but the model call ran on the app's provider account. Agents now follow the `auth.api` config exactly like endpoints: `public`, `protected`, and `roles` patterns match agent ids, and unauthorized calls fail with the same error as an unknown agent id. Sub-agent invocations are authorized against the same session per call, matching how in-run endpoint tool calls are authorized.
+
+  Note for apps using wildcard patterns in `auth.api.public` or `auth.api.roles`: those patterns now also match agent ids.
+
+- 842d71c: fix(build): Reject reserved names as agent ids, locale codes and event shortcuts.
+
+  Each of these author-written identifiers later becomes a key in a plain object — the sub-agent graph
+  and agent registry, the i18n message catalogs and the client's shortcut map. A reserved name such as
+  `__proto__` or `constructor` resolved through `Object.prototype` instead of adding an entry, so the
+  config built clean and misbehaved later: a duplicate id went undetected, or the build crashed with an
+  unlocated internal error. None of these sites had a build-time shape check.
+
+  The build now rejects them where the identifier is first accepted, with a located `ConfigError` naming
+  the offending value. A shortcut like `Ctrl+__proto__` is still valid.
+
+  Apps using a reserved name for one of these identifiers will now fail the build. Rename the identifier.
+
+- 291b4cf: fix(build): Reject reserved names as page, request, connection, endpoint, step and block ids.
+
+  `validIdPattern` allowed letters and underscores, so `__proto__` and `constructor` passed as ids. The
+  engine keys plain-object registries on these ids, so a reserved id re-parented the registry instead of
+  adding an entry — a build-clean config that fails at runtime. `validateId` now rejects the
+  reserved names with a located `ConfigError`.
+
+  Block ids are dot-paths that nest state, so they don't go through `validateId` and are checked
+  separately, per dot-separated segment: `a.constructor.b` is rejected, while `a\.constructor` (an
+  escaped literal dot, a single segment named "a.constructor") still builds.
+
+  Apps using a reserved name as an id, or as a block id path segment, will now fail the build. Rename
+  the id.
+
+  `buildAuth` reaches page, endpoint and agent ids before `validateId` does, and keys plain-object role
+  maps on them, so a reserved id there read through `Object.prototype` — silently marking the entity
+  protected with `Object.prototype` as its roles, which then corrupted every plain object in the build.
+  Those ids are now gated where `buildAuth` first touches them. Collected build errors are deduplicated
+  on resolved source line plus message, so an id rejected by both gates reads as one error.
+
+- 3ead269: fix(helpers): Deep merges replace arrays instead of merging them index-by-index.
+
+  Wherever Lowdefy deep-merges configuration — block property defaults, `AxiosHttp` connection
+  and request config, theme tokens, i18n message catalogs — an array value is now treated as a
+  single value. A later array replaces an earlier one; it no longer merges element-by-element
+  at matching indices.
+
+  This is what most overrides already assumed, and it matches a plain object spread. Two
+  places where the old behaviour was visible:
+
+  - `RatingSlider`'s `CheckboxInput.options` — overriding it previously inherited the default
+    element's `label: 'N/A'`. It no longer does; specify the full option object.
+  - The layout blocks (`PageHeaderMenu`, `PageSiderMenu`, `PageSidebarLayout`, `MobileMenu`) —
+    if you set the same array (`selectedKeys`, `defaultOpenKeys`, `links`) on both `menu` and a
+    breakpoint variant such as `menuLg` or `menuMd`, the breakpoint value now replaces the base
+    value outright rather than overlaying it index-by-index.
+
+  Two smaller semantic changes come with this. A later `undefined` now replaces an earlier value
+  instead of being skipped — `mergeObjects([{ a: 1 }, { a: undefined }])` was `{ a: 1 }` and is now
+  `{ a: undefined }`, so a caller that means "no override" must omit the key rather than set it to
+  `undefined`. And a single-object merge no longer passes its input through: `mergeObjects([x]) === x`
+  was `true` and is now `false`, so memoise at the call site if a stable reference is needed across
+  renders. Both are reachable only from code that calls `mergeObjects` — plugin and connection authors
+  — not from YAML, which has no `undefined`; a config `null` merges as it always did.
+
+  Also fixed: merging no longer mutates its inputs. `AxiosHttp` previously wrote merged request
+  config back into the shared connection config, leaking values such as the HTTP agent between
+  requests.
+
+  `lodash.merge`, the last remaining lodash dependency in Lowdefy, has been removed.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [6785e0e]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/operators@5.6.0
+  - @lowdefy/ai-utils@5.6.0
+  - @lowdefy/node-utils@5.6.0
+  - @lowdefy/operators-js@5.6.0
+  - @lowdefy/nunjucks@5.6.0
+  - @lowdefy/blocks-basic@5.6.0
+  - @lowdefy/blocks-loaders@5.6.0
+  - @lowdefy/block-utils@5.6.0
+  - @lowdefy/ajv@5.6.0
+  - @lowdefy/errors@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- 33e062f: fix(build): resolve module page resolver/transformer paths against the module root in JIT dev builds.
+
+  A module page backed by a `resolver:` (or `transformer:`) declares its path relative to the module
+  (e.g. `resolvers/makeActionPages.js`). The full build rebases this against the module root in the ref
+  walker, but the JIT dev path (`buildPageJit`) rebuilt the page refDef directly from the un-rebased
+  authored `_ref` and called `getRefContent` without going through the walker — so the relative path was
+  resolved against the app config dir, producing a `ConfigError` (`Error importing resolvers/...`) when a
+  module page was rebuilt on request. `buildPageJit` now applies the same module-root rebasing to
+  `path`/`resolver`/`transformer` before resolving content. File-based module pages were unaffected.
+
+  - @lowdefy/operators@5.5.1
+  - @lowdefy/blocks-basic@5.5.1
+  - @lowdefy/blocks-loaders@5.5.1
+  - @lowdefy/operators-js@5.5.1
+  - @lowdefy/ai-utils@5.5.1
+  - @lowdefy/ajv@5.5.1
+  - @lowdefy/block-utils@5.5.1
+  - @lowdefy/errors@5.5.1
+  - @lowdefy/helpers@5.5.1
+  - @lowdefy/node-utils@5.5.1
+  - @lowdefy/nunjucks@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/operators@5.5.0
+- @lowdefy/blocks-basic@5.5.0
+- @lowdefy/blocks-loaders@5.5.0
+- @lowdefy/operators-js@5.5.0
+- @lowdefy/ai-utils@5.5.0
+- @lowdefy/ajv@5.5.0
+- @lowdefy/block-utils@5.5.0
+- @lowdefy/errors@5.5.0
+- @lowdefy/helpers@5.5.0
+- @lowdefy/node-utils@5.5.0
+- @lowdefy/nunjucks@5.5.0
+
+## 5.4.0
+
+### Minor Changes
+
+- 5e498dd: feat: Add ajv-formats + ajv-keywords plugins, a `compile({ schema })` export, and a `ValidateSchema` routine step
+
+  **Breaking change:** `@lowdefy/ajv` now registers `ajv-formats` and `ajv-keywords` on the shared Ajv instance. Schemas that use `format: date-time` / `email` / `uri` / `uuid` / etc. or the `instanceof` keyword previously slipped through `validate()` un-validated; they are now checked. Schemas that were already invalid against these definitions will surface errors they did not before.
+
+  **Additions**
+
+  - `addFormats(ajv)` — registers all standard JSON Schema formats (`date`, `date-time`, `time`, `email`, `uri`, `uuid`, `regex`, `ipv4`, `ipv6`, …).
+  - `addKeywords(ajv, ['instanceof', 'transform', 'regexp'])` — registers three `ajv-keywords` extensions:
+    - `instanceof` — match JS class instances (e.g. `{ instanceof: 'Date' }`).
+    - `transform` — normalise string values during validation (`transform: ['trim', 'toUpperCase']`); mutates the parent object in place. Useful for upload pipelines that need cleaned values before downstream processing.
+    - `regexp` — full regex with flags (`regexp: '/^l[0-9]+$/i'` or `regexp: { pattern: '...', flags: 'i' }`); fills the gap left by JSON Schema's `pattern:` which has no flag support.
+  - New `compile({ schema })` named export — returns a `(data) => { valid, errors }` function so callers can pre-compile a schema and reuse the validator across many calls without re-resolving through `Ajv.prototype.validate`.
+
+  **Internal**
+
+  - The configured Ajv instance is extracted into a new `src/ajvInstance.js`. Both `validate.js` and `compile.js` share it.
+  - Plugin registration order is `ajv-formats` → `ajv-keywords` → `ajv-errors` so the `errorMessage` keyword can attach to format / instanceof errors.
+
+  **`ValidateSchema` routine step (built-in)**
+
+  A new connectionless server routine step (sibling to `CallApi`) that runs `@lowdefy/ajv` `validate` inside a routine. Properties:
+
+  - `schema` — JSON Schema (required, operators evaluated).
+  - `data` — value to validate (required, operators evaluated).
+  - `throwOnInvalid` — boolean, default `true`. On invalid + `true`, the routine short-circuits with `status: 'error'` and the AJV errors attached as `error.cause`. On invalid + `false`, the routine continues and the step result `{ valid, errors }` is available to downstream steps as `_step.<stepId>`.
+
+  Example:
+
+  ```yaml
+  routine:
+    - id: validate_input
+      type: ValidateSchema
+      properties:
+        schema:
+          type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+        data:
+          _payload: true
+  ```
+
+  Wired through the existing build → runtime path used by `CallApi`: `setStepId` assigns a `validate:` id prefix, `validateStep` enforces required props and forbids `connectionId`, `countStepTypes` skips it, and `runRoutine` dispatches the prefix to a new `handleValidateSchema` handler in `@lowdefy/api`.
+
+  **Use case**
+
+  The hydra `data-upload` plugin uses `compile({ schema })` to build a row validator from a tool's `columns[]` once per import and runs it against every row in the upload — pre-compilation avoids per-row dictionary lookup on large XLSX files.
+
+- 60401aa: feat: Add `_app` operator and structured app metadata.
+
+  A new runtime operator `_app` reads the app's declared metadata —
+  `slug`, `name`, `version`, `description`, `license`, `lowdefyVersion`,
+  `gitSha`. It works on both client and server, including inside
+  `modules-mongodb` request filters, and inside `_js` functions via a
+  bound `lowdefyApp(p)` callable.
+
+  The root `lowdefy.yaml` schema gains two new optional fields:
+
+  - `slug` — a kebab-case identifier (`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`),
+    validated at build time. Build fails with a clear error if invalid.
+  - `description` — a free-form string.
+
+  `gitSha` resolves through a fallback chain: `LOWDEFY_GIT_SHA` env var
+  when set non-empty → `git rev-parse HEAD` → `null`. This lets apps
+  deployed without `.git` (Docker, Vercel, Netlify, Render, hermetic
+  PaaS sandboxes) pin the SHA explicitly by mapping their platform's
+  commit env var via shell expansion in the build command.
+
+  Build emits a new `appMeta.json` artifact alongside `app.json`. The
+  existing `app.git_sha` field is removed; consumers (internal telemetry)
+  read `gitSha` from `appMeta` instead.
+
+  See the `_app` operator reference for the full key set and examples.
+
+- f11addd: feat: Extend i18n coverage to Lowdefy agents.
+
+  Builds on the i18n / locale support from
+  `feat-i18n-locale-support.md`. End-user-visible strings in the agent
+  runtime and the `AgentChat` block now localize automatically when
+  `config.i18n` is configured.
+
+  **Agent runtime errors.** HTTP 4xx/5xx responses from the agent
+  endpoint (`Only POST requests are supported.`, `Invalid agent path`,
+  `Agent "X" does not exist.`, `Agent type "Y" can not be found.`,
+  `Endpoint execution failed`, etc.) translate per request via the
+  `Accept-Language` header against `agent.runtime.*` builtin keys.
+
+  **AgentChat block UI.** Framework-rendered strings in the chat UI go
+  through `methods.translate` against new `agent.*` builtin keys:
+
+  - `agent.sender.placeholder` — `'Type a message...'`
+  - `agent.toolApproval.{approve,reject}` — `'Approve'` / `'Reject'`
+  - `agent.message.{copy,feedback,regenerate,delete}` — message actions
+  - `agent.toolResult.{completed,completedNoData,empty,emptyList,showMore,showLess}` — tool result captions
+
+  Override per locale via `config.i18n.messages.{locale}` — same
+  mechanism as any other built-in message.
+
+  **antd X locale wiring.** The app shell now uses
+  `@ant-design/x@2.7.x`'s `XProvider` at the root (drop-in superset of
+  antd's `ConfigProvider`) with a merged antd + antd-X locale pack.
+  antd X ships only `en_US` and `zh_CN` packs; other locales fall back
+  to `en_US` for X-native strings (`'New chat'`, `'Stop loading'`,
+  `'Like'`/`'Dislike'`, bubble edit `'OK'`/`'Cancel'`). Apps can
+  override these in unsupported locales via the new `agent.antdx.*`
+  reference keys.
+
+  **Plugin-author surface.** Agent hook endpoints (`onStart`,
+  `onStepStart`, `onToolCallStart`, `onToolCallFinish`, `onStepFinish`,
+  `onFinish`) now receive `locale: <activeCode>` in their payload, so
+  hook routines can branch on the user's locale.
+
+  **System prompt translation.** `agent.properties.instructions` passes
+  through the operator parser at request time — `_t:` works there for
+  locale-aware system prompts.
+
+  ```yaml
+  agents:
+    - id: assistant
+      type: AISDKAgent
+      connectionId: anthropic
+      properties:
+        agent:
+          model: claude-sonnet-4
+          instructions:
+            _t: agent.systemPrompt
+  ```
+
+  **What stays English** (explicit choices):
+
+  - Built-in tool descriptions used in the model prompt (English-trained
+    models perform best with English tool descriptions).
+  - Build-time agent validation errors (developer diagnostics).
+  - Console warnings (ops diagnostics).
+  - The `[File truncated — showing first NKB...]` notice in the
+    `read-file` built-in tool (model-facing).
+  - Model-streamed natural-language output (owned by the model).
+
+- 0108f38: feat: First-class i18n / locale support for Lowdefy apps.
+
+  Apps can now declare supported locales and message catalogs under
+  `config.i18n`, switch language at runtime, and translate their own
+  strings with ICU MessageFormat. Ant Design's component strings (date
+  pickers, modal Ok/Cancel, pagination, form validation messages),
+  dayjs date formatting, and the engine's built-in framework strings
+  (loading toasts, validation summaries, popup blocker warnings, error
+  page) all localize automatically once `config.i18n` is set.
+
+  ```yaml
+  config:
+    i18n:
+      defaultLocale: en-US
+      locales:
+        - { code: en-US, label: English, antd: en_US, dayjs: en }
+        - { code: de-DE, label: Deutsch, antd: de_DE, dayjs: de }
+      messages:
+        en-US: { greeting: 'Hello, {name}!' }
+        de-DE: { greeting: 'Hallo, {name}!' }
+  ```
+
+  **New schema** — `config.i18n` with `defaultLocale`, `locales[]`, and
+  `messages`. Validated at build time; only declared locales are bundled
+  (antd and dayjs locale imports are codegen'd, no ~150KB unused). The
+  missing-key fallback is always `en-US`, so plugin and module authors
+  should ship `en-US` translations as a baseline.
+
+  **New operators**
+
+  - [`_t`](/_t) — translate operator with ICU MessageFormat. Resolution
+    order: active locale → fallback locale → built-in framework message
+    → key.
+
+    ```yaml
+    _t:
+      key: cart.items
+      values: { count: { _state: itemCount } }
+    ```
+
+  - [`_locale`](/_locale) — read `active` / `default` / `fallback`
+    (always `'en-US'`) / `supported` locale state. Use with `Selector`
+    to build a language picker.
+
+  **New action** — [`SetLocale`](/SetLocale) sets the user's preferred
+  locale (persisted to `localStorage`). Pass `'auto'` to clear the
+  preference and fall back to the browser language or default.
+
+  **Built-in framework strings.** Engine and client strings (`'Loading'`,
+  `'Success'`, `'This field is required'`, validation summaries, popup
+  blocker, error page) live in a built-in catalog and surface as English
+  by default. Authors override per-locale by adding the same key to
+  `config.i18n.messages`:
+
+  ```yaml
+  messages:
+    de-DE:
+      engine.action.loading: 'Laden'
+      engine.validation.fieldRequired: 'Pflichtfeld'
+  ```
+
+  See the [Internationalization concept page](/i18n) for the full list
+  of overridable keys.
+
+  **Ant Design block cleanup.** `Modal`/`ConfirmModal` `okText`/`cancelText`
+  and date picker placeholders (`DateSelector`, `DateRangeSelector`,
+  `DateTimeSelector`, `MonthSelector`, `WeekSelector`) no longer hardcode
+  English defaults — they fall through to antd's `ConfigProvider locale`,
+  so a German app gets `'OK'` / `'Abbrechen'` / `'Datum auswählen'`
+  without per-block configuration. The antd `ConfigProvider` block
+  itself now accepts a `locale` prop for subtree overrides.
+
+  **Server-side translation.** API requests resolve the user's active
+  locale from the `Accept-Language` header and thread it into the server
+  operator parser, so `_t` works the same in server-side actions and
+  requests as on the client.
+
+  **Translation engine.** A new `translate()` helper in `@lowdefy/helpers`
+  backs both the `_t` operator and the engine/client adapter (installed
+  on `lowdefy._internal.translate`). One source of truth for the lookup
+  chain; no duplication. Adds `intl-messageformat` as a foundational dep.
+
+  **Plugin-author surface.** Action and block plugins receive
+  `methods.translate(key, values)` and `methods.getLocale()` for runtime
+  translation in their JS code. Plugin packages can ship default
+  messages via a `./messages` export — the build merges them into the
+  app's i18n catalog (user app messages > plugin messages > framework
+  builtins > key).
+
+  **DatePicker and NumberInput auto-localization.** Date selector blocks
+  (`DateSelector`, `DateRangeSelector`, `DateTimeSelector`,
+  `MonthSelector`) and `NumberInput` derive their default `format` /
+  `decimalSeparator` from the active locale via `Intl.DateTimeFormat` /
+  `Intl.NumberFormat`. A German user sees `DD.MM.YYYY` and `1234,56`
+  automatically; an en-US user sees `MM/DD/YYYY` and `1234.56`.
+
+- 5f00be7: feat(blocks-antd): Per-item styling and new props for menu items.
+
+  Menu items in `Menu` and `DropdownMenu` now support the same `class` and slot-keyed `style` ergonomics as other Lowdefy blocks, plus the missing antd MenuItem props.
+
+  - **Per-item `class`** (Tailwind / arbitrary CSS) on `MenuLink`, `MenuGroup`, and `MenuDivider`. Flat string/array applies to the item wrapper; objects with dot-prefixed slot keys (`.element`, `.icon`, `.label`, and `.popup` on `MenuGroup` for the floating SubMenu popup) target specific parts.
+  - **Slot-keyed `style`** on the same item types using `.element` / `.icon` / `.label`. Flat objects continue to work as a shorthand for `.element`.
+  - **New item properties:** `properties.disabled` (greys out the item and blocks clicks), `properties.tooltip` (text shown when the menu is collapsed — maps to antd's `title`), and `properties.extra` (free-form right-aligned label on a `MenuLink`, e.g. `beta`, `soon`).
+  - **`shortcut` badge moved to the far right.** The existing `properties.shortcut` already auto-rendered a kbd badge and wired the key handler — the badge is now floated to the far right of the item to match common menu conventions (previously inline next to the title). When `extra` and `shortcut` are both set on the same item, `extra` sits to the left of the shortcut badge.
+  - **`extra` rendering note:** rendered inside the `<Link>` via `float: right` rather than antd's `extra` prop. The antd `extra` prop triggers a `display: inline-flex; width: 100%` layout on `.ant-menu-title-content-with-extra` that collapses Lowdefy-wrapped labels, so we bypass it.
+  - **Unified internals:** `Menu` and `DropdownMenu` now share one item builder, eliminating the prior divergence in icon CSS keys and which props were plumbed.
+
+  Block-level `properties.theme` on `Menu` is unchanged; pair it with `properties.danger: true` on a `MenuLink` to theme danger items via `dangerItem*` tokens. See the updated theming docs.
+
+- 1db0ef9: feat: Remove static `exports` declaration from modules.
+
+  The `exports:` block in `module.lowdefy.yaml` is no longer required. Modules can now generate page, connection, and API endpoint ids dynamically — via `_build.array.map`, `_module.var`, or resolver functions — without declaring them upfront. Cross-module references are validated against the merged id sets after full resolve, with clearer, page-scoped error messages naming the broken reference and its source page.
+
+  A leftover `exports:` block has no effect on the build and is silently ignored. A codemod (`modules-remove-exports`) is provided to strip the dead field from your manifests.
+
+- d1fb1d7: feat: Plugin-driven `serverExternalPackages` for Next.js.
+
+  Plugins can now declare which of their dependencies need to be passed
+  through to Next.js's `serverExternalPackages` config — used for CJS
+  packages whose runtime `require()` chains Turbopack can't resolve
+  through pnpm's isolated symlink layout (e.g. `turndown` →
+  `@mixmark-io/domino`, `@aws-sdk/client-s3` → `fast-xml-parser` →
+  `strnum`).
+
+  Declare in the plugin's `package.json`:
+
+  ```json
+  {
+    "lowdefy": {
+      "serverExternalPackages": ["turndown"]
+    }
+  }
+  ```
+
+  Build aggregates declarations from every plugin the app actually uses
+  (across blocks, connections, operators, actions, agents, auth, icons,
+  requests) and writes a per-app `serverExternalPackages.json` artifact,
+  read by `server`, `server-dev`, and `server-e2e` Next.js configs.
+
+  Replaces a hardcoded list in the three server configs. Apps not using
+  `blocks-tiptap` or `plugin-aws` no longer carry their externals.
+
+  Initial declarations:
+
+  - `@lowdefy/blocks-tiptap` → `turndown`
+  - `@lowdefy/plugin-aws` → `@aws-sdk/client-s3`
+
+### Patch Changes
+
+- b182517: fix(build): Resolve cross-module refs in module entry vars and connections.
+
+  Cross-module operators (`_ref { module, component }`, `_module.pageId/connectionId/endpointId/id { module }`) inside a module entry's `vars` or `connections` in `lowdefy.yaml` previously failed the build with "no module with that entry id was registered" because the entry subtrees were walked before any module was registered. They now resolve correctly against the app-level module registry — apps can compose components from one module into another's slot without forcing a dependency declaration on the host module.
+
+  **Behavior change:** required-var validation now sees through `_ref` to the resolved value. A required var supplied via a `_ref` that resolves to `null` previously passed validation (the raw `_ref` object was non-none) and now correctly fails.
+
+- 7c97d3b: fix(build): Resolve `_ref` resolver and transformer JS paths against the module root.
+
+  Modules can now ship their own JS resolvers and transformers. Previously, a `_ref: { resolver: resolvers/x.js }` inside a module manifest failed with `Cannot find module` because the build resolved the JS path against the host app's config directory instead of the module root. Absolute paths in `resolver`, `transformer`, and `.js` content refs are also now honored verbatim. The existing package-root escape check that prevents module refs from reading outside their package is extended to cover both new fields.
+
+- 42db297: fix: Correct `secrets` → `secret` in the server `_js` function prototype.
+
+  The generated `serverJsMap.js` previously destructured `{ secrets }`, which
+  never matched the binding name (`secret`) passed at runtime by the `_js`
+  operator. As a result, any user `_js` function that referenced `secrets` in
+  its argument destructuring received `undefined`. The prototype now
+  destructures `secret`, matching the runtime binding.
+
+- b6e555f: fix(api,build): Render MenuDivider items in menus.
+
+  MenuDivider items defined in a menu's `links` were silently dropped at request time by `filterMenuList`, which only let `MenuLink` and `MenuGroup` items through. Dividers now pass the filter and render via the existing Antd menu block code. A post-pass removes orphaned dividers (leading, trailing, or adjacent to another divider) so an item left dangling after auth-based filtering does not produce a broken-looking separator. The `menuDivider` shape was also added to the build schema so configs containing dividers no longer trigger a schema warning, and `buildMenu` now assigns `auth: { public: true }` to dividers for consistency with other menu items.
+
+- Updated dependencies [ff7ed66]
+- Updated dependencies [5e498dd]
+- Updated dependencies [60401aa]
+- Updated dependencies [25225ab]
+- Updated dependencies [ba1d3bd]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/ai-utils@5.4.0
+  - @lowdefy/ajv@5.4.0
+  - @lowdefy/operators@5.4.0
+  - @lowdefy/operators-js@5.4.0
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/block-utils@5.4.0
+  - @lowdefy/errors@5.4.0
+  - @lowdefy/blocks-basic@5.4.0
+  - @lowdefy/blocks-loaders@5.4.0
+  - @lowdefy/node-utils@5.4.0
+  - @lowdefy/nunjucks@5.4.0
+
+## 5.3.0
+
+### Minor Changes
+
+- 6955341: feat: Add AI agent support with multi-provider chat and tool use
+
+  **Agent Runtime (`@lowdefy/ai-utils`)**
+
+  - `handleAgentChat` orchestrates the full agent lifecycle: tool merging, MCP client lifecycle, hook callbacks, and stream composition
+  - `ToolLoopAgent` handles multi-turn tool calling, streaming responses, and artifact cleaning
+  - `createAgentUIStreamResponse` converts agent output to a streaming HTTP response for the client
+  - `buildAgentTools` merges endpoint tools, MCP tools, and sub-agent tools into AI SDK tool objects
+  - `buildPrepareStep` enables dynamic tool phasing per step
+  - `buildUpdatePageStateTool` provides a built-in tool for the agent to write to page state via the AgentChat block
+  - File system agent tools: `listFiles`, `readFile`, `searchFiles`, `statFile`, `resolvePath` for sandboxed access to agent-scoped file directories
+  - `pruneMessages` for context compaction
+  - `experimental_repairToolCall` integration
+  - Sub-agent support — agents can be exposed as tools to other agents
+  - Reserved tool name collision detection (e.g. `update-page-state`)
+  - Server-side hooks (`instructions`, `onStart`, `onStepStart`, `onToolCallStart`, `onToolCallFinish`, `onStepFinish`, `onFinish`) callable as Lowdefy endpoints
+  - Provider-agnostic design using the Vercel AI SDK — supports reasoning/thinking display, `providerOptions` passthrough, and source citation streaming via `sendSources`
+  - Strip `data:` URL prefix from file attachments before AI SDK processing
+
+  **AgentChat Block (`@lowdefy/blocks-antd-x`)**
+
+  - New `AgentChat` composite block built on Ant Design X with real-time streaming display
+  - Sequential message part rendering with configurable reasoning/thinking display
+  - Tool approval UI for endpoint and MCP tools marked `confirm: true`
+  - File attachment support (configurable accept types and max size) with S3 upload integration
+  - Drawer display mode with a `FloatButton` trigger for embedding chat on any page
+  - Source citation rendering for `source-url` and `source-document` parts
+  - Mermaid diagrams, LaTeX, and syntax-highlighted code blocks (with copy + language label) — toggled via `renderMermaid` and `codeHighlighter`
+  - Copy, feedback, regenerate, and delete message actions
+  - Suggestions and `Sender.Header` / `Sender.Switch` UI affordances
+  - Configurable roles, avatars, and names per message role
+  - Event bridging for agent lifecycle events (`onSuccess`, `onError`, `onFinish`, `onFeedback`)
+  - `sharedState` two-way binding lets the agent read and write page state via the `update-page-state` tool
+
+  **`AgentConversations` Block (`@lowdefy/blocks-antd-x`)**
+
+  - New standalone conversations sidebar block, extracted from AgentChat for independent placement
+
+  **Connection Plugins**
+
+  - `@lowdefy/connection-anthropic`: Anthropic connection with `AnthropicAgent` resolver supporting Claude models
+  - `@lowdefy/connection-openai`: OpenAI connection with `OpenAIAgent` resolver supporting GPT models
+  - `@lowdefy/connection-google`: Google AI connection with `GeminiAgent` resolver, including `thinkingConfig` and `safetySettings` sugar props
+  - `@lowdefy/connection-ai-gateway`: Vercel AI Gateway connection with `AIGatewayAgent` resolver for routing to multiple providers through a single endpoint
+
+  **MCP Integration (`@lowdefy/connection-mcp`, `@lowdefy/ai-utils`, `@lowdefy/build`)**
+
+  - New `Mcp` connection type for HTTP, SSE, and stdio transport config
+  - Agents can reference MCP connections via `connectionId` or inline config with build-time validation
+  - Runtime MCP client creation with automatic tool discovery, merging, and cleanup
+  - Tool approval support via `confirm: true` on both endpoint tools and MCP sources
+
+  **Build Pipeline (`@lowdefy/build`)**
+
+  - `buildAgents` validates agent config (model, tools, sub-agents, MCP) and normalizes tool definitions
+  - `writeAgents` writes agent artifacts for server consumption
+  - Sub-agent circular reference detection
+  - Tool object format with `confirm` support
+  - MCP `connectionId` normalization (inline config vs reference)
+  - Lazy module variable resolution for agent properties referenced from modules
+  - Agent schema validation integrated into the build pipeline
+  - `copyAgentFileSystems` emits an `agentFileSystems.json` manifest so the production server can include each agent's `fileSystem.basePath` directory in Next.js file tracing — agents that read files now work on Vercel and standalone (`output: 'standalone'`) deployments without manual `next.config.js` configuration
+
+  **API (`@lowdefy/api`)**
+
+  - Agent route handler (`callAgent`) for streaming agent responses
+  - Endpoint tool execution context with operator evaluation
+  - Sub-agent resolver methods for agents-as-tools
+  - MCP `connectionId` resolution at request time
+  - `getAgentConfig` and `getAgentResolver` helpers for runtime agent resolution
+
+  **Servers (`@lowdefy/server`, `@lowdefy/server-dev`)**
+
+  - Agent API route (`/api/agent/[...path]`) added to both production and development servers
+  - `urlQuery` validation
+  - 10 MB request body limit for file attachments
+  - Server-side hooks for agent lifecycle callbacks (`instructions`, `onFinish`)
+
+### Patch Changes
+
+- Updated dependencies [6955341]
+  - @lowdefy/ai-utils@5.3.0
+  - @lowdefy/operators@5.3.0
+  - @lowdefy/blocks-basic@5.3.0
+  - @lowdefy/blocks-loaders@5.3.0
+  - @lowdefy/operators-js@5.3.0
+  - @lowdefy/ajv@5.3.0
+  - @lowdefy/block-utils@5.3.0
+  - @lowdefy/errors@5.3.0
+  - @lowdefy/helpers@5.3.0
+  - @lowdefy/node-utils@5.3.0
+  - @lowdefy/nunjucks@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 73fa2b9: feat: Internal API endpoint calls
+
+  **Endpoint-to-Endpoint Calls (`@lowdefy/api`)**
+
+  - API endpoint routines can call other endpoints server-side via `CallApi` steps, without HTTP
+  - Each called endpoint runs in an isolated context with its own `steps` and `payload` namespaces
+  - Recursive endpoint call depth is capped at 10 to prevent infinite loops
+  - `InternalApi` endpoints are blocked from HTTP access — they return the same response as a missing endpoint
+
+  **Build Support (`@lowdefy/build`)**
+
+  - `CallApi` routine steps validated at build time: require `properties.endpointId`, reject `connectionId`
+  - `InternalApi` endpoint type accepted alongside `Api`
+  - Client-side `CallAPI` actions targeting `InternalApi` endpoints produce a build warning (error in production)
+
+  **Operator Parser (`@lowdefy/operators`)**
+
+  - `ServerParser.parse()` accepts `steps` and `payload` per call for routine context isolation
+
+- 69a59c0: feat(\_js): Pass pre-computed values into `_js` via an `args` object.
+
+  The `_js` operator now accepts an object form `{ fn, args }` alongside the existing string form. Values in `args` are resolved by the parser — using any Lowdefy operator (`_state`, `_request`, `_user`, nested `_js`, etc.) — before the JavaScript function runs, and are injected as the `args` object inside the function body.
+
+  ```yaml
+  _js:
+    fn: |
+      const { products, target } = args;
+      return products
+        .filter((p) => p.category === target)
+        .reduce((a, p) => a + p.price, 0);
+    args:
+      products:
+        _request: get_products.data.products
+      target: smartphones
+  ```
+
+  This lets you precompute or normalize values in YAML and keep the JavaScript body focused on computation, rather than mixing operator lookups into the function. The string form continues to work unchanged, and identical `fn` bodies still share a single compiled function at build time — only `args` varies per call.
+
+- 0f38c9f: feat: First-class module system for reusable config packages
+
+  Modules are reusable bundles of Lowdefy config — pages, connections, API endpoints, menus, and exposed components — hosted in GitHub repositories or local directories. Apps install modules in `lowdefy.yaml` and configure them through `vars`, replacing the copy-paste-between-projects pattern with a declarative dependency.
+
+  **Module entries (`@lowdefy/build`)**
+
+  - Apps declare entries in the `modules` array of `lowdefy.yaml` with `id`, `source`, and optional `vars`, `connections`, and `dependencies`.
+  - The entry `id` namespaces the module's content and forms the URL prefix for its pages (e.g. `/team-users/users-list`).
+  - Multi-instance: the same module source can be installed multiple times under different entry IDs, each with its own vars and namespace.
+  - GitHub sources (`github:owner/repo[/path]@ref`) are fetched as tarballs and locally cached. Private repos use `GITHUB_TOKEN`, the `gh` CLI, or git credential helpers.
+  - Local sources (`file:./relative/path`) resolve relative to the project root.
+
+  **Module manifest (`module.lowdefy.yaml`)**
+
+  - Declares the module's interface: `name`, `description`, `vars`, `connections`, `pages`, `api`, `components`, `menus`, `dependencies`, `exports`, `plugins`, and `secrets`.
+  - `vars` declarations validate consumer values with `type`, `required`, `default`, and `description`. Consumer values override manifest defaults; omitted values fall back to the declared default.
+  - `exports` declares the module's public interface — the IDs other modules and apps may reference. The build validates cross-module references against exports.
+  - `plugins` declarations are validated against the app's installed plugins with semver compatibility checks.
+  - `secrets` is an allowlist of secrets the module may access; undeclared `_secret` references fail the build. Remapped connections skip the module's secret references for that connection.
+
+  **Module operators**
+
+  - `_module.var` — read manifest-validated vars, including consumer overrides and declared defaults.
+  - `_module.pageId`, `_module.connectionId`, `_module.endpointId` — produce scoped IDs from a module-author's unscoped ID.
+  - `_module.id` — the entry ID of the current module.
+
+  **Auto-scoped IDs**
+
+  Page, connection, API endpoint, and menu item IDs are auto-prefixed with the entry ID. Block and request IDs inherit page scope and are not rewritten.
+
+  **Consuming module resources**
+
+  - Pages and APIs are auto-included and auto-scoped — they appear in the app under the entry-ID prefix.
+  - Components are reusable config fragments included with `_ref: { module, component, vars }`. They can export any config — UI blocks, enum maps, config templates, schema fragments — and accept vars at the call site.
+  - Menus are included with `_ref: { module, menu }`, typically wrapped in a `MenuGroup`.
+
+  **Connection remapping**
+
+  Apps can redirect a module connection to an existing app connection via the entry's `connections` map. The module's connection definition and its declared secrets are skipped — the app connection handles them.
+
+  **Cross-module dependencies**
+
+  Modules can reference each other's pages, components, menus, connections, and APIs via abstract dependencies declared in `module.lowdefy.yaml`.
+
+  - Auto-wiring: when a module entry's `id` matches a declared dependency name, the build wires it automatically.
+  - Explicit wiring: the entry's `dependencies` map overrides auto-wiring and supports multi-instance topologies where each instance points at a different partner.
+  - The build validates every wiring, detects dependency cycles, and reports unmapped or undeclared dependencies with remediation hints.
+
+  **Auth page rules**
+
+  Picomatch glob patterns in auth page rules (e.g. `team-users/*`) for wildcard module page matching.
+
+  **Slashed page IDs (`@lowdefy/server`, `@lowdefy/server-dev`)**
+
+  Server routes support module page IDs containing `/` (e.g. `/team-users/users-list`).
+
+### Patch Changes
+
+- 762755c: feat(blocks-tiptap): Add new default block package with `TiptapInput` and `TiptapMentionInput` rich-text editors.
+
+  `@lowdefy/blocks-tiptap` ships two rich-text editor blocks built on [TipTap](https://tiptap.dev):
+
+  - **`TiptapInput`** — standard rich-text editor with bold/italic/strike-through, multi-color highlight, headings, lists, tables, links, and a bubble menu.
+  - **`TiptapMentionInput`** — everything `TiptapInput` does, plus an @-mention dropdown populated from a static options list or a Lowdefy request. Resolved mentions are returned on the block value as `mentions: [...]`.
+
+  Both blocks emit an object value shaped `{ html, text, markdown, fileList, mentions? }` and register `clear`, `setContent`, and `focus` methods.
+
+  **Configurable extensions** — defaults preserve the bundled editor; override any of these to trim the editor down or tune it:
+
+  - `properties.starterKit` — object forwarded to TipTap [StarterKit](https://tiptap.dev/docs/editor/extensions/functionality/starterkit), e.g. `{ heading: false, codeBlock: false }`.
+  - `properties.image` — `{ enabled, maxWidth, zoom }`
+  - `properties.table` — `{ enabled, resizable }`
+  - `properties.link` — `{ enabled, autolink, linkOnPaste, openOnClick, defaultProtocol }`
+  - `properties.highlight` — `{ enabled, multicolor }`
+  - `properties.mentions.char` / `properties.mentions.allowSpaces` — change the trigger char (e.g. `#` for hashtags) or disable spaces inside a mention query (`TiptapMentionInput` only).
+
+  Image drag/drop and paste are supported by pointing `properties.s3PostPolicyRequestId` at a request that returns an S3 presigned POST policy (e.g. `AwsS3PresignedPostPolicy`). The file handler is optional — omit the request id to disable uploads entirely.
+
+  The blocks are registered in the default types map and are available out of the box on `@lowdefy/server-dev`. No private-registry tokens are required: the blocks use the open-source [`@tiptap/extension-file-handler`](https://www.npmjs.com/package/@tiptap/extension-file-handler) instead of `@tiptap-pro/extension-file-handler`, so projects that migrated from a custom TipTap plugin can drop their `TIPTAP_PRO_TOKEN` environment variable and `.npmrc` scoped-registry config.
+
+- 72b6159: fix(build): Replace schema validation errors with warnings and add focused validations.
+
+  AJV schema validation now emits warnings instead of blocking the build. Focused validations in each build step (validateBlock, buildConnections, buildEvents, etc.) provide better error messages with full context — page, block, and event names — instead of generic schema messages. Added focused validation for connections and menu items that previously relied on schema checks alone.
+
+- Updated dependencies [1d18a13]
+- Updated dependencies [73fa2b9]
+- Updated dependencies [69a59c0]
+- Updated dependencies [0d44433]
+- Updated dependencies [1e964c4]
+- Updated dependencies [c91003d]
+  - @lowdefy/operators-js@5.2.0
+  - @lowdefy/operators@5.2.0
+  - @lowdefy/blocks-loaders@5.2.0
+  - @lowdefy/blocks-basic@5.2.0
+  - @lowdefy/ajv@5.2.0
+  - @lowdefy/block-utils@5.2.0
+  - @lowdefy/errors@5.2.0
+  - @lowdefy/helpers@5.2.0
+  - @lowdefy/node-utils@5.2.0
+  - @lowdefy/nunjucks@5.2.0
+
+## 5.1.0
+
+### Minor Changes
+
+- 72fbd4bab: feat(build): Themed default scrollbars in generated `globals.css`.
+
+  Every Lowdefy app now ships with themed scrollbars out of the box. Native Windows/Linux scrollbars were rendering as light grey on dark surfaces (Modal, Drawer, overflowing containers), clashing with dark themes — macOS overlay scrollbars hid the problem. The generated `globals.css` now emits a `@layer base` block that:
+
+  - Sets `scrollbar-width: thin` and `scrollbar-color` for Firefox and modern browsers.
+  - Styles `::-webkit-scrollbar` (10px, transparent track, subtle thumb with inset border, hover darkens) for Chromium / WebKit.
+  - Drives all colors from antd CSS custom properties (`--ant-color-border-secondary`, `--ant-color-text-tertiary`) so they auto-swap on dark / light mode toggle.
+
+  User-provided CSS remains in `@layer components`, so any app-level `::-webkit-scrollbar` overrides in `public/styles.css` still win.
+
+### Patch Changes
+
+- f56a47d87: fix(server): Prevent white flash on page navigation in dark mode.
+
+  Pages no longer flash white when navigating between pages in dark mode. A synchronous inline script now sets the correct background color before the page paints, matching the user's dark mode preference from config, localStorage, or system settings.
+
+- Updated dependencies [af8ef77cb]
+  - @lowdefy/operators-js@5.1.0
+  - @lowdefy/operators@5.1.0
+  - @lowdefy/blocks-basic@5.1.0
+  - @lowdefy/blocks-loaders@5.1.0
+  - @lowdefy/ajv@5.1.0
+  - @lowdefy/block-utils@5.1.0
+  - @lowdefy/errors@5.1.0
+  - @lowdefy/helpers@5.1.0
+  - @lowdefy/node-utils@5.1.0
+  - @lowdefy/nunjucks@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Rename `areas` to `slots` throughout the framework.
+
+  ### Breaking Changes
+
+  - **`areas` renamed to `slots`**: All block area definitions use `slots` instead of `areas`. The build pipeline auto-migrates `areas` to `slots` with a deprecation warning in dev mode (error in production).
+  - **Engine internals**: `Areas.js` renamed to `Slots.js`. Block instances expose `.slots` instead of `.areas`.
+  - **Layout internals**: `layoutParamsToArea` renamed to `layoutParamsToSlot`.
+  - **Custom blocks**: Blocks that render child areas must use `content.slotName()` — the API is unchanged but the terminology in config and docs is now `slots`.
+
+- 29eb199c7f: Restructure block metadata from component static properties to dedicated `meta.js` files.
+
+  ### Breaking Changes
+
+  - **`schema.js` renamed to `meta.js`**: Block definitions moved from `schema.js` to `meta.js`. The `meta.js` files export `category`, `icons`, `valueType`, `cssKeys`, `events`, and `properties` (JSON Schema).
+  - **`schemas.js` barrel renamed to `metas.js`**: Block packages export `./metas` instead of `./schemas`.
+  - **`.meta` removed from components**: Block components no longer have a `.meta` static property. Metadata is loaded from the `blockMetas.json` build artifact at runtime.
+  - **`blockMetas.json` build artifact**: The build pipeline writes `plugins/blockMetas.json` containing category, valueType, and initValue for each block type.
+  - **`buildBlockSchema(meta)`**: New function in `@lowdefy/block-utils` generates complete JSON Schema from meta objects with operator support and CSS slot key validation.
+
+- 155c0b9724: Replace moment.js with day.js across the monorepo.
+
+  ### Breaking Changes
+
+  - **`_moment` operator removed**: Use `_dayjs` instead. The new `@lowdefy/operators-dayjs` package provides the `_dayjs` operator with the same API patterns.
+  - **`@lowdefy/operators-moment` package removed**: Apps using `_moment` must migrate to `_dayjs`.
+  - **Nunjucks `date` filter**: Now uses day.js internally. Format strings are day.js compatible (mostly identical to moment).
+  - **Date picker blocks**: All date/time picker blocks use day.js instead of moment for value parsing and formatting.
+  - **Google Sheets connection**: Date serialization uses day.js internally.
+  - **`humanizeDuration` thresholds**: The `thresholds` parameter on `_dayjs.humanizeDuration` is silently ignored (day.js does not support it).
+  - **AgGrid cell renderers**: Update `__moment` to `__dayjs` in custom AG Grid cell renderer references.
+  - **Date selector UTC handling**: Antd v6 bundles its own dayjs without the UTC plugin. Date selector blocks wrap antd's dayjs instances with the extended dayjs before calling `.utc()` — this is handled internally and requires no user action.
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+- f430f02dde: Replace the Less/Emotion styling system with unified `style` and `class` properties using `.` prefixed CSS slot keys.
+
+  ### Breaking Changes
+
+  - **Less removed**: `.less` files are no longer supported. All styling uses CSS, CSS Modules, or Tailwind utilities.
+  - **`makeCssClass` removed**: Blocks no longer call `methods.makeCssClass()`. They receive `classNames` and `styles` objects as props, keyed by CSS slot names (`element`, `icon`, `header`, `body`, etc.).
+  - **`mediaToCssObject` removed** from `@lowdefy/block-utils`.
+  - **`style` replaces `styles`**: The `style` (singular) property handles all styling. Using `styles` (plural) throws a `ConfigError`.
+  - **`class` property added**: New `class` property for CSS classes (Tailwind utilities, custom classes). Supports string, array, or object with `.` slot keys.
+  - **`properties.style` moved**: Block-specific `properties.style` maps to `style: { .element }` at build time.
+  - **Inline style props removed**: `headerStyle`, `bodyStyle`, `maskStyle`, `contentWrapperStyle`, `contentStyle`, `labelStyle`, `valueStyle`, `tabBarStyle`, `overlayStyle` are replaced by CSS slot keys (e.g., `style: { .header }`, `style: { .body }`).
+
+  ### CSS Slot Keys
+
+  `.` prefixed keys target specific parts of a block:
+
+  | Key                                | Target                                                  |
+  | ---------------------------------- | ------------------------------------------------------- |
+  | `.block`                           | Layout wrapper (grid column)                            |
+  | `.element`                         | Component root element                                  |
+  | `.header`, `.body`, `.cover`, etc. | Antd semantic sub-elements (declared in `meta.cssKeys`) |
+
+  Flat shorthand (no `.` keys) maps to `.block`:
+
+  ```yaml
+  # These are equivalent:
+  style: { marginTop: 20 }
+  style:
+    .block: { marginTop: 20 }
+  ```
+
+### Minor Changes
+
+- 130a569d36: Add keyboard shortcut support for block events.
+
+  Blocks can now define keyboard shortcuts on events using the `shortcut` property in the event long-form object. Shortcuts are platform-aware (`mod+K` maps to Cmd+K on Mac, Ctrl+K on Windows), support sequences (`g i`), and can be arrays for multiple bindings.
+
+  - **Build validation** warns on duplicate shortcuts within a page and conflicts with browser defaults (e.g. `mod+N`)
+  - **ShortcutManager** registers a single global keydown listener via tinykeys with visibility gating and input field suppression
+  - **ShortcutBadge** component renders platform-appropriate key symbols (e.g. `⌘ K`) and is available to all blocks via `components.ShortcutBadge`
+  - **ShortcutBadge in blocks**: Button, Anchor, Tag, and Search blocks display a platform-aware keyboard shortcut badge (e.g. `⌘S` / `Ctrl+S`) next to the title when the event has a `shortcut` defined
+
+- c8f4a41063: Add `theme.darkMode` config with system preference support.
+
+  **System Dark Mode (`theme.darkMode`)**
+
+  - New `theme.darkMode` config key accepts `'system'` (default), `'light'`, or `'dark'`
+  - When set to `'system'`, the app follows the OS dark mode preference and updates live when it changes
+  - When set to `'light'` or `'dark'`, the developer locks the mode — user preferences are stored but not applied
+
+  **SetDarkMode Action**
+
+  - Now accepts string params: `darkMode: 'system' | 'light' | 'dark'`
+  - Without params, cycles through light, dark, and system preferences
+
+  **`_media` Operator**
+
+  - New `_media: darkModePreference` returns the user's preference (`'system'`, `'light'`, or `'dark'`)
+  - `_media: darkMode` continues to return the effective boolean state
+
+  **Dark Mode Rendering**
+
+  - Notification, Message, and ConfirmModal render with correct dark mode colors via `App.useApp()` hooks
+  - Loader blocks (Skeleton, Spinner) use antd design tokens instead of hardcoded colors
+  - 404 page and loading states use theme-aware backgrounds
+  - Mobile menu drawer background matches the active theme
+
+- f430f02dde: Extract Tailwind utility classes from block properties for CSS generation. All string values in block properties (HTML content, markdown, class names) are scanned at build time and written to per-page content files so Tailwind v4's Oxide engine generates CSS for all used utilities. Content files are regenerated on each JIT rebuild for hot reload.
+
+  Block plugin source files are resolved using `require.resolve` to follow pnpm symlinks correctly. The server package includes `postcss.config.js` so Tailwind compiles in production builds.
+
+- f430f02dde: Add theme token system. Use `_theme` operator to access Ant Design v6 design tokens (colors, spacing, typography) at runtime. Theme is configured via `theme.antd.token` and `theme.antd.algorithm` in `lowdefy.yaml`. The `_theme` operator resolves the full computed token set including antd defaults.
+
+### Patch Changes
+
+- f430f02dde: Throw `ConfigError` when a block ID collides with its page ID, preventing runtime state conflicts.
+- 8b9f926d1: Improve build error messages: schema validation errors include the property name, style/class errors suggest dot-prefixed CSS slot keys, and YAML parse errors surface immediately instead of crashing on null entries.
+- c3b5b45ec5: feat(blocks-antd): Add Search command palette block with MiniSearch.
+
+  New `Search` display block provides a full-text search command palette (Cmd+K / Ctrl+K) using MiniSearch (~6KB) and antd Modal.
+
+  - **Pre-built index support**: Load a static JSON index via `indexUrl` for zero-config search on static sites
+  - **Runtime indexing**: Pass `documents` array with `fields` and `storeFields` for client-side indexing
+  - **Grouped results**: Results auto-grouped by configurable field with section headers
+  - **Keyboard navigation**: Arrow keys, Enter to select, Escape to close
+  - **Term highlighting**: Matched search terms highlighted in results
+  - **Recent searches**: localStorage-backed search history with configurable count
+  - **14 CSS slots**: Full style customization via `styles`/`classNames` (trigger, modal, input, results, groups, highlights)
+  - **Analytics-friendly events**: `onSelect` passes the result item, search `query`, and `resultCount` for click-through tracking; `onSearch` passes the search term and result count on each query change
+
+  ### Docs app integration
+
+  - New search index transformer (`generateSiteAssets.js`) builds a MiniSearch index at build time from page content
+  - Replaces Algolia DocSearch with the self-hosted Search block — removes external CDN dependency
+
+  ### Removed
+
+  - `@lowdefy/blocks-algolia` package has been removed. Use the `Search` block in `@lowdefy/blocks-antd` instead.
+
+- Updated dependencies [52ea769811]
+- Updated dependencies [29eb199c7f]
+- Updated dependencies [155c0b9724]
+- Updated dependencies [130a569d36]
+- Updated dependencies [e3e922538]
+- Updated dependencies [c8f4a41063]
+- Updated dependencies [fd8225b7a1]
+- Updated dependencies [905d5d406]
+- Updated dependencies [8b9f926d1]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/blocks-basic@5.0.0
+  - @lowdefy/block-utils@5.0.0
+  - @lowdefy/blocks-loaders@5.0.0
+  - @lowdefy/nunjucks@5.0.0
+  - @lowdefy/operators-js@5.0.0
+  - @lowdefy/helpers@5.0.0
+  - @lowdefy/node-utils@5.0.0
+  - @lowdefy/ajv@5.0.0
+  - @lowdefy/operators@5.0.0
+  - @lowdefy/errors@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- 8779686f9: fix(build,server-dev): Improved accuracy of dev server skeleton rebuild detection.
+
+  The dev server previously used a path-based heuristic to decide which file changes required a skeleton rebuild. This could miss changes to API endpoints referenced from page directories, and unnecessarily rebuild for non-skeleton page templates. Skeleton rebuild classification now uses the build's ref map as the source of truth, ensuring only the correct file changes trigger skeleton rebuilds.
+
+- Updated dependencies [c5ce5b972]
+  - @lowdefy/operators-js@4.7.3
+  - @lowdefy/operators@4.7.3
+  - @lowdefy/blocks-basic@4.7.3
+  - @lowdefy/blocks-loaders@4.7.3
+  - @lowdefy/ajv@4.7.3
+  - @lowdefy/errors@4.7.3
+  - @lowdefy/helpers@4.7.3
+  - @lowdefy/node-utils@4.7.3
+  - @lowdefy/nunjucks@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- 30616048d: fix: Fix dev server build hang when page files contain top-level \_ref.
+
+  The dev server could hang indefinitely at "Building config..." when a page YAML file's entire content was a `_ref`. This caused a self-referencing parent in the ref map, leading to an infinite loop during page source resolution. Also fixed null `lowdefy.yaml` handling in custom plugin type map generation.
+
+  - @lowdefy/operators@4.7.2
+  - @lowdefy/blocks-basic@4.7.2
+  - @lowdefy/blocks-loaders@4.7.2
+  - @lowdefy/operators-js@4.7.2
+  - @lowdefy/ajv@4.7.2
+  - @lowdefy/errors@4.7.2
+  - @lowdefy/helpers@4.7.2
+  - @lowdefy/node-utils@4.7.2
+  - @lowdefy/nunjucks@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- 1ce9f9a56: fix(build): Dev server dynamically loads icons discovered during JIT page builds.
+
+  Icons referenced only inside page blocks (e.g., `icon: FiAperture` on a Button) were not available in the dev server's static bundle, causing a fallback icon to render. The JIT page builder now detects missing icons when a page is compiled, extracts their SVG data from react-icons, and serves it via a dynamic API endpoint. The client fetches and merges these icons at runtime without triggering a Next.js rebuild or server restart.
+
+- ca26d3441: Resolve sibling refs in parallel using Promise.all to interleave CPU and I/O during build.
+- Updated dependencies [fac48c10a]
+  - @lowdefy/operators-js@4.7.1
+  - @lowdefy/blocks-basic@4.7.1
+  - @lowdefy/blocks-loaders@4.7.1
+  - @lowdefy/operators@4.7.1
+  - @lowdefy/ajv@4.7.1
+  - @lowdefy/errors@4.7.1
+  - @lowdefy/helpers@4.7.1
+  - @lowdefy/node-utils@4.7.1
+  - @lowdefy/nunjucks@4.7.1
+
+## 4.7.0
+
+### Minor Changes
+
+- 4543688f7: feat: Single-pass async walker for ref resolution
+
+  **Single-Pass Walker (`@lowdefy/build`)**
+
+  - New `walker` module replaces the multi-pass JSON round-trip architecture in `buildRefs` with a single async tree walk
+  - Resolves `_ref` markers, evaluates `_build.*` operators, and tags `~r` provenance in one pass instead of 5+ `serializer.copy` calls per ref
+  - Wired into both `buildRefs` (production) and `buildPageJit` (dev server)
+  - Added `isPageContentPath` for semantic shallow build matching, replacing brittle path-index checks
+  - Deleted redundant code replaced by walker: `getRefsFromFile`, `populateRefs`, `createRefReviver`, and the `evaluateStaticOperators` wrapper
+
+  **In-Place Operator Evaluation (`@lowdefy/operators`)**
+
+  - New `evaluateOperators` function walks a tree in-place and evaluates operator nodes, avoiding JSON serialization round-trips
+  - Used by the walker module to evaluate `_build.*` operators inline during ref resolution
+
+  **Serializer Fix (`@lowdefy/helpers`)**
+
+  - Added `skipMarkers` option to `serializer.serializeToString` to exclude internal markers (`~k`, `~r`, `~l`, `~arr`) from serialized output
+
+### Patch Changes
+
+- e1274566b: fix(build): Report all ref errors at once instead of stopping on the first one.
+
+  When multiple referenced files have errors (missing files, YAML parse errors, invalid refs), the build now collects and reports all errors at once instead of stopping on the first failure. This reduces the fix-rebuild-fix cycle when multiple config files have issues.
+
+- 5716be2c8: fix(build): Preserve inline page content in JIT builds
+
+  Pages declared inline in `lowdefy.yaml` (not via `_ref`) had their content stripped during shallow builds with no way to recover at JIT time, resulting in empty page shells. Detect inline pages by checking refId matches root ref with no sourceRef, and skip stripping. Set refId to null for inline pages in `createPageRegistry` so `buildPageJit` reads the pre-built artifact instead of attempting JIT resolution.
+
+- 5a556b918: fix(build): Improve error message for YAML errors in njk templates
+
+  When a .yaml.njk nunjucks template produces invalid YAML, the error now says "Nunjucks template produced invalid YAML" instead of showing a misleading line number from the generated output.
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [811f80760]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/operators@4.7.0
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/blocks-basic@4.7.0
+  - @lowdefy/operators-js@4.7.0
+  - @lowdefy/blocks-loaders@4.7.0
+  - @lowdefy/node-utils@4.7.0
+  - @lowdefy/nunjucks@4.7.0
+  - @lowdefy/ajv@4.7.0
+  - @lowdefy/errors@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- 8ec5f1be05: Collect all build errors before stopping
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+- af61715d5: feat: JIT page building for dev server
+
+  **Shallow Refs and JIT Build (`@lowdefy/build`)**
+
+  - Shallow `_ref` resolution stops at configured JSON paths, leaving `~shallow` markers for on-demand resolution
+  - `shallowBuild` produces a page registry with dependency tracking instead of fully built pages
+  - `buildPageJit` fully resolves a single page on demand using the shallow build output
+  - File dependency map tracks which config files affect which pages for targeted rebuilds
+  - Build package reorganized: `jit/` folder for dev-server-only files, `full/` folder for production-only files
+
+  **JIT Page Building (`@lowdefy/server-dev`)**
+
+  - Pages are built on-demand when requested instead of all at once during initial build
+  - Page cache with file-watcher invalidation for fast rebuilds
+  - `/api/page/[pageId]` endpoint triggers JIT build if page not cached
+  - `/api/js/[env]` endpoint serves operator JS maps
+  - Build error page component displays errors inline in the browser
+
+  **Operator JS Hash Check (`@lowdefy/operators-js`)**
+
+  - Added hash validation for jsMap to detect stale operator definitions
+
+- 43a5243da: feat(server-dev): Add mock user support for e2e testing
+
+  Set `LOWDEFY_DEV_USER` env var or `auth.dev.mockUser` in config to bypass login in dev server.
+
+- cacbb4d189: Add build-time validation for NEXTAUTH_SECRET environment variable when auth providers are configured
+- 338ea04b9f: feat(build): Add ~ignoreBuildChecks property to suppress build validation
+
+  **Build Validation Suppression (#1949, #1963)**
+
+  - New `~ignoreBuildChecks` property suppresses build-time validation errors and warnings
+  - Supports `true` (suppress all) or array of specific check slugs (e.g., `['state-refs', 'types']`)
+  - Cascades to all descendant config objects - set on a page to suppress for all child blocks
+  - Silent suppression - no log output when validation is skipped (visible with `--log-level debug`)
+
+  > **Renamed:** Previously `~ignoreBuildCheck` (singular) - using the old name throws a helpful migration error.
+
+  **Available Check Slugs:**
+
+  - `state-refs`, `payload-refs`, `step-refs` - Reference validation warnings
+  - `link-refs`, `request-refs`, `connection-refs` - Action reference validation
+  - `types` - All type validation (blocks, operators, actions, etc.)
+  - `schema` - JSON schema validation errors
+
+  **Use Cases:**
+
+  - Dynamic state references created at runtime by custom blocks
+  - Multi-app monorepos with conditional configurations
+  - Work-in-progress features during development
+  - Plugin development with custom types not yet registered
+
+  **Example:**
+
+  ```yaml
+  # Suppress all checks for this page and descendants
+  pages:
+    - id: dynamic-page
+      type: Box
+      ~ignoreBuildChecks: true
+      blocks:
+        - id: block1
+          type: TextInput
+          properties:
+            value:
+              _state: dynamicField # No warning
+
+  # Suppress only specific checks
+  blocks:
+    - id: custom_block
+      type: CustomBlock
+      ~ignoreBuildChecks:
+        - state-refs
+        - types
+      properties:
+        onClick:
+          _state: dynamicState # No warning (state-refs suppressed)
+  ```
+
+### Patch Changes
+
+- aeae7f0c83: fix(build): Eliminate false positive warnings for \_state references set by SetState actions
+
+  The validateStateReferences validator now recognizes state keys initialized by SetState actions in page or block events, eliminating false positive warnings when \_state references legitimate state that's set programmatically rather than from input blocks.
+
+- 7936ee3fd8: Improve build error handling and test infrastructure:
+  - Stop build after schema validation errors to prevent cascading failures
+  - Convert makeId to class with reset() method for reliable test isolation
+  - Add parseTestYaml helper for realistic YAML-based test fixtures
+  - Simplify buildConnections by removing duplicate validations handled by schema
+  - Fix addKeys to not store undefined values in keyMap
+  - Menu link to missing page is warning in dev, error in prod
+  - Handle areas with no blocks gracefully - render as empty page instead of crashing
+  - Filter out anyOf/oneOf cascade errors in schema validation - only show the specific error
+- aebca6ab51: refactor: Consolidate error classes into @lowdefy/errors package with environment-specific subpaths
+
+  **Error Package Restructure**
+
+  - New `@lowdefy/errors` package with all error classes (`ConfigError`, `PluginError`, `ServiceError`, `UserError`, `LowdefyInternalError`, `ConfigWarning`)
+    - `@lowdefy/errors/build` - Build-time errors with sync resolution via keyMap/refMap
+  - Moved ConfigMessage, resolveConfigLocation from node-utils to errors/build
+
+  **TC39 Standard Constructor Signatures**
+
+  - All error constructors standardized to `new MyError(message, { cause, ...options })`:
+    ```javascript
+    new ConfigError('Property must be a string.', { configKey });
+    new OperatorError(e.message, { cause: e, typeName: '_if', received: params });
+    new ServiceError(undefined, { cause: error, service: 'MongoDB', configKey });
+    ```
+  - Plugins throw simple errors without knowing about configKey
+  - Interface layer adds configKey before re-throwing
+
+  **configKey Added to ALL Errors**
+
+  - Interface layer now adds configKey to ALL error types (not just PluginError):
+    - ConfigError: adds configKey if not present, re-throws
+    - ServiceError: created via `new ServiceError(undefined, { cause: error, service, configKey })`
+    - Plain Error: wraps in PluginError with configKey
+  - Helps developers trace any error back to its config source, including service/network errors
+
+  **Cause Chain Support**
+
+  - All error classes use TC39 `error.cause` instead of custom stack copying
+  - CLI logger walks cause chain displaying `Caused by:` lines
+  - `extractErrorProps` recursively serializes Error causes for pino JSON logs
+  - ConfigError and PluginError extract `received` and `configKey` from `cause`:
+    ```javascript
+    new ConfigError(undefined, { cause: plainError }); // extracts cause.received and cause.configKey
+    new PluginError(undefined, { cause: plainError }); // same extraction
+    ```
+
+  **Error Display**
+
+  - `errorToDisplayString()` formats errors for display, appending `Received: <JSON>` when `error.received` is defined
+  - `rawMessage` stores the original unformatted message on PluginError
+
+- ab19b1bb77: fix(helpers): Preserve ~l line numbers on arrays in serializer.copy
+
+  Fixed an issue where line number metadata (`~l`) on arrays was lost during `serializer.copy()`, causing schema validation errors to show incorrect line numbers.
+
+  **Problem:**
+
+  - Schema errors for properties like `requests:` at line 7 were showing `:1` instead of `:7`
+  - The `~l` property on arrays was stripped during JSON round-trip in `evaluateBuildOperators`
+
+  **Solution:**
+
+  - Arrays with `~l` are now wrapped in a marker object `{ '~arr': [...], '~l': N }` during serialization
+  - The reviver restores the array with `~l` preserved as a non-enumerable property
+  - Custom revivers now receive the restored array instead of the wrapper object
+
+  **Result:**
+
+  ```
+  Before: lowdefy.yaml:1 at root
+  After:  lowdefy.yaml:7 at root
+  ```
+
+- 8ec5f1be05: fix: Correct file path tracing for multi-file \_ref imports
+- Updated dependencies [fb7910f62]
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [bb3222a5a]
+- Updated dependencies [8ec5f1be05]
+- Updated dependencies [af61715d5]
+- Updated dependencies [f673e3ab3]
+  - @lowdefy/blocks-basic@4.6.0
+  - @lowdefy/errors@4.6.0
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/node-utils@4.6.0
+  - @lowdefy/operators@4.6.0
+  - @lowdefy/operators-js@4.6.0
+  - @lowdefy/blocks-loaders@4.6.0
+  - @lowdefy/nunjucks@4.6.0
+  - @lowdefy/ajv@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.2
+- @lowdefy/blocks-basic@4.5.2
+- @lowdefy/blocks-loaders@4.5.2
+- @lowdefy/operators-js@4.5.2
+- @lowdefy/ajv@4.5.2
+- @lowdefy/helpers@4.5.2
+- @lowdefy/node-utils@4.5.2
+- @lowdefy/nunjucks@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.1
+- @lowdefy/blocks-basic@4.5.1
+- @lowdefy/blocks-loaders@4.5.1
+- @lowdefy/operators-js@4.5.1
+- @lowdefy/ajv@4.5.1
+- @lowdefy/helpers@4.5.1
+- @lowdefy/node-utils@4.5.1
+- @lowdefy/nunjucks@4.5.1
+
+## 4.5.0
+
+### Minor Changes
+
+- abc90f3f7: Change to Apache 2.0 license for all packages. All license checks and restrictions have been removed.
+- 09ae496d8: Add JSONata operator.
+
+### Patch Changes
+
+- Updated dependencies [09ae496d8]
+  - @lowdefy/operators@4.5.0
+  - @lowdefy/operators-js@4.5.0
+  - @lowdefy/blocks-basic@4.5.0
+  - @lowdefy/blocks-loaders@4.5.0
+  - @lowdefy/ajv@4.5.0
+  - @lowdefy/helpers@4.5.0
+  - @lowdefy/node-utils@4.5.0
+  - @lowdefy/nunjucks@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

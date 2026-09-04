@@ -4,12 +4,25 @@
 **/node_modules/*
 **/.lowdefy/*
 **/.next/*
+**/playwright-report/*
+**/test-results/*
+**/out/*
 **/.env
-**/lowdefy.yaml
+
+.claude/settings.local.json
+.claude/skills/
+.agents/
+.superpowers/
+.worktrees/
+skills-lock.json
+docs/superpowers/
 
 .turbo
 
+_server/
+
 packages/servers/*/build/**
+packages/servers/*/lowdefy-build/**
 packages/servers/*/public/**
 packages/servers/*/package.original.json
 
@@ -31,10 +44,17 @@ packages/utils/node-utils/test/copyDirectory/**
 packages/utils/node-utils/test/copyFile/**
 
 app/**
+modules/**
 
 packages/docs/public/sitemap.xml
+packages/docs/public/search-index.json
 packages/website/public/sitemap.xml
 
 lerna-debug.log
+log.txt
 
 *.vsix
+
+temp.md
+
+_server

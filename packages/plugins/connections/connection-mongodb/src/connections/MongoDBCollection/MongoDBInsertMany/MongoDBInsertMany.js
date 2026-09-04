@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,20 +18,35 @@ import getCollection from '../getCollection.js';
 import { serialize, deserialize } from '../serialize.js';
 import schema from './schema.js';
 
-async function MongodbInsertMany({ connection, request }) {
+async function MongodbInsertMany({
+  blockId,
+  connection,
+  connectionId,
+  pageId,
+  payload,
+  request,
+  requestId,
+}) {
   const deserializedRequest = deserialize(request);
   const { docs, options } = deserializedRequest;
-  const { collection, client } = await getCollection({ connection });
-  let response;
-  try {
-    response = await collection.insertMany(docs, options);
-  } catch (error) {
-    await client.close();
-    throw error;
+  const { collection, logCollection } = await getCollection({ connection });
+  const response = await collection.insertMany(docs, options);
+  if (logCollection) {
+    await logCollection.insertOne({
+      args: { docs, options },
+      blockId,
+      connectionId,
+      pageId,
+      payload,
+      requestId,
+      response,
+      timestamp: new Date(),
+      type: 'MongoDBInsertMany',
+      meta: connection.changeLog?.meta,
+    });
   }
-  await client.close();
-  const { acknowledged, insertedCount } = serialize(response);
-  return { acknowledged, insertedCount };
+  const { acknowledged, insertedCount, insertedIds } = serialize(response);
+  return { acknowledged, insertedCount, insertedIds };
 }
 
 MongodbInsertMany.schema = schema;

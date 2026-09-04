@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -39,6 +39,14 @@ export default {
       description: 'Optional settings.',
       errorMessage: {
         type: 'MongoDBUpdateOne request property "options" should be an object.',
+      },
+    },
+    disableNoMatchError: {
+      type: 'boolean',
+      description:
+        'Do not throw an error when no document matches the filter. By default the request throws "No matching record to update." when nothing matched and upsert is not set.',
+      errorMessage: {
+        type: 'MongoDBUpdateOne request property "disableNoMatchError" should be a boolean.',
       },
     },
   },

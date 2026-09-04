@@ -1,0 +1,18 @@
+name: Companies
+
+vars:
+  label:
+    type: string
+    default: Companies
+
+dependencies:
+  - id: contacts
+
+components:
+  - id: company-selector
+    type: Component
+    component:
+      _ref: components/company-selector.yaml
+
+pages:
+  - _ref: pages/company-detail.yaml

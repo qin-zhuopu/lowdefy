@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,10 +14,8 @@
   limitations under the License.
 */
 
-import { jest } from '@jest/globals';
 import React from 'react';
 import { render } from '@testing-library/react';
-import { makeCssClass } from '@lowdefy/block-utils';
 
 import AutoBlockSim from './blocks/AutoBlockSim.js';
 
@@ -26,26 +24,10 @@ mockMath.random = () => 0.123456789;
 global.Math = mockMath;
 
 const runExampleTests = (examples) => {
-  beforeEach(() => {
-    Object.defineProperty(window, 'matchMedia', {
-      writable: true,
-      value: jest.fn().mockImplementation((query) => ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: jest.fn(), // deprecated
-        removeListener: jest.fn(), // deprecated
-        addEventListener: jest.fn(),
-        removeEventListener: jest.fn(),
-        dispatchEvent: jest.fn(),
-      })),
-    });
-  });
-
   examples.forEach((ex) => {
     test(ex.id, () => {
       const { container } = render(
-        <AutoBlockSim block={ex} state={{}} areaKey="content" makeCssClass={makeCssClass} />
+        <AutoBlockSim block={ex} state={{}} areaKey="content" />
       );
       expect(container).toMatchSnapshot();
     });

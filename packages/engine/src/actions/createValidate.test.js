@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
   limitations under the License.
 */
 import { jest } from '@jest/globals';
+import { ActionError, UserError } from '@lowdefy/errors';
 
 import testContext from '../../test/testContext.js';
 
@@ -27,6 +28,13 @@ const lowdefy = {
       },
     },
     displayMessage,
+    translate: (key, values) => {
+      if (key === 'engine.validation.summary') {
+        return `Your input has ${values.count} validation error${values.count === 1 ? '' : 's'}.`;
+      }
+      if (key === 'engine.validation.fieldRequired') return 'This field is required';
+      return key;
+    },
   },
 };
 
@@ -81,8 +89,8 @@ test('Validate required field', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['text1'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['text1'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: ['This field is required'],
@@ -99,23 +107,26 @@ test('Validate required field', async () => {
         id: 'validate',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 1 validation error.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['This field is required'],
     status: 'error',
@@ -206,9 +217,9 @@ test('Validate all fields', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['text1'];
-  const text2 = context._internal.RootBlocks.map['text2'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['text1'];
+  const text2 = context._internal.RootSlots.map['text2'];
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: null,
@@ -225,23 +236,26 @@ test('Validate all fields', async () => {
         id: 'validate',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 2 validation errors.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 2 validation errors.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 2 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: 'error',
@@ -277,23 +291,26 @@ test('Validate all fields', async () => {
         id: 'validate',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 1 validation error.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: [],
     status: 'success',
@@ -393,9 +410,9 @@ test('Validate only one field', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['text1'];
-  const text2 = context._internal.RootBlocks.map['text2'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['text1'];
+  const text2 = context._internal.RootSlots.map['text2'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
@@ -413,23 +430,27 @@ test('Validate only one field', async () => {
         params: 'text1',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          params: 'text1',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 1 validation error.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: 'error',
@@ -539,10 +560,10 @@ test('Validate list of fields', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['text1'];
-  const text2 = context._internal.RootBlocks.map['text2'];
-  const text3 = context._internal.RootBlocks.map['text3'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['text1'];
+  const text2 = context._internal.RootSlots.map['text2'];
+  const text3 = context._internal.RootSlots.map['text3'];
   text1.setValue('text1');
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
@@ -571,23 +592,27 @@ test('Validate list of fields', async () => {
         params: ['text1', 'text2'],
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          params: ['text1', 'text2'],
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 1 validation error.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(displayMessage.mock.calls).toMatchInlineSnapshot(`
     Array [
       Array [
@@ -666,7 +691,7 @@ test('Invalid Validate params', async () => {
     lowdefy,
     pageConfig,
   });
-  const button = context._internal.RootBlocks.map['button'];
+  const button = context._internal.RootSlots.map['button'];
   await button.triggerEvent({ name: 'onClick' });
   expect(button.Events.events.onClick.history[0]).toEqual({
     blockId: 'button',
@@ -679,23 +704,27 @@ test('Invalid Validate params', async () => {
         params: 1,
         type: 'Validate',
       },
-      error: {
-        error: new Error('Invalid validate params.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(ActionError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          params: 1,
+          type: 'Validate',
+        },
+        error: expect.any(ActionError),
         index: 0,
-        error: new Error('Invalid validate params.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error._message).toContain(
+    'Invalid validate params.'
+  );
   expect(displayMessage.mock.calls).toMatchInlineSnapshot(`
     Array [
       Array [
@@ -744,8 +773,8 @@ test('Validate does not fail on warnings', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['text1'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['text1'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: [],
@@ -821,8 +850,8 @@ test('Validate on nested objects using params.regex string', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text1 = context._internal.RootBlocks.map['obj.text1'];
+  const button = context._internal.RootSlots.map['button'];
+  const text1 = context._internal.RootSlots.map['obj.text1'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
@@ -833,14 +862,15 @@ test('Validate on nested objects using params.regex string', async () => {
     blockId: 'button',
     bounced: false,
     error: {
-      error: { type: 'Validate', error: new Error('Your input has 1 validation error.'), index: 0 },
       action: { id: 'validate', type: 'Validate', params: { regex: '^obj.*1$' } },
+      error: expect.any(UserError),
+      index: 0,
     },
     eventName: 'onClick',
     responses: {
       validate: {
-        type: 'Validate',
-        error: new Error('Your input has 1 validation error.'),
+        action: { id: 'validate', type: 'Validate', params: { regex: '^obj.*1$' } },
+        error: expect.any(UserError),
         index: 0,
       },
     },
@@ -848,6 +878,9 @@ test('Validate on nested objects using params.regex string', async () => {
     startTimestamp: { date: 0 },
     success: false,
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: 'error',
@@ -912,10 +945,10 @@ test('Validate on nested objects using params.regex array', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text2 = context._internal.RootBlocks.map['text2'];
-  const text1 = context._internal.RootBlocks.map['obj.text1'];
-  const abc1 = context._internal.RootBlocks.map['obj.abc1'];
+  const button = context._internal.RootSlots.map['button'];
+  const text2 = context._internal.RootSlots.map['text2'];
+  const text1 = context._internal.RootSlots.map['obj.text1'];
+  const abc1 = context._internal.RootSlots.map['obj.abc1'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
@@ -926,18 +959,15 @@ test('Validate on nested objects using params.regex array', async () => {
     blockId: 'button',
     bounced: false,
     error: {
-      error: {
-        type: 'Validate',
-        error: new Error('Your input has 2 validation errors.'),
-        index: 0,
-      },
       action: { id: 'validate', type: 'Validate', params: { regex: ['^obj.*1$'] } },
+      error: expect.any(UserError),
+      index: 0,
     },
     eventName: 'onClick',
     responses: {
       validate: {
-        type: 'Validate',
-        error: new Error('Your input has 2 validation errors.'),
+        action: { id: 'validate', type: 'Validate', params: { regex: ['^obj.*1$'] } },
+        error: expect.any(UserError),
         index: 0,
       },
     },
@@ -945,6 +975,9 @@ test('Validate on nested objects using params.regex array', async () => {
     startTimestamp: { date: 0 },
     success: false,
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 2 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: 'error',
@@ -1020,10 +1053,10 @@ test('Validate on nested objects using params.regex array and blockIds', async (
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const text2 = context._internal.RootBlocks.map['text2'];
-  const text1 = context._internal.RootBlocks.map['obj.text1'];
-  const abc1 = context._internal.RootBlocks.map['obj.abc1'];
+  const button = context._internal.RootSlots.map['button'];
+  const text2 = context._internal.RootSlots.map['text2'];
+  const text1 = context._internal.RootSlots.map['obj.text1'];
+  const abc1 = context._internal.RootSlots.map['obj.abc1'];
   await button.triggerEvent({ name: 'onClick' });
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
@@ -1034,23 +1067,24 @@ test('Validate on nested objects using params.regex array and blockIds', async (
     blockId: 'button',
     bounced: false,
     error: {
-      error: {
-        type: 'Validate',
-        error: new Error('Your input has 2 validation errors.'),
-        index: 0,
-      },
       action: {
         id: 'validate',
         type: 'Validate',
         params: { regex: ['^obj.*t1$'], blockIds: ['text2'] },
       },
+      error: expect.any(UserError),
+      index: 0,
     },
     event: undefined,
     eventName: 'onClick',
     responses: {
       validate: {
-        type: 'Validate',
-        error: new Error('Your input has 2 validation errors.'),
+        action: {
+          id: 'validate',
+          type: 'Validate',
+          params: { regex: ['^obj.*t1$'], blockIds: ['text2'] },
+        },
+        error: expect.any(UserError),
         index: 0,
       },
     },
@@ -1058,6 +1092,9 @@ test('Validate on nested objects using params.regex array and blockIds', async (
     startTimestamp: { date: 0 },
     success: false,
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 2 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['text1 does not match pattern "text1"'],
     status: 'error',

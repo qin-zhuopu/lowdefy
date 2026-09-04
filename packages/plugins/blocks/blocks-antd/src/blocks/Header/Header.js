@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,29 +14,61 @@
   limitations under the License.
 */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Layout } from 'antd';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { type } from '@lowdefy/helpers';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+
+import { renderHeaderActions, registerDarkModeMethod } from '../headerActions.js';
 
 const Header = Layout.Header;
 
-const HeaderBlock = ({ blockId, content, methods, properties }) => (
-  <Header
-    id={blockId}
-    className={`${methods.makeCssClass([
-      { backgroundColor: properties.theme === 'light' && '#fff' },
-      properties.style,
-    ])} hide-on-print`}
-  >
-    {content.content && content.content()}
-  </Header>
-);
+const HeaderBlock = ({
+  blockId,
+  classNames = {},
+  components: { Icon, Link, ShortcutBadge } = {},
+  content,
+  events = {},
+  methods = {},
+  properties = {},
+  styles = {},
+}) => {
+  useEffect(() => {
+    if (properties.darkModeToggle && methods.registerEvent) {
+      registerDarkModeMethod(methods);
+    }
+  });
 
-HeaderBlock.defaultProps = blockDefaultProps;
-HeaderBlock.meta = {
-  category: 'container',
-  icons: [],
-  styles: ['blocks/Header/style.less'],
+  const hasActions =
+    !type.isNone(properties.notifications) ||
+    !type.isNone(properties.profile) ||
+    properties.darkModeToggle;
+
+  return (
+    <Header
+      id={blockId}
+      className={classNames.element ? `${classNames.element} hide-on-print` : 'hide-on-print'}
+      style={{
+        background: properties.color ?? 'var(--ant-color-bg-container)',
+        display: 'flex',
+        alignItems: 'center',
+        ...styles.element,
+      }}
+    >
+      {content.content && content.content({ flex: '1 1 auto', minWidth: 0, alignItems: 'center' })}
+      {hasActions &&
+        renderHeaderActions({
+          blockId,
+          classNames,
+          styles,
+          properties,
+          methods,
+          events,
+          components: { Icon, Link, ShortcutBadge },
+          iconsColor: properties.iconsColor,
+        })}
+    </Header>
+  );
 };
 
-export default HeaderBlock;
+export default withBlockDefaults(HeaderBlock);

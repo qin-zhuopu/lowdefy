@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 */
 
 import validate from './validate.js';
+import { MAX_VALIDATION_ERRORS } from './ajvInstance.js';
 
 test('Object matches schema', () => {
   const schema = {
@@ -332,4 +333,37 @@ test('Object does not match schema, one error, error message, returnErrors true'
     ],
     valid: false,
   });
+});
+
+test('Error allocation is hard-capped at MAX_VALIDATION_ERRORS (DoS guard)', () => {
+  // 50 disallowed properties — without the cap, Ajv would produce 50 errors.
+  // With code.process injection, the generated validator early-exits at the cap.
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    properties: {},
+  };
+  const data = {};
+  for (let i = 0; i < 50; i++) {
+    data[`extra_${i}`] = i;
+  }
+  const result = validate({ schema, data, returnErrors: true });
+  expect(result.valid).toBe(false);
+  expect(result.errors).toHaveLength(MAX_VALIDATION_ERRORS);
+});
+
+test('Error count below cap is returned in full', () => {
+  // Legitimate use case: a handful of errors should pass through unchanged.
+  const schema = {
+    type: 'object',
+    properties: {
+      a: { type: 'string' },
+      b: { type: 'string' },
+      c: { type: 'string' },
+    },
+  };
+  const data = { a: 1, b: 2, c: 3 };
+  const result = validate({ schema, data, returnErrors: true });
+  expect(result.valid).toBe(false);
+  expect(result.errors).toHaveLength(3);
 });

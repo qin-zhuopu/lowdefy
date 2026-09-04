@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import crypto from 'crypto';
 
 import addUserFieldsToSession from './addUserFieldsToSession.js';
 import createCallbackPlugins from './createCallbackPlugins.js';
+import validateSessionRoles from './validateSessionRoles.js';
 
 function createSessionCallback({ authConfig, plugins }) {
   const sessionCallbackPlugins = createCallbackPlugins({
@@ -93,6 +94,8 @@ function createSessionCallback({ authConfig, plugins }) {
         user,
       });
     }
+
+    validateSessionRoles({ session });
 
     // TODO: Should this be session.hashed_id or session.user.hashed_id
     // Only session.user will be available using the _user operator

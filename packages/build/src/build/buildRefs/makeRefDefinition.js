@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -19,12 +19,19 @@ import { get } from '@lowdefy/helpers';
 import getRefPath from './getRefPath.js';
 import makeId from '../../utils/makeId.js';
 
-function makeRefDefinition(refDefinition, parent, refMap) {
-  const id = makeId();
+function makeRefDefinition(refDefinition, parent, refMap, lineNumber, walkerPath) {
+  // Use walker tree path when available for deterministic IDs under parallel
+  // resolution. Falls back to counter for root ref and JIT-created refs.
+  // When a file's root content is itself a _ref, both the outer and inner refs
+  // share the same walker path. Fall back to counter to avoid overwriting the
+  // outer ref's refMap entry (which would create a self-referencing parent).
+  const id = walkerPath != null && refMap[walkerPath] === undefined ? walkerPath : makeId.next();
   const refDef = {
     parent,
+    lineNumber,
   };
   refMap[id] = refDef;
+  const ignoreBuildChecks = get(refDefinition, '~ignoreBuildChecks');
   return {
     ...refDef,
     id,
@@ -34,6 +41,13 @@ function makeRefDefinition(refDefinition, parent, refMap) {
     resolver: get(refDefinition, 'resolver'),
     transformer: get(refDefinition, 'transformer'),
     vars: get(refDefinition, 'vars', { default: {} }),
+    module: get(refDefinition, 'module'),
+    component: get(refDefinition, 'component'),
+    menu: get(refDefinition, 'menu'),
+    page: get(refDefinition, 'page'),
+    connection: get(refDefinition, 'connection'),
+    api: get(refDefinition, 'api'),
+    ...(ignoreBuildChecks !== undefined && { ignoreBuildChecks }),
   };
 }
 

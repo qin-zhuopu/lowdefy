@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 */
 
 import buildConnections from './buildConnections.js';
-import testContext from '../test/testContext.js';
+import testContext from '../test-utils/testContext.js';
 
 const context = testContext();
 
@@ -23,16 +23,6 @@ test('buildConnections no connections', () => {
   const components = {};
   const res = buildConnections({ components, context });
   expect(res.connections).toBe(undefined);
-});
-
-test('buildConnections connections not an array', () => {
-  const components = {
-    connections: 'connections',
-  };
-  const res = buildConnections({ components, context });
-  expect(res).toEqual({
-    connections: 'connections',
-  });
 });
 
 test('buildConnections', () => {
@@ -63,28 +53,76 @@ test('buildConnections', () => {
   ]);
 });
 
-test('throw on missing id', () => {
+test('buildConnections throws when connection is not an object', () => {
   const components = {
-    connections: [{ type: 'ConnectionType' }],
+    connections: [null],
+  };
+  expect(() => buildConnections({ components, context })).toThrow(
+    'Connection should be an object.'
+  );
+});
+
+test('buildConnections throws when connection id is missing', () => {
+  const components = {
+    connections: [
+      {
+        type: 'ConnectionType',
+      },
+    ],
   };
   expect(() => buildConnections({ components, context })).toThrow('Connection id missing.');
 });
 
-test('connection id is not a string', () => {
+test('buildConnections throws when connection id is not a string', () => {
   const components = {
-    connections: [{ id: 1 }],
+    connections: [
+      {
+        id: true,
+        type: 'ConnectionType',
+      },
+    ],
+  };
+  expect(() => buildConnections({ components, context })).toThrow('Connection id is not a string.');
+});
+
+test('buildConnections throws when connection id is a reserved name', () => {
+  const components = {
+    connections: [
+      {
+        id: 'constructor',
+        type: 'ConnectionType',
+      },
+    ],
   };
   expect(() => buildConnections({ components, context })).toThrow(
-    'Connection id is not a string. Received 1.'
+    'Connection id "constructor" is a reserved name and cannot be used as an id.'
   );
 });
 
-test('throw on missing type', () => {
+test('buildConnections throws when connection type is not defined', () => {
   const components = {
-    connections: [{ id: 'connection1' }],
+    connections: [
+      {
+        id: 'connection1',
+      },
+    ],
   };
   expect(() => buildConnections({ components, context })).toThrow(
-    'Connection type is not a string at connection "connection1". Received undefined.'
+    'Connection type is not defined at connection "connection1".'
+  );
+});
+
+test('buildConnections throws when connection type is not a string', () => {
+  const components = {
+    connections: [
+      {
+        id: 'connection1',
+        type: 123,
+      },
+    ],
+  };
+  expect(() => buildConnections({ components, context })).toThrow(
+    'Connection type is not a string at connection "connection1".'
   );
 });
 
@@ -104,4 +142,41 @@ test('throw on Duplicate ids', () => {
   expect(() => buildConnections({ components, context })).toThrow(
     'Duplicate connectionId "connection1".'
   );
+});
+
+test('count operators', () => {
+  const components = {
+    connections: [
+      {
+        id: 'connection1',
+        type: 'MongoDBCollection',
+        properties: {
+          collection: { _payload: 'collection' },
+          databaseUri: {
+            '_string.concat': ['db', 'uri'],
+          },
+        },
+      },
+      {
+        id: 'connection2',
+        type: 'MongoDBCollection',
+        properties: {
+          changeLog: {
+            _payload: 'changelog',
+          },
+          collection: { '_number.toString': 10 },
+          write: {
+            _eq: [true, false],
+          },
+        },
+      },
+    ],
+  };
+  buildConnections({ components, context });
+  expect(context.typeCounters.operators.server.getCounts()).toEqual({
+    _eq: 1,
+    _number: 1,
+    _payload: 2,
+    _string: 1,
+  });
 });

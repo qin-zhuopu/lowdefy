@@ -1,0 +1,307 @@
+/*
+  Copyright 2020-2026 Lowdefy, Inc
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+import { ToolLoopAgent, tool, jsonSchema, stepCountIs } from 'ai';
+import { createMCPClient } from '@ai-sdk/mcp';
+import { Experimental_StdioMCPTransport } from '@ai-sdk/mcp/mcp-stdio';
+import { ConfigError } from '@lowdefy/errors';
+import { getKey, isReserved, serializer, setKey, translate } from '@lowdefy/helpers';
+
+import listFiles from './fileSystem/listFiles.js';
+import readFile from './fileSystem/readFile.js';
+import searchFiles from './fileSystem/searchFiles.js';
+import statFile from './fileSystem/statFile.js';
+import RESERVED_PLATFORM_TOOL_NAMES from './reservedToolNames.js';
+
+// Build artifacts carry serializer markers (~k, ~r, ~l) and wrap location-marked
+// arrays as { '~arr': [...], '~k': '...' }. serializer.deserialize un-wraps
+// ~arr back to a plain array and demotes markers to non-enumerable properties;
+// the subsequent JSON round-trip drops those non-enumerable markers, leaving a
+// clean structure for the AI SDK.
+function cleanBuildArtifact(obj) {
+  return JSON.parse(JSON.stringify(serializer.deserialize(obj)));
+}
+
+function assertNotPlatformToolName(name, kind, i18n) {
+  if (RESERVED_PLATFORM_TOOL_NAMES.includes(name)) {
+    throw new ConfigError(
+      translate({
+        key: 'agent.runtime.reservedToolName',
+        values: { kind, name, reserved: RESERVED_PLATFORM_TOOL_NAMES.join(', ') },
+        i18n,
+      })
+    );
+  }
+}
+
+async function buildAgentTools({ agent, context, depth = 0 }) {
+  const MAX_DEPTH = 5;
+  if (depth > MAX_DEPTH) {
+    throw new Error(
+      translate({
+        key: 'agent.runtime.subAgentDepthExceeded',
+        values: { max: MAX_DEPTH },
+        i18n: context.i18n,
+      })
+    );
+  }
+
+  const tools = {};
+  const mcpClients = [];
+
+  // Build endpoint tools
+  for (const toolConfig of agent.tools ?? []) {
+    const { endpointId, confirm } = toolConfig;
+    assertNotPlatformToolName(endpointId, 'Endpoint tool', context.i18n);
+    // A second, disjoint list: RESERVED_PLATFORM_TOOL_NAMES are the tools Lowdefy itself registers,
+    // isReserved are the prototype-pollution keys setKey refuses. A name can pass one gate and fail
+    // the other, so both checks are needed. The build rejects reserved key names, so this only fires
+    // for a stale or hand-edited build artifact. Skip the tool rather than fail the whole agent, as
+    // the MCP name cases below do.
+    if (isReserved(endpointId)) {
+      console.warn(`Endpoint tool "${endpointId}" uses a reserved key name — skipped.`);
+      continue;
+    }
+    const endpointConfig = await context.getEndpointConfig({ endpointId });
+
+    setKey(
+      tools,
+      endpointId,
+      tool({
+        description: endpointConfig.description,
+        inputSchema: jsonSchema(cleanBuildArtifact(endpointConfig.payloadSchema)),
+        ...(confirm ? { needsApproval: true } : {}),
+        execute: async (input, { abortSignal } = {}) => {
+          const result = await context.callEndpoint(endpointId, { payload: input, abortSignal });
+          if (!result.success) {
+            const err = serializer.deserialize(result.error);
+            throw new Error(
+              err?.message ??
+                translate({ key: 'agent.runtime.toolExecutionFailed', i18n: context.i18n })
+            );
+          }
+          return cleanBuildArtifact(result.response);
+        },
+      })
+    );
+  }
+
+  // Build MCP clients and merge their tools
+  for (const mcpSource of agent.mcp ?? []) {
+    const evaluatedSource = context.evaluateOperators(mcpSource);
+
+    try {
+      let transport;
+      if (evaluatedSource.transport === 'stdio') {
+        transport = new Experimental_StdioMCPTransport({
+          command: evaluatedSource.command,
+          args: evaluatedSource.args,
+          env: { ...process.env, ...(evaluatedSource.env ?? {}) },
+        });
+      } else {
+        transport = {
+          type: evaluatedSource.transport ?? 'http',
+          url: evaluatedSource.url,
+          ...(evaluatedSource.headers ? { headers: evaluatedSource.headers } : {}),
+        };
+      }
+      const client = await createMCPClient({ transport });
+      mcpClients.push({ client, source: evaluatedSource });
+    } catch (err) {
+      const label =
+        evaluatedSource.transport === 'stdio' ? evaluatedSource.command : evaluatedSource.url;
+      console.warn(`MCP server "${label}" unreachable: ${err.message}`);
+    }
+  }
+
+  // Merge MCP tools with endpoint tools.
+  // MCP tool names come from external servers at runtime — on collisions with
+  // reserved platform names or existing endpoint tools we warn + skip rather
+  // than fail, since the names aren't under app control.
+  for (const { client, source } of mcpClients) {
+    try {
+      const mcpTools = await client.tools();
+      for (const [name, mcpTool] of Object.entries(mcpTools)) {
+        if (RESERVED_PLATFORM_TOOL_NAMES.includes(name)) {
+          console.warn(
+            `MCP tool "${name}" from ${source.url ?? source.command} ` +
+              `uses a reserved platform tool name — skipped.`
+          );
+          continue;
+        }
+        // Same policy as the reserved-platform-name and collision cases above:
+        // MCP tool names are not under app control, so warn and skip.
+        if (isReserved(name)) {
+          console.warn(
+            `MCP tool "${name}" from ${source.url ?? source.command} ` +
+              `uses a reserved key name — skipped.`
+          );
+          continue;
+        }
+        if (getKey(tools, name)) {
+          console.warn(
+            `MCP tool "${name}" from ${source.url ?? source.command} ` +
+              `conflicts with endpoint tool — skipped.`
+          );
+          continue;
+        }
+        setKey(tools, name, source.confirm ? { ...mcpTool, needsApproval: true } : mcpTool);
+      }
+    } catch (err) {
+      const label = source.transport === 'stdio' ? source.command : source.url;
+      console.warn(`MCP server "${label}" tool listing failed: ${err.message}`);
+    }
+  }
+
+  // Build sub-agent tools
+  for (const subAgentRef of agent.agents ?? []) {
+    assertNotPlatformToolName(subAgentRef.agentId, 'Sub-agent', context.i18n);
+    // Same policy as the endpoint tool name above: unreachable from valid config, so skip rather
+    // than fail the whole agent.
+    if (isReserved(subAgentRef.agentId)) {
+      console.warn(`Sub-agent tool "${subAgentRef.agentId}" uses a reserved key name — skipped.`);
+      continue;
+    }
+    const subAgentConfig = await context.getAgentConfig({ agentId: subAgentRef.agentId });
+    const subConnection = await context.getConnectionForAgent({ agentConfig: subAgentConfig });
+    subAgentConfig.mcp = await context.resolveMcpSources({ agentConfig: subAgentConfig });
+
+    // Recursively build sub-agent's tools
+    const { tools: subTools, mcpClients: subMcpClients } = await buildAgentTools({
+      agent: subAgentConfig,
+      context,
+      depth: depth + 1,
+    });
+
+    const subModel = subConnection.provider(subAgentConfig.properties.model);
+
+    const subAgent = new ToolLoopAgent({
+      model: subModel,
+      instructions: subAgentConfig.properties.instructions,
+      tools: subTools,
+      stopWhen: stepCountIs(subAgentConfig.properties.maxSteps ?? 10),
+      maxOutputTokens: subAgentConfig.properties.maxOutputTokens,
+      temperature: subAgentConfig.properties.temperature,
+      toolChoice: subAgentConfig.properties.toolChoice ?? 'auto',
+      providerOptions: subAgentConfig.properties.providerOptions,
+    });
+
+    const description =
+      subAgentRef.description ?? `Delegate task to the ${subAgentRef.agentId} agent`;
+
+    const inputSchema = subAgentRef.inputSchema
+      ? jsonSchema(subAgentRef.inputSchema)
+      : jsonSchema({
+          type: 'object',
+          properties: { task: { type: 'string', description: 'The task to delegate' } },
+          required: ['task'],
+        });
+
+    setKey(
+      tools,
+      subAgentRef.agentId,
+      tool({
+        description,
+        inputSchema,
+        execute: async (input, { abortSignal }) => {
+          const prompt = input.task ?? JSON.stringify(input);
+          const result = await subAgent.generate({ prompt, abortSignal });
+
+          // Cleanup sub-agent's MCP clients
+          await Promise.all(subMcpClients.map(({ client }) => client.close().catch(() => {})));
+
+          return { _subAgent: true, agentId: subAgentRef.agentId, text: result.text };
+        },
+        toModelOutput: ({ output }) => ({
+          type: 'text',
+          value: output.text ?? String(output),
+        }),
+      })
+    );
+  }
+
+  // Build fileSystem tools
+  if (agent.properties?.fileSystem) {
+    const { basePath } = agent.properties.fileSystem;
+
+    tools['read-file'] = tool({
+      description:
+        'Read a file by path. Use list-files or search-files first to discover available paths.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          path: { type: 'string', description: 'File path relative to the base directory.' },
+        },
+        required: ['path'],
+      }),
+      execute: async ({ path }) => readFile(basePath, { path }),
+    });
+
+    tools['list-files'] = tool({
+      description: 'List files and directories. Supports optional glob patterns for filtering.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Directory path to list. Omit for root.',
+          },
+          glob: {
+            type: 'string',
+            description: 'Glob pattern to filter results, e.g. "**/*.md".',
+          },
+        },
+      }),
+      execute: async (params) => listFiles(basePath, params),
+    });
+
+    tools['search-files'] = tool({
+      description:
+        'Search for text across files. Returns matching files with line numbers and context.',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Text to search for.' },
+          glob: {
+            type: 'string',
+            description: 'Glob pattern to limit which files are searched.',
+          },
+        },
+        required: ['query'],
+      }),
+      execute: async (params) => searchFiles(basePath, params),
+    });
+
+    tools['stat-file'] = tool({
+      description: 'Get metadata for a file or directory (size, type, modified date).',
+      inputSchema: jsonSchema({
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'File or directory path relative to the base directory.',
+          },
+        },
+        required: ['path'],
+      }),
+      execute: async ({ path }) => statFile(basePath, { path }),
+    });
+  }
+
+  return { tools, mcpClients };
+}
+
+export default buildAgentTools;

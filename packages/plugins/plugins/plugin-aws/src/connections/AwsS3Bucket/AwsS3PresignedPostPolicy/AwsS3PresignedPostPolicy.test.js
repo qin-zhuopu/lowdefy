@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,32 +15,35 @@
 */
 
 import { validate } from '@lowdefy/ajv';
-import AWS from 'aws-sdk';
 
 import AwsS3PresignedPostPolicy from './AwsS3PresignedPostPolicy.js';
 
-jest.mock('aws-sdk');
+const mockCreatePresignedPost = jest.fn();
+const mockS3ClientConstructor = jest.fn();
+
+jest.mock('@aws-sdk/client-s3', () => ({
+  S3Client: jest.fn().mockImplementation((...args) => {
+    mockS3ClientConstructor(...args);
+    return {};
+  }),
+}));
+
+jest.mock('@aws-sdk/s3-presigned-post', () => ({
+  createPresignedPost: (...args) => mockCreatePresignedPost(...args),
+}));
 
 const schema = AwsS3PresignedPostPolicy.schema;
 const { checkRead, checkWrite } = AwsS3PresignedPostPolicy.meta;
 
-const mockCreatePresignedPost = jest.fn();
 const createPresignedPostMockImp = () => 'res';
-const mockS3Constructor = jest.fn();
-const s3ConstructorMockImp = () => ({
-  createPresignedPost: mockCreatePresignedPost,
-});
-
-AWS.S3 = mockS3Constructor;
 
 beforeEach(() => {
   mockCreatePresignedPost.mockReset();
-  mockS3Constructor.mockReset();
+  mockS3ClientConstructor.mockReset();
   mockCreatePresignedPost.mockImplementation(createPresignedPostMockImp);
-  mockS3Constructor.mockImplementation(s3ConstructorMockImp);
 });
 
-test('AwsS3PresignedPostPolicy', () => {
+test('AwsS3PresignedPostPolicy', async () => {
   const request = { key: 'key' };
   const connection = {
     accessKeyId: 'accessKeyId',
@@ -49,31 +52,32 @@ test('AwsS3PresignedPostPolicy', () => {
     write: true,
     bucket: 'bucket',
   };
-  const res = AwsS3PresignedPostPolicy({ request, connection });
-  expect(mockS3Constructor.mock.calls).toEqual([
+  const res = await AwsS3PresignedPostPolicy({ request, connection });
+  expect(mockS3ClientConstructor.mock.calls).toEqual([
     [
       {
-        accessKeyId: 'accessKeyId',
-        bucket: 'bucket',
+        credentials: {
+          accessKeyId: 'accessKeyId',
+          secretAccessKey: 'secretAccessKey',
+        },
         region: 'region',
-        secretAccessKey: 'secretAccessKey',
       },
     ],
   ]);
   expect(mockCreatePresignedPost.mock.calls).toEqual([
     [
+      {},
       {
         Bucket: 'bucket',
-        Fields: {
-          key: 'key',
-        },
+        Key: 'key',
+        Fields: {},
       },
     ],
   ]);
   expect(res).toEqual('res');
 });
 
-test('AwsS3PresignedPostPolicy options ', async () => {
+test('AwsS3PresignedPostPolicy options', async () => {
   const request = {
     key: 'key',
     acl: 'private',
@@ -87,31 +91,63 @@ test('AwsS3PresignedPostPolicy options ', async () => {
     write: true,
     bucket: 'bucket',
   };
-  const res = AwsS3PresignedPostPolicy({ request, connection });
-  expect(mockS3Constructor.mock.calls).toEqual([
+  const res = await AwsS3PresignedPostPolicy({ request, connection });
+  expect(mockS3ClientConstructor.mock.calls).toEqual([
     [
       {
-        accessKeyId: 'accessKeyId',
-        bucket: 'bucket',
+        credentials: {
+          accessKeyId: 'accessKeyId',
+          secretAccessKey: 'secretAccessKey',
+        },
         region: 'region',
-        secretAccessKey: 'secretAccessKey',
       },
     ],
   ]);
   expect(mockCreatePresignedPost.mock.calls).toEqual([
     [
+      {},
       {
         Bucket: 'bucket',
+        Key: 'key',
         Conditions: [['condition']],
         Expires: 1,
         Fields: {
-          key: 'key',
           acl: 'private',
         },
       },
     ],
   ]);
   expect(res).toEqual('res');
+});
+
+test('AwsS3PresignedPostPolicy URL-encodes x-amz-meta-* fields but passes other fields through', async () => {
+  const request = {
+    key: 'key',
+    acl: 'private',
+  };
+  const connection = {
+    accessKeyId: 'accessKeyId',
+    secretAccessKey: 'secretAccessKey',
+    region: 'region',
+    write: true,
+    bucket: 'bucket',
+  };
+  // Fields are normally injected via request.properties.fields in the engine;
+  // simulate that shape here by attaching fields directly to the request.
+  request.fields = {
+    'x-amz-meta-uploaded-by-name': 'Zoë Güven',
+    'x-amz-meta-uploaded-by-url': 'https://example.com/page?q=hello world',
+    'X-Amz-Meta-Mixed-Case': 'a b',
+    'Content-Type': 'application/pdf',
+  };
+  await AwsS3PresignedPostPolicy({ request, connection });
+  expect(mockCreatePresignedPost.mock.calls[0][1].Fields).toEqual({
+    acl: 'private',
+    'x-amz-meta-uploaded-by-name': 'Zo%C3%AB%20G%C3%BCven',
+    'x-amz-meta-uploaded-by-url': 'https%3A%2F%2Fexample.com%2Fpage%3Fq%3Dhello%20world',
+    'X-Amz-Meta-Mixed-Case': 'a%20b',
+    'Content-Type': 'application/pdf',
+  });
 });
 
 test('Error from s3 client', async () => {
@@ -126,7 +162,7 @@ test('Error from s3 client', async () => {
     bucket: 'bucket',
     write: true,
   };
-  await expect(() => AwsS3PresignedPostPolicy({ request, connection })).toThrow(
+  await expect(AwsS3PresignedPostPolicy({ request, connection })).rejects.toThrow(
     'Test S3 client error.'
   );
 });

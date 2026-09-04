@@ -1,0 +1,14 @@
+name: Layout
+
+dependencies:
+  - id: widgets
+
+components:
+  - id: page-wrapper
+    type: Component
+    component:
+      id: layout-box
+      type: Box
+      blocks:
+        - _var: sidebar
+        - _var: content

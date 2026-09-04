@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,29 +16,34 @@
 
 import React from 'react';
 import { Input } from 'antd';
-import { blockDefaultProps } from '@lowdefy/block-utils';
-
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
 import useRunAfterUpdate from '../../useRunAfterUpdate.js';
 
 const PasswordInput = ({
   blockId,
+  classNames = {},
   components,
   events,
   loading,
   methods,
   properties,
   required,
+  styles = {},
   validation,
   value,
 }) => {
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={components}
       events={events}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       required={required}
+      styles={styles}
       validation={validation}
       content={{
         content: () => {
@@ -46,13 +51,14 @@ const PasswordInput = ({
           return (
             <Input.Password
               id={`${blockId}_input`}
-              bordered={properties.bordered}
-              className={methods.makeCssClass(properties.inputStyle)}
+              variant={properties.bordered === false ? 'borderless' : properties.variant}
+              className={classNames.element}
+              style={styles.element}
               autoFocus={properties.autoFocus}
               disabled={properties.disabled || loading}
               onChange={(event) => {
                 methods.setValue(event.target.value);
-                methods.triggerEvent({ name: 'onChange' });
+                methods.triggerEvent({ name: 'onChange', event: { value: event.target.value } });
                 const cStart = event.target.selectionStart;
                 const cEnd = event.target.selectionEnd;
                 runAfterUpdate(() => {
@@ -81,12 +87,4 @@ const PasswordInput = ({
   );
 };
 
-PasswordInput.defaultProps = blockDefaultProps;
-PasswordInput.meta = {
-  valueType: 'string',
-  category: 'input',
-  icons: [...Label.meta.icons],
-  styles: ['blocks/PasswordInput/style.less'],
-};
-
-export default PasswordInput;
+export default withTheme('Input', withBlockDefaults(PasswordInput));

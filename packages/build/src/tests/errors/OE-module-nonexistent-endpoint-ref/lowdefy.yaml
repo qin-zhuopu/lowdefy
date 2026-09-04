@@ -1,0 +1,12 @@
+# OE: Module page uses _module.endpointId referencing a non-existent endpoint
+# Tests that the build throws when a CallAPI action references an endpoint the module has not produced.
+lowdefy: local
+
+modules:
+  - id: widget
+    source: 'file:modules/widget'
+    vars: {}
+
+pages:
+  - id: home
+    type: Box

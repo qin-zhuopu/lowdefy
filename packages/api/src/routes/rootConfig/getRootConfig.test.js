@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -24,7 +24,10 @@ jest.unstable_mockModule('./menus/getMenus.js', () => ({
 
 const mockReadConfigFile = jest.fn();
 
-const context = testContext({ readConfigFile: mockReadConfigFile });
+const context = testContext({
+  appMeta: { slug: 'my-app', name: 'My App' },
+  readConfigFile: mockReadConfigFile,
+});
 
 beforeEach(() => {
   mockReadConfigFile.mockReset();
@@ -36,6 +39,11 @@ test('getRootConfig', async () => {
     if (path === 'global.json') {
       return {
         global: true,
+      };
+    }
+    if (path === 'theme.json') {
+      return {
+        antd: { token: { colorPrimary: '#00b96b' } },
       };
     }
     return null;
@@ -61,8 +69,13 @@ test('getRootConfig', async () => {
       configured: false,
       pageId: 'page',
     },
+    i18n: {},
+    lowdefyApp: { slug: 'my-app', name: 'My App' },
     lowdefyGlobal: {
       global: true,
+    },
+    theme: {
+      antd: { token: { colorPrimary: '#00b96b' } },
     },
     menus: [
       {

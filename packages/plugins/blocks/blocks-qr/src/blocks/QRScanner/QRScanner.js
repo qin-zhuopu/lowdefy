@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import { Html5Qrcode } from 'html5-qrcode';
 
 const codes = {
@@ -87,17 +87,9 @@ class QRScanner extends React.Component {
   }
 
   render() {
-    const { blockId, properties, methods } = this.props;
-    return <div id={blockId} className={methods.makeCssClass([properties.style])} />;
+    const { blockId, classNames, styles } = this.props;
+    return <div id={blockId} className={classNames?.element} style={styles?.element} />;
   }
 }
 
-QRScanner.defaultProps = blockDefaultProps;
-QRScanner.meta = {
-  valueType: 'object',
-  category: 'input',
-  icons: [],
-  styles: [],
-};
-
-export default QRScanner;
+export default withBlockDefaults(QRScanner);

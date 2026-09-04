@@ -1,0 +1,15 @@
+name: Nav
+
+menus:
+  - id: shared-nav
+    links:
+      - id: dashboard
+        type: MenuLink
+        pageId:
+          _module.pageId: dashboard
+        properties:
+          title: Dashboard
+
+pages:
+  - id: dashboard
+    type: Box

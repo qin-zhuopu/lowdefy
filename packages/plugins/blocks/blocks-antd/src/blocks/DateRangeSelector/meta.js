@@ -1,0 +1,294 @@
+/*
+  Copyright 2020-2026 Lowdefy, Inc
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+import LabelMeta from '../Label/meta.js';
+import label from '../../schemas/label.js';
+import icon from '../../schemas/icon.js';
+import disabledDates from '../../schemas/disabledDates.js';
+import {
+  disabled,
+  inputTitle,
+  autoFocus,
+  allowClear,
+  sizeSmallDefaultLarge,
+} from '../../schemas/inputProperties.js';
+
+export default {
+  category: 'input',
+  icons: [...LabelMeta.icons, 'AiOutlineCalendar'],
+  valueType: 'array',
+  cssKeys: {
+    element: 'The DateRangeSelector element.',
+    label: 'The DateRangeSelector label.',
+    extra: 'The DateRangeSelector extra content.',
+    feedback: 'The DateRangeSelector validation feedback.',
+    popup: 'The DateRangeSelector popup.',
+    suffixIcon: 'The suffix icon in the DateRangeSelector.',
+  },
+  events: {
+    onChange: {
+      description: 'Trigger actions when selection is changed.',
+      event: { value: 'The selected date range value.' },
+    },
+    onTooltipClick: 'Trigger actions when the tooltip icon is clicked.',
+  },
+  properties: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      allowClear: { ...allowClear, default: true },
+      autoFocus,
+      bordered: {
+        type: 'boolean',
+        default: true,
+        description:
+          "Deprecated - use variant: 'borderless'. Whether or not the input has a border style.",
+      },
+      disabled,
+      variant: {
+        type: 'string',
+        enum: ['outlined', 'filled', 'borderless'],
+        default: 'outlined',
+        description: "Variant style of the input. Use 'borderless' instead of bordered: false.",
+      },
+      disabledDates,
+      format: {
+        type: 'string',
+        description:
+          'Format in which to parse the date value, eg. "DD MMMM YYYY" will parse a date value of 1999-12-31 as "31 December 1999". The format has to conform to dayjs formats. Defaults to the active locale\'s date format, or "YYYY-MM-DD" when no locale is configured.',
+      },
+      label,
+      placeholder: {
+        type: 'array',
+        description: 'Placeholder text inside the block before user types input. When unset, antd uses the localized default from ConfigProvider locale.',
+        docs: {
+          displayType: 'manual',
+          block: {
+            id: 'block_properties_placeholder',
+            layout: {
+              _global: 'settings_input_layout',
+            },
+            type: 'Label',
+            properties: {
+              title: 'placeholder',
+              span: 8,
+              align: 'right',
+              extra: 'Placeholder text inside the block before user types input.',
+            },
+            blocks: [
+              {
+                id: 'block.properties.placeholder.0',
+                layout: {
+                  span: 12,
+                },
+                type: 'TextInput',
+                properties: {
+                  size: 'small',
+                  label: {
+                    disabled: true,
+                  },
+                },
+              },
+              {
+                id: 'block.properties.placeholder.1',
+                layout: {
+                  span: 12,
+                },
+                type: 'TextInput',
+                properties: {
+                  size: 'small',
+                  label: {
+                    disabled: true,
+                  },
+                },
+              },
+            ],
+          },
+        },
+      },
+      separator: {
+        type: 'string',
+        default: '~',
+        description: 'Separator symbol shown between start and end date inputs.',
+      },
+      size: sizeSmallDefaultLarge,
+      suffixIcon: {
+        ...icon,
+        default: 'AiOutlineCalendar',
+        description:
+          "Name of an React-Icon (See <a href='https://react-icons.github.io/react-icons/'>all icons</a>) or properties of an Icon block to customize icon on right-hand side of the date picker.",
+      },
+      title: inputTitle,
+      theme: {
+        type: 'object',
+        description:
+          'Antd design token overrides for this block. See <a href="https://ant.design/components/overview#design-token">antd design tokens</a>.',
+        docs: {
+          displayType: 'yaml',
+          link: 'https://ant.design/components/date-picker#design-token',
+        },
+        properties: {
+          cellHeight: {
+            type: 'number',
+            default: 24,
+            description: 'Height of a calendar cell.',
+          },
+          cellWidth: {
+            type: 'number',
+            default: 36,
+            description: 'Width of a calendar cell.',
+          },
+          cellHoverBg: {
+            type: 'string',
+            description: 'Background color of a calendar cell on hover.',
+          },
+          cellActiveWithRangeBg: {
+            type: 'string',
+            description: 'Background color of cells within the selected range.',
+          },
+          cellHoverWithRangeBg: {
+            type: 'string',
+            description: 'Background color of cells within range on hover.',
+          },
+          cellBgDisabled: {
+            type: 'string',
+            description: 'Background color of disabled cells.',
+          },
+          cellRangeBorderColor: {
+            type: 'string',
+            description: 'Border color of range selection cells.',
+          },
+          timeColumnWidth: {
+            type: 'number',
+            default: 56,
+            description: 'Width of the time panel column.',
+          },
+          timeColumnHeight: {
+            type: 'number',
+            default: 224,
+            description: 'Height of the time panel column.',
+          },
+          timeCellHeight: {
+            type: 'number',
+            default: 28,
+            description: 'Height of a time cell in the time panel.',
+          },
+          addonBg: {
+            type: 'string',
+            description: 'Background color for the addon area.',
+          },
+          hoverBorderColor: {
+            type: 'string',
+            description: 'Border color on hover.',
+          },
+          activeBorderColor: {
+            type: 'string',
+            description: 'Border color when active.',
+          },
+          activeShadow: {
+            type: 'string',
+            description: 'Shadow effect when active.',
+          },
+          paddingBlock: {
+            type: 'number',
+            default: 4,
+            description: 'Vertical padding of the input.',
+          },
+          paddingBlockSM: {
+            type: 'number',
+            default: 0,
+            description: 'Vertical padding for small size.',
+          },
+          paddingBlockLG: {
+            type: 'number',
+            default: 7,
+            description: 'Vertical padding for large size.',
+          },
+          paddingInline: {
+            type: 'number',
+            default: 11,
+            description: 'Horizontal padding of the input.',
+          },
+          paddingInlineSM: {
+            type: 'number',
+            default: 7,
+            description: 'Horizontal padding for small size.',
+          },
+          paddingInlineLG: {
+            type: 'number',
+            default: 11,
+            description: 'Horizontal padding for large size.',
+          },
+          zIndexPopup: {
+            type: 'number',
+            default: 1050,
+            description: 'Z-index of the picker popup.',
+          },
+          borderRadius: {
+            type: 'number',
+            default: 6,
+            description: 'Border radius of the input.',
+          },
+          controlHeight: {
+            type: 'number',
+            default: 32,
+            description: 'Height of the input.',
+          },
+          controlHeightLG: {
+            type: 'number',
+            default: 40,
+            description: 'Height for large size.',
+          },
+          controlHeightSM: {
+            type: 'number',
+            default: 24,
+            description: 'Height for small size.',
+          },
+          fontSize: {
+            type: 'number',
+            default: 14,
+            description: 'Font size.',
+          },
+          lineWidth: {
+            type: 'number',
+            default: 1,
+            description: 'Border width.',
+          },
+          colorPrimary: {
+            type: 'string',
+            description: 'Primary color override.',
+          },
+          colorBgContainer: {
+            type: 'string',
+            description: 'Background color of the input.',
+          },
+          colorText: {
+            type: 'string',
+            description: 'Text color.',
+          },
+          colorBorder: {
+            type: 'string',
+            description: 'Border color.',
+          },
+          colorTextPlaceholder: {
+            type: 'string',
+            description: 'Placeholder text color.',
+          },
+        },
+      },
+    },
+  },
+};

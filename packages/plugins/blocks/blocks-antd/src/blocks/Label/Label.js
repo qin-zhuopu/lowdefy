@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@
 // MIT Copyright (c) 2015-present Ant UED, https://xtech.antfin.com/ - 2020-09-08
 
 import React from 'react';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
-import { Col, Row } from 'antd';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
+import { type } from '@lowdefy/helpers';
+import { Col, Row, Tooltip } from 'antd';
 import classNames from 'classnames';
-import CSSMotion from 'rc-motion';
+import CSSMotion from '@rc-component/motion';
 
 import labelLogic from './labelLogic.js';
+import './style.module.css';
 
 const validationKeyMap = {
   error: 'errors',
@@ -34,26 +36,34 @@ let iconMap;
 
 const Label = ({
   blockId,
+  classNames: blockClassNames = {},
   components: { Icon },
   content,
   methods,
   properties,
   required,
+  styles = {},
   validation,
 }) => {
   const {
     extraClassName,
+    extraStyle,
     feedbackClassName,
+    feedbackStyle,
     iconClassName,
     label,
     labelClassName,
     labelCol,
     labelColClassName,
+    labelColStyle,
+    labelStyle,
     rowClassName,
+    rowStyle,
     showExtra,
     showFeedback,
+    showFeedbackIcon,
     wrapperCol,
-  } = labelLogic({ blockId, content, methods, properties, required, validation });
+  } = labelLogic({ blockId, blockClassNames, content, properties, required, styles, validation });
   if (!iconMap) {
     iconMap = {
       error: () => <Icon properties="AiFillCloseCircle" />,
@@ -62,20 +72,40 @@ const Label = ({
       warning: () => <Icon properties="AiFillExclamationCircle" />,
     };
   }
-  const IconNode = validation.status && iconMap[validation.status];
-  const icon =
-    validation.status && IconNode ? (
-      <span className={iconClassName}>
-        <IconNode />
-      </span>
-    ) : null;
+  const IconNode = showFeedbackIcon && iconMap[validation.status];
+  const icon = IconNode ? (
+    <span className={iconClassName}>
+      <IconNode />
+    </span>
+  ) : null;
+
+  // tooltip is either a string (the tooltip text) or an object that also
+  // customizes the icon and color. The onClick is exposed as the block's
+  // onTooltipClick event, not a property.
+  const tooltip = type.isString(properties.tooltip)
+    ? { title: properties.tooltip }
+    : properties.tooltip;
 
   return (
-    <Row id={blockId} className={rowClassName}>
+    <Row id={blockId} className={rowClassName} style={rowStyle}>
       {label && (
-        <Col {...labelCol} className={labelColClassName}>
-          <label htmlFor={`${blockId}_input`} className={labelClassName} title={label}>
-            {renderHtml({ html: label, methods })}
+        <Col {...labelCol} className={labelColClassName} style={labelColStyle}>
+          <label htmlFor={`${blockId}_input`} className={labelClassName} style={labelStyle}>
+            {renderHtml({ html: label })}
+            {tooltip && (
+              <Tooltip title={tooltip.title ? renderHtml({ html: tooltip.title }) : undefined}>
+                <span
+                  className="ldf-label-tooltip"
+                  style={{ marginInlineStart: 4, cursor: 'pointer', color: tooltip.color }}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    methods?.triggerEvent({ name: 'onTooltipClick' });
+                  }}
+                >
+                  <Icon properties={tooltip.icon ?? 'AiOutlineQuestionCircle'} />
+                </span>
+              </Tooltip>
+            )}
           </label>
         </Col>
       )}
@@ -94,15 +124,15 @@ const Label = ({
             removeOnLeave
           >
             {({ className: motionClassName }) => (
-              <div className={classNames(extraClassName, motionClassName)}>
+              <div className={classNames(extraClassName, motionClassName)} style={extraStyle}>
                 {showFeedback ? (
-                  <div className={classNames(feedbackClassName)}>
+                  <div className={feedbackClassName} style={feedbackStyle}>
                     {validation[validationKeyMap[validation.status]] &&
                       validation[validationKeyMap[validation.status]].length > 0 &&
                       validation[validationKeyMap[validation.status]][0]}
                   </div>
                 ) : (
-                  renderHtml({ html: properties.extra, methods })
+                  renderHtml({ html: properties.extra })
                 )}
               </div>
             )}
@@ -113,11 +143,4 @@ const Label = ({
   );
 };
 
-Label.defaultProps = blockDefaultProps;
-Label.meta = {
-  category: 'container',
-  icons: ['AiFillCloseCircle', 'AiFillCheckCircle', 'AiOutlineLoading', 'AiFillExclamationCircle'],
-  styles: ['blocks/Label/style.less'],
-};
-
-export default Label;
+export default withBlockDefaults(Label);

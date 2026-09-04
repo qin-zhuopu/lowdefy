@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@
 import { jest } from '@jest/globals';
 
 import { get } from '@lowdefy/helpers';
-import buildPages from '../buildPages.js';
-import testContext from '../../../test/testContext.js';
+import buildPages from '../../full/buildPages.js';
+import testContext from '../../../test-utils/testContext.js';
 
 const mockLogWarn = jest.fn();
 const mockLog = jest.fn();
@@ -64,13 +64,13 @@ test('block events actions array should map to try catch', () => {
     ],
   };
   const res = buildPages({ components, context });
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.try')).toEqual([
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.try')).toEqual([
     {
       id: 'action_1',
       type: 'Reset',
     },
   ]);
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.catch')).toEqual([]);
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.catch')).toEqual([]);
 });
 
 test('block events actions as try catch arrays', () => {
@@ -106,13 +106,13 @@ test('block events actions as try catch arrays', () => {
     ],
   };
   const res = buildPages({ components, context });
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.try')).toEqual([
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.try')).toEqual([
     {
       id: 'action_1',
       type: 'Reset',
     },
   ]);
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.catch')).toEqual([
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.catch')).toEqual([
     {
       id: 'action_2',
       type: 'Retry',
@@ -147,13 +147,13 @@ test('block events actions as try array and catch not defined.', () => {
     ],
   };
   const res = buildPages({ components, context });
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.try')).toEqual([
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.try')).toEqual([
     {
       id: 'action_1',
       type: 'Reset',
     },
   ]);
-  expect(get(res, 'pages.0.areas.content.blocks.0.events.onClick.catch')).toEqual([]);
+  expect(get(res, 'pages.0.slots.content.blocks.0.events.onClick.catch')).toEqual([]);
 });
 
 test('block events actions try not an array', () => {
@@ -185,9 +185,7 @@ test('block events actions try not an array', () => {
       components,
       context,
     })
-  ).toThrow(
-    'Try actions must be an array at "block_1" in event "onClick.try" on page "page_1". Received {"id":"action_1","type":"Reset"}'
-  );
+  ).toThrow('Try actions must be an array at "block_1" in event "onClick.try" on page "page_1".');
 });
 
 test('block events actions not an array', () => {
@@ -210,7 +208,7 @@ test('block events actions not an array', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Actions must be an array at "block_1" in event "onClick" on page "page_1". Received undefined'
+    'Actions must be an array at "block_1" in event "onClick" on page "page_1".'
   );
 });
 
@@ -240,7 +238,7 @@ test('block events actions catch not an array', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Catch actions must be an array at "block_1" in event "onClick.catch" on page "page_1". Received {"id":"action_1","type":"Reset"}'
+    'Catch actions must be an array at "block_1" in event "onClick.catch" on page "page_1".'
   );
 });
 
@@ -312,7 +310,7 @@ test('action type is not a string', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Action type is not a string on action "reset" on event "onClick" on block "block_1" on page "page_1". Received undefined.'
+    'Action type is not a string on action "reset" on event "onClick" on block "block_1" on page "page_1".'
   );
 });
 
@@ -349,7 +347,7 @@ test('block events action id is not a string', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Action id is not a string on event "onClick" on block "block_1" on page "page_1". Received true.'
+    'Action id is not a string on event "onClick" on block "block_1" on page "page_1".'
   );
 });
 
@@ -441,7 +439,7 @@ test("don't throw on Duplicate separate block events action ids", () => {
     ],
   };
   const res = buildPages({ components, context });
-  expect(get(res, 'pages.0.areas.content.blocks.0')).toEqual({
+  expect(get(res, 'pages.0.slots.content.blocks.0')).toEqual({
     blockId: 'block_1',
     events: {
       onChange: {
@@ -456,4 +454,61 @@ test("don't throw on Duplicate separate block events action ids", () => {
     id: 'block:page_1:block_1:0',
     type: 'Input',
   });
+});
+
+test('event shortcut that is a reserved name throws a located error', () => {
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        type: 'Container',
+        auth,
+        blocks: [
+          {
+            id: 'block_1',
+            type: 'Button',
+            events: {
+              onClick: {
+                shortcut: '__proto__',
+                try: [{ id: 'action_1', type: 'Reset' }],
+              },
+            },
+          },
+        ],
+      },
+    ],
+  };
+  expect(() => buildPages({ components, context })).toThrow(
+    'Event shortcut "__proto__" on event "onClick" on block "block_1" on page "page_1" is a reserved name and cannot be used as a shortcut.'
+  );
+  try {
+    buildPages({ components, context });
+  } catch (e) {
+    expect(e.configKey).toBeDefined();
+  }
+});
+
+test('event shortcut that only contains a reserved name as a modified key is accepted', () => {
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        type: 'Container',
+        auth,
+        blocks: [
+          {
+            id: 'block_1',
+            type: 'Button',
+            events: {
+              onClick: {
+                shortcut: 'Ctrl+__proto__',
+                try: [{ id: 'action_1', type: 'Reset' }],
+              },
+            },
+          },
+        ],
+      },
+    ],
+  };
+  expect(() => buildPages({ components, context })).not.toThrow();
 });

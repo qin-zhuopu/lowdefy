@@ -1,5 +1,5 @@
 /*
-  Copyright 2021 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,28 +15,32 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+
+import antdStyles from '../../ag-grid-antd.module.css';
+import { themeAlpineAntd, useGridTheme } from '../../theme/themeLowdefy.js';
 
 import AgGrid from '../../AgGrid.js';
 
-const AgGridAlpine = ({ blockId, events, loading, methods, properties }) => (
-  <div
-    id={blockId}
-    className={`ag-theme-alpine ${methods.makeCssClass({
-      width: '100%',
-      height: properties.height ?? 500,
-      ...properties.style,
-    })}`}
-  >
-    <AgGrid events={events} loading={loading} methods={methods} properties={properties} />
-  </div>
-);
+const AgGridAlpine = ({ blockId, components, events, loading, methods, properties, styles }) => {
+  const theme = useGridTheme(themeAlpineAntd, properties.themeParams);
 
-AgGridAlpine.defaultProps = blockDefaultProps;
-AgGridAlpine.meta = {
-  category: 'display',
-  icons: [],
-  styles: ['blocks/AgGridAlpine/style.less'],
+  return (
+    <div
+      id={blockId}
+      className={`ag-theme-alpine ${antdStyles.antdTheme}`}
+      style={{ width: '100%', height: properties.height ?? 500, ...styles?.element }}
+    >
+      <AgGrid
+        components={components}
+        events={events}
+        loading={loading}
+        methods={methods}
+        properties={properties}
+        theme={theme}
+      />
+    </div>
+  );
 };
 
-export default AgGridAlpine;
+export default withBlockDefaults(AgGridAlpine);

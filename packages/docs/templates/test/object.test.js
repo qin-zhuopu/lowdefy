@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ test('object propertiesFormTransformer', () => {
         ],
         "id": "block.properties.field",
         "layout": Object {
-          "contentGutter": 0,
+          "gap": 0,
         },
         "properties": Object {
           "bodyStyle": Object {
@@ -275,7 +275,7 @@ test('object schemaNested propertiesFormTransformer', () => {
             ],
             "id": "block.properties.field.obj",
             "layout": Object {
-              "contentGutter": 0,
+              "gap": 0,
             },
             "properties": Object {
               "bodyStyle": Object {
@@ -306,7 +306,7 @@ test('object schemaNested propertiesFormTransformer', () => {
         ],
         "id": "block.properties.field",
         "layout": Object {
-          "contentGutter": 0,
+          "gap": 0,
         },
         "properties": Object {
           "bodyStyle": Object {

@@ -1,0 +1,10 @@
+name: Events
+
+components:
+  - id: event-log-panel
+    type: Component
+    component:
+      _ref: components/event-log-panel.yaml
+
+pages:
+  - _ref: pages/event-log.yaml

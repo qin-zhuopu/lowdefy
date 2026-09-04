@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,14 +15,24 @@
 */
 
 import React, { useEffect, useState } from 'react';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import { cn, renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
 
 import { Upload } from 'antd';
 
 import useFileList from '../utils/useFileList.js';
 import getS3Upload from '../utils/getS3Upload.js';
+import withTheme from '../withTheme.js';
 
-const S3UploadPhoto = ({ blockId, components: { Icon }, events, methods, properties, value }) => {
+const S3UploadPhoto = ({
+  blockId,
+  classNames = {},
+  components: { Icon },
+  events,
+  methods,
+  properties,
+  styles = {},
+  value,
+}) => {
   const [state, loadFileList, setFileList, removeFile, setValue] = useFileList({
     properties,
     methods,
@@ -50,58 +60,60 @@ const S3UploadPhoto = ({ blockId, components: { Icon }, events, methods, propert
     }
   }, [value]);
   return (
-    <Upload
-      accept="image/*"
-      beforeUpload={loadFileList}
-      className="avatar-uploader"
-      customRequest={s3UploadRequest}
-      disabled={properties.disabled}
-      fileList={state.fileList}
+    <div
       id={blockId}
-      listType="picture-card"
-      maxCount={properties.maxCount}
-      multiple={!properties.singleFile}
-      onRemove={removeFile}
-      showUploadList={properties.showUploadList}
-      onChange={() => {
-        methods.triggerEvent({ name: 'onChange' });
-      }}
+      className={cn('lf-s3-upload-photo', classNames.element)}
+      style={styles.element}
     >
-      <div className={methods.makeCssClass([properties.style])}>
-        {loading ? (
+      <Upload
+        accept="image/*"
+        beforeUpload={loadFileList}
+        classNames={{
+          trigger: classNames.trigger,
+          list: classNames.list,
+          item: classNames.item,
+        }}
+        styles={{
+          trigger: styles.trigger,
+          list: styles.list,
+          item: styles.item,
+        }}
+        customRequest={s3UploadRequest}
+        disabled={properties.disabled}
+        fileList={state.fileList}
+        listType="picture-card"
+        maxCount={properties.maxCount}
+        multiple={!properties.singleFile}
+        onRemove={removeFile}
+        showUploadList={properties.showUploadList}
+        onChange={() => {
+          methods.triggerEvent({ name: 'onChange' });
+        }}
+      >
+        <div className="lf-s3-upload-photo-content">
           <Icon
             blockId={`${blockId}_icon`}
+            classNames={{ element: cn('lf-s3-upload-photo-icon', classNames.icon) }}
             events={events}
-            properties={{ name: 'AiOutlineLoading', size: 24 }}
+            properties={{
+              name: loading ? 'AiOutlineLoading' : 'AiOutlineCamera',
+              size: 24,
+            }}
+            styles={{ element: styles.icon }}
           />
-        ) : (
-          <Icon
-            blockId={`${blockId}_icon`}
-            events={events}
-            properties={{ name: 'AiOutlineCamera', size: 24 }}
-          />
-        )}
-        <div
-          style={{
-            marginTop: 8,
-          }}
-        >
-          {renderHtml({
-            html: properties.title ?? 'Upload image',
-            methods,
-          })}
+          <div
+            className={cn('lf-s3-upload-photo-title', classNames.title)}
+            style={{ marginTop: 8, ...styles.title }}
+          >
+            {renderHtml({
+              html: properties.title ?? 'Upload image',
+              methods,
+            })}
+          </div>
         </div>
-      </div>
-    </Upload>
+      </Upload>
+    </div>
   );
 };
 
-S3UploadPhoto.defaultProps = blockDefaultProps;
-S3UploadPhoto.meta = {
-  valueType: 'object',
-  category: 'input',
-  icons: ['AiOutlineLoading', 'AiOutlineCamera'],
-  styles: ['blocks/S3UploadPhoto/style.less'],
-};
-
-export default S3UploadPhoto;
+export default withBlockDefaults(withTheme('Upload', S3UploadPhoto));

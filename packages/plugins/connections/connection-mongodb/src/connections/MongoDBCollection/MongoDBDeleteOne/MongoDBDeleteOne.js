@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,18 +18,46 @@ import getCollection from '../getCollection.js';
 import { serialize, deserialize } from '../serialize.js';
 import schema from './schema.js';
 
-async function MongodbDeleteOne({ connection, request }) {
+async function MongodbDeleteOne({
+  blockId,
+  connection,
+  connectionId,
+  pageId,
+  payload,
+  request,
+  requestId,
+}) {
   const deserializedRequest = deserialize(request);
   const { filter, options } = deserializedRequest;
-  const { collection, client } = await getCollection({ connection });
+  const { collection, logCollection } = await getCollection({ connection });
   let response;
-  try {
+  if (logCollection) {
+    // findOneAndDelete instead of deleteOne to capture the deleted document
+    // for the change log. The response shape matches the deleteOne response.
+    const result = await collection.findOneAndDelete(filter, {
+      ...options,
+      includeResultMetadata: true,
+    });
+    const before = result.value ?? null;
+    response = {
+      acknowledged: true,
+      deletedCount: result.lastErrorObject?.n ?? 0,
+    };
+    await logCollection.insertOne({
+      args: { filter, options },
+      blockId,
+      connectionId,
+      pageId,
+      payload,
+      requestId,
+      before,
+      timestamp: new Date(),
+      type: 'MongoDBDeleteOne',
+      meta: connection.changeLog?.meta,
+    });
+  } else {
     response = await collection.deleteOne(filter, options);
-  } catch (error) {
-    await client.close();
-    throw error;
   }
-  await client.close();
   return serialize(response);
 }
 

@@ -1,0 +1,936 @@
+/*
+  Copyright 2020-2026 Lowdefy, Inc
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+import path from 'path';
+import { jest } from '@jest/globals';
+
+const realNodeUtils = await import('@lowdefy/node-utils');
+const mockWriteFile = jest.fn();
+jest.unstable_mockModule('@lowdefy/node-utils', () => ({
+  ...realNodeUtils,
+  writeFile: mockWriteFile,
+}));
+
+const { default: testContext } = await import('../../test-utils/testContext.js');
+const { snapshotTypesMap } = await import('../../test-utils/runBuildForSnapshots.js');
+const { default: makeId } = await import('../../utils/makeId.js');
+const { default: buildPageJit } = await import('./buildPageJit.js');
+
+const mockReadConfigFile = jest.fn();
+const mockWriteBuildArtifact = jest.fn();
+
+function createTestContext() {
+  const context = testContext({
+    readConfigFile: mockReadConfigFile,
+    writeBuildArtifact: mockWriteBuildArtifact,
+  });
+  context.errors = [];
+  context.typesMap = snapshotTypesMap;
+  context.unresolvedRefVars = {};
+  return context;
+}
+
+function mockFiles(files) {
+  mockReadConfigFile.mockImplementation((filePath) => {
+    const file = files.find((f) => f.path === filePath);
+    return file ? file.content : null;
+  });
+}
+
+beforeEach(() => {
+  makeId.reset();
+  mockReadConfigFile.mockReset();
+  mockWriteBuildArtifact.mockReset();
+  mockWriteBuildArtifact.mockResolvedValue(undefined);
+  mockWriteFile.mockReset();
+  mockWriteFile.mockResolvedValue(undefined);
+});
+
+test('buildPageJit returns null for unknown pageId', async () => {
+  const context = createTestContext();
+  const pageRegistry = new Map();
+  const result = await buildPageJit({
+    pageId: 'unknown',
+    pageRegistry,
+    context,
+  });
+  expect(result).toBeNull();
+});
+
+test('buildPageJit resolves simple page without vars', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'home.yaml',
+      content: `
+id: home
+type: PageHeaderMenu
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-home',
+        refPath: 'home.yaml',
+        unresolvedVars: null,
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  expect(result.auth).toEqual(expect.objectContaining({ public: true }));
+  expect(result.type).toBe('PageHeaderMenu');
+});
+
+test('buildPageJit resolves page template with simple vars', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: {{ pageId }}
+type: PageHeaderMenu
+properties:
+  title: {{ title }}
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-layout',
+        refPath: 'template.yaml.njk',
+        unresolvedVars: { pageId: 'home', title: 'Home Page' },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  expect(result.type).toBe('PageHeaderMenu');
+  expect(result.properties.title).toBe('Home Page');
+});
+
+test('buildPageJit resolves vars containing inner _ref from disk', async () => {
+  const context = createTestContext();
+
+  // The unresolved vars contain a _ref that should be resolved fresh from disk.
+  // makeRefDefinition normalizes _ref objects during skeleton build, giving them
+  // an id, path, etc. JIT ignores old IDs and re-resolves via getRefsFromFile.
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: {{ pageId }}
+type: PageHeaderMenu
+areas:
+  content:
+    blocks:
+      {{ sidebar | dump | safe }}
+`,
+    },
+    {
+      path: 'components/sidebar.yaml',
+      content: `
+- id: sidebar_title
+  type: Title
+  properties:
+    content: Sidebar
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-layout',
+        refPath: 'template.yaml.njk',
+        // Unresolved vars with an inner _ref — this is what recursiveBuild
+        // needs to resolve fresh from disk on each JIT build.
+        unresolvedVars: {
+          pageId: 'home',
+          sidebar: { _ref: 'components/sidebar.yaml' },
+        },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  expect(result.type).toBe('PageHeaderMenu');
+  // The sidebar var should have been resolved from components/sidebar.yaml
+  const contentBlocks = result.slots?.content?.blocks ?? [];
+  expect(contentBlocks).toHaveLength(1);
+  expect(contentBlocks[0].blockId).toBe('sidebar_title');
+  expect(contentBlocks[0].type).toBe('Title');
+});
+
+test('buildPageJit resolves vars with inner _ref and picks up file changes', async () => {
+  const context = createTestContext();
+
+  // First build: sidebar has one block
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: {{ pageId }}
+type: PageHeaderMenu
+areas:
+  content:
+    blocks:
+      {{ sidebar | dump | safe }}
+`,
+    },
+    {
+      path: 'components/sidebar.yaml',
+      content: `
+- id: sidebar_v1
+  type: Title
+  properties:
+    content: Version 1
+`,
+    },
+  ]);
+
+  const pageEntry = {
+    pageId: 'home',
+    auth: { public: true },
+    refId: 'ref-layout',
+    refPath: 'template.yaml.njk',
+    unresolvedVars: {
+      pageId: 'home',
+      sidebar: { _ref: 'components/sidebar.yaml' },
+    },
+  };
+  const pageRegistry = new Map([['home', pageEntry]]);
+
+  const result1 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+  const contentBlocks1 = result1.slots?.content?.blocks ?? [];
+  expect(contentBlocks1[0].blockId).toBe('sidebar_v1');
+
+  // Second build: sidebar file changed on disk
+  makeId.reset();
+  context.errors = [];
+  context.typeCounters.blocks = (await import('../../utils/createCounter.js')).default();
+  context.typeCounters.actions = (await import('../../utils/createCounter.js')).default();
+
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: {{ pageId }}
+type: PageHeaderMenu
+areas:
+  content:
+    blocks:
+      {{ sidebar | dump | safe }}
+`,
+    },
+    {
+      path: 'components/sidebar.yaml',
+      content: `
+- id: sidebar_v2
+  type: Title
+  properties:
+    content: Version 2
+`,
+    },
+  ]);
+
+  const result2 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+  const contentBlocks2 = result2.slots?.content?.blocks ?? [];
+  expect(contentBlocks2[0].blockId).toBe('sidebar_v2');
+});
+
+test('buildPageJit evaluates build operators in resolved vars', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: {{ pageId }}
+type: PageHeaderMenu
+areas:
+  content:
+    blocks:
+      {{ blocks | dump | safe }}
+`,
+    },
+    {
+      path: 'components/block1.yaml',
+      content: `
+id: block1
+type: TextInput
+`,
+    },
+    {
+      path: 'components/block2.yaml',
+      content: `
+id: block2
+type: TextInput
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-layout',
+        refPath: 'template.yaml.njk',
+        // Vars with a _build operator that concatenates two ref-resolved arrays
+        unresolvedVars: {
+          pageId: 'home',
+          blocks: {
+            '_build.array.concat': [
+              [{ _ref: 'components/block1.yaml' }],
+              [{ _ref: 'components/block2.yaml' }],
+            ],
+          },
+        },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  const contentBlocks = result.slots?.content?.blocks ?? [];
+  expect(contentBlocks).toHaveLength(2);
+  expect(contentBlocks[0].blockId).toBe('block1');
+  expect(contentBlocks[1].blockId).toBe('block2');
+});
+
+test('buildPageJit resolves resolver page without vars', async () => {
+  const context = createTestContext();
+  mockFiles([]);
+
+  // No vars key on resolverOriginal — resolvedVars stays null,
+  // so resolverOriginal is passed through as-is to makeRefDefinition.
+  const pageRegistry = new Map([
+    [
+      'resolved-page',
+      {
+        pageId: 'resolved-page',
+        auth: { public: true },
+        refId: 'ref-resolver',
+        refPath: null,
+        unresolvedVars: null,
+        resolverOriginal: {
+          resolver: 'src/test-utils/buildRefs/testJitPageResolver.js',
+        },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'resolved-page',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:resolved-page');
+  expect(result.type).toBe('PageHeaderMenu');
+  // Resolver receives empty vars (makeRefDefinition default), falls back to defaults
+  expect(result.properties.title).toBe('Default');
+});
+
+test('buildPageJit resolves resolver page by re-running the resolver with fresh vars', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'config.yaml',
+      content: `MyApp`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-resolver',
+        refPath: null,
+        unresolvedVars: null,
+        resolverOriginal: {
+          resolver: 'src/test-utils/buildRefs/testJitPageResolver.js',
+          vars: {
+            pageId: 'home',
+            app_name: { _ref: 'config.yaml' },
+          },
+        },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  expect(result.type).toBe('PageHeaderMenu');
+  expect(result.properties.title).toBe('MyApp');
+});
+
+test('buildPageJit resolver page picks up config file changes on subsequent JIT builds', async () => {
+  const context = createTestContext();
+
+  // First build: config.yaml has 'AppV1'
+  mockFiles([
+    {
+      path: 'config.yaml',
+      content: `AppV1`,
+    },
+  ]);
+
+  const pageEntry = {
+    pageId: 'home',
+    auth: { public: true },
+    refId: 'ref-resolver',
+    refPath: null,
+    unresolvedVars: null,
+    resolverOriginal: {
+      resolver: 'src/test-utils/buildRefs/testJitPageResolver.js',
+      vars: {
+        pageId: 'home',
+        app_name: { _ref: 'config.yaml' },
+      },
+    },
+  };
+  const pageRegistry = new Map([['home', pageEntry]]);
+
+  const result1 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+  expect(result1.properties.title).toBe('AppV1');
+
+  // Second build: config.yaml changed on disk
+  makeId.reset();
+  context.errors = [];
+  context.typeCounters.blocks = (await import('../../utils/createCounter.js')).default();
+  context.typeCounters.actions = (await import('../../utils/createCounter.js')).default();
+
+  mockFiles([
+    {
+      path: 'config.yaml',
+      content: `AppV2`,
+    },
+  ]);
+
+  const result2 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+  expect(result2.properties.title).toBe('AppV2');
+});
+
+test('buildPageJit throws when inner _ref in vars references missing file', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'template.yaml.njk',
+      content: `
+id: home
+type: PageHeaderMenu
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-layout',
+        refPath: 'template.yaml.njk',
+        unresolvedVars: {
+          sidebar: { _ref: 'components/missing.yaml' },
+        },
+      },
+    ],
+  ]);
+
+  await expect(
+    buildPageJit({
+      pageId: 'home',
+      pageRegistry,
+      context,
+    })
+  ).rejects.toThrow('Page "home" build failed with 1 error(s).');
+
+  // Verify the underlying error is preserved in buildErrors
+  try {
+    await buildPageJit({ pageId: 'home', pageRegistry, context });
+  } catch (err) {
+    expect(err.buildErrors[0].message).toMatch(
+      'Referenced file does not exist: "components/missing.yaml"'
+    );
+  }
+});
+
+test('buildPageJit resolves a module page resolver relative to the module root, not the app config dir', async () => {
+  const context = createTestContext();
+  // The app config dir does NOT contain the resolver — only the module root
+  // does. A module authors its resolver path relative to itself
+  // (e.g. "resolvers/makeActionPages.js"); the JIT path must rebase it against
+  // the module root the same way walker.js step 4 does in the full build.
+  // Without rebasing, the relative path resolves against directories.config and
+  // the import fails.
+  context.directories.config = path.resolve('src/test-utils');
+  const moduleRoot = path.resolve('src/test-utils/buildRefs');
+  context.modules = {
+    mymod: {
+      id: 'mymod',
+      moduleRoot,
+      packageRoot: moduleRoot,
+      moduleDependencies: null,
+    },
+  };
+  mockFiles([]);
+
+  const pageRegistry = new Map([
+    [
+      'mymod/home',
+      {
+        pageId: 'mymod/home',
+        auth: { public: true },
+        refId: 'ref-resolver',
+        refPath: null,
+        unresolvedVars: null,
+        moduleEntryId: 'mymod',
+        // Authored relative to the module — must rebase against moduleRoot.
+        resolverOriginal: {
+          resolver: 'testJitPageResolver.js',
+          vars: { pageId: 'home', app_name: 'ModuleApp' },
+        },
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'mymod/home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:mymod/home');
+  expect(result.type).toBe('PageHeaderMenu');
+  expect(result.properties.title).toBe('ModuleApp');
+});
+
+test('buildPageJit resolver page traces errors back to resolver when inner _ref fails', async () => {
+  const context = createTestContext();
+  mockFiles([]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-resolver',
+        refPath: null,
+        unresolvedVars: null,
+        resolverOriginal: {
+          resolver: 'src/test-utils/buildRefs/testJitPageResolver.js',
+          vars: {
+            app_name: { _ref: 'config/missing.yaml' },
+          },
+        },
+      },
+    ],
+  ]);
+
+  await expect(
+    buildPageJit({
+      pageId: 'home',
+      pageRegistry,
+      context,
+    })
+  ).rejects.toThrow('Page "home" build failed with 1 error(s).');
+
+  // Verify the underlying error details are preserved
+  try {
+    await buildPageJit({ pageId: 'home', pageRegistry, context });
+  } catch (err) {
+    expect(err.buildErrors[0].message).toMatch(
+      'Referenced file does not exist: "config/missing.yaml"'
+    );
+  }
+});
+
+test('buildPageJit writes keyMap/refMap so error handler resolves correct location', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'page-with-action.yaml',
+      content: `id: action-page
+type: PageHeaderMenu
+blocks:
+  - id: btn1
+    type: Button
+    events:
+      onClick:
+        - id: my_action
+          type: UndefinedAction
+          params:
+            message: test`,
+    },
+  ]);
+
+  const pageEntry = {
+    pageId: 'action-page',
+    auth: { public: true },
+    refId: 'ref-action-page',
+    refPath: 'page-with-action.yaml',
+  };
+  const pageRegistry = new Map([['action-page', pageEntry]]);
+
+  await expect(
+    buildPageJit({
+      pageId: 'action-page',
+      pageRegistry,
+      context,
+    })
+  ).rejects.toMatchObject({
+    message: expect.stringContaining('Action type "UndefinedAction" was used but is not defined'),
+  });
+
+  // Verify keyMap.json and refMap.json were written to disk before the error
+  const writeArgs = mockWriteBuildArtifact.mock.calls.map((c) => c[0]);
+  expect(writeArgs).toContain('keyMap.json');
+  expect(writeArgs).toContain('refMap.json');
+
+  // The written keyMap should contain the action's ~k with correct ~l
+  const keyMapCall = mockWriteBuildArtifact.mock.calls.find((c) => c[0] === 'keyMap.json');
+  const keyMap = JSON.parse(keyMapCall[1]);
+  // Find the entry for the UndefinedAction (line 9 in the YAML: "type: UndefinedAction")
+  const actionEntry = Object.values(keyMap).find(
+    (entry) => entry.key && entry.key.includes('UndefinedAction')
+  );
+  expect(actionEntry).toBeDefined();
+  expect(actionEntry['~l']).toBe(8);
+});
+
+test('two JIT builds with object vars produce identical results and do not mutate unresolvedVars', async () => {
+  const context = createTestContext();
+  mockFiles([
+    {
+      path: 'page-template.yaml',
+      content: `
+id: home
+type: PageHeaderMenu
+areas:
+  content:
+    blocks:
+      _var: header`,
+    },
+    {
+      path: 'header.yaml',
+      content: `
+- id: h1
+  type: Title`,
+    },
+  ]);
+
+  const pageEntry = {
+    pageId: 'home',
+    auth: { public: true },
+    refId: 'ref-home',
+    refPath: 'page-template.yaml',
+    unresolvedVars: { header: { _ref: 'header.yaml' } },
+  };
+  const pageRegistry = new Map([['home', pageEntry]]);
+
+  // First build
+  const result1 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  const contentBlocks1 = result1.slots?.content?.blocks ?? [];
+  expect(contentBlocks1).toHaveLength(1);
+  expect(contentBlocks1[0].blockId).toBe('h1');
+
+  // Verify unresolvedVars not mutated after first build
+  expect(pageEntry.unresolvedVars.header).toEqual({ _ref: 'header.yaml' });
+
+  // Reset for second build
+  makeId.reset();
+  context.errors = [];
+  context.typeCounters.blocks = (await import('../../utils/createCounter.js')).default();
+  context.typeCounters.actions = (await import('../../utils/createCounter.js')).default();
+
+  // Second build
+  const result2 = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  const contentBlocks2 = result2.slots?.content?.blocks ?? [];
+  expect(contentBlocks2).toHaveLength(1);
+  expect(contentBlocks2[0].blockId).toBe('h1');
+
+  // Both builds produce structurally identical results
+  expect(contentBlocks1[0].blockId).toBe(contentBlocks2[0].blockId);
+
+  // unresolvedVars still not mutated
+  expect(pageEntry.unresolvedVars.header).toEqual({ _ref: 'header.yaml' });
+});
+
+// Icon detection tests
+// Note: existing tests above implicitly cover the !iconImports guard path
+// since they do not set context.iconImports.
+
+test('buildPageJit detects missing icons and writes dynamic icon data', async () => {
+  const context = createTestContext();
+  // Set up iconImports with no IoAddCircle — simulating shallow build that missed it
+  context.iconImports = [
+    { icons: [], package: 'react-icons/ai' },
+    { icons: [], package: 'react-icons/io5' },
+  ];
+  context.dynamicIconData = {};
+  context.directories.server = '/test/server';
+
+  mockFiles([
+    {
+      path: 'home.yaml',
+      content: `
+id: home
+type: PageHeaderMenu
+blocks:
+  - id: action_button
+    type: Button
+    properties:
+      title: Do Something
+      icon: IoAddCircle
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-home',
+        refPath: 'home.yaml',
+        unresolvedVars: null,
+      },
+    ],
+  ]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+
+  // Icon imports should have been updated
+  const io5Entry = context.iconImports.find((e) => e.package === 'react-icons/io5');
+  expect(io5Entry.icons).toContain('IoAddCircle');
+
+  // plugins/iconsDynamic.js should have been written
+  const iconDynamicCall = mockWriteBuildArtifact.mock.calls.find(
+    (c) => c[0] === 'plugins/iconsDynamic.js'
+  );
+  expect(iconDynamicCall).toBeDefined();
+});
+
+test('buildPageJit does not write dynamic icons when all icons already present', async () => {
+  const context = createTestContext();
+  context.iconImports = [{ icons: ['AiFillHome'], package: 'react-icons/ai' }];
+  context.dynamicIconData = {};
+
+  mockFiles([
+    {
+      path: 'home.yaml',
+      content: `
+id: home
+type: PageHeaderMenu
+blocks:
+  - id: btn
+    type: Button
+    properties:
+      title: Home
+      icon: AiFillHome
+`,
+    },
+  ]);
+
+  const pageRegistry = new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-home',
+        refPath: 'home.yaml',
+        unresolvedVars: null,
+      },
+    ],
+  ]);
+
+  await buildPageJit({
+    pageId: 'home',
+    pageRegistry,
+    context,
+  });
+
+  // plugins/iconsDynamic.js should NOT have been written
+  const iconDynamicCall = mockWriteBuildArtifact.mock.calls.find(
+    (c) => c[0] === 'plugins/iconsDynamic.js'
+  );
+  expect(iconDynamicCall).toBeUndefined();
+});
+
+// CallAPI endpoint reference validation (validateCallApiRefs) in the JIT path.
+// The dev server hydrates context.components.api from build/api/*.json before building
+// a page (see getBuildContext + readBuildApiArtifacts). These tests assert that, given
+// that hydrated context, a valid CallAPI endpointId does NOT produce a false warning,
+// while a genuinely missing endpointId still does.
+function createTestContextWithApi(api) {
+  const context = createTestContext();
+  context.components = { api };
+  context.typesMap = {
+    ...snapshotTypesMap,
+    actions: {
+      ...snapshotTypesMap.actions,
+      CallAPI: { package: '@lowdefy/actions-core' },
+    },
+  };
+  return context;
+}
+
+const callApiPageYaml = `
+id: home
+type: PageHeaderMenu
+blocks:
+  - id: btn
+    type: Button
+    events:
+      onClick:
+        - id: call_endpoint
+          type: CallAPI
+          params:
+            endpointId: my_endpoint
+`;
+
+function callApiPageRegistry() {
+  return new Map([
+    [
+      'home',
+      {
+        pageId: 'home',
+        auth: { public: true },
+        refId: 'ref-home',
+        refPath: 'home.yaml',
+        unresolvedVars: null,
+      },
+    ],
+  ]);
+}
+
+test('buildPageJit does not warn for a CallAPI action when the endpoint exists in components.api', async () => {
+  const context = createTestContextWithApi([{ endpointId: 'my_endpoint', type: 'Api' }]);
+  const warnings = [];
+  context.handleWarning = (warning) => warnings.push(warning);
+
+  mockFiles([{ path: 'home.yaml', content: callApiPageYaml }]);
+
+  const result = await buildPageJit({
+    pageId: 'home',
+    pageRegistry: callApiPageRegistry(),
+    context,
+  });
+
+  expect(result.id).toBe('page:home');
+  expect(warnings.find((w) => w.message.includes('non-existent endpoint'))).toBeUndefined();
+});
+
+test('buildPageJit warns for a CallAPI action when the endpoint is missing from components.api', async () => {
+  const context = createTestContextWithApi([]);
+  const warnings = [];
+  context.handleWarning = (warning) => warnings.push(warning);
+
+  mockFiles([{ path: 'home.yaml', content: callApiPageYaml }]);
+
+  await buildPageJit({
+    pageId: 'home',
+    pageRegistry: callApiPageRegistry(),
+    context,
+  });
+
+  const warning = warnings.find((w) => w.checkSlug === 'callapi-refs');
+  expect(warning).toBeDefined();
+  expect(warning.message).toBe(
+    'CallAPI action on page "home" references non-existent endpoint "my_endpoint".'
+  );
+});

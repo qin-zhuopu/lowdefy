@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -33,6 +33,24 @@ export default {
     },
     style: {
       type: 'object',
+    },
+    class: {
+      oneOf: [
+        { type: 'string' },
+        { type: 'array', items: { type: 'string' } },
+        {
+          type: 'object',
+          additionalProperties: {
+            oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+          },
+        },
+      ],
+    },
+    styles: {
+      type: 'object',
+      additionalProperties: {
+        type: 'object',
+      },
     },
     layout: {
       type: 'object',

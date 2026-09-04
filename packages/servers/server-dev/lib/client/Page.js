@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,9 +14,12 @@
   limitations under the License.
 */
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { GenIcon } from 'react-icons/lib';
 import Client from '@lowdefy/client';
 
+import BuildErrorPage from './BuildErrorPage.js';
+import InstallingPluginsPage from './InstallingPluginsPage.js';
 import RestartingPage from './RestartingPage.js';
 import usePageConfig from './utils/usePageConfig.js';
 
@@ -33,13 +36,51 @@ const Page = ({
 }) => {
   const { data: pageConfig } = usePageConfig(pageId, router.basePath);
 
+  // Push build warnings to ErrorBar via runtime error callback
+  const pushedWarningsRef = useRef(null);
+  useEffect(() => {
+    if (pageConfig?._warnings && pageConfig._warnings !== pushedWarningsRef.current) {
+      pushedWarningsRef.current = pageConfig._warnings;
+      for (const warning of pageConfig._warnings) {
+        lowdefy._runtimeErrorCallback?.(warning);
+      }
+    }
+  }, [pageConfig?._warnings, lowdefy]);
+
   if (!pageConfig) {
     router.replace(`/404`);
     return '';
   }
+  if (pageConfig.buildError) {
+    return (
+      <BuildErrorPage
+        errors={pageConfig.errors}
+        message={pageConfig.message}
+        source={pageConfig.source}
+      />
+    );
+  }
+  if (pageConfig.installing) {
+    return <InstallingPluginsPage packages={pageConfig.packages} />;
+  }
   if (resetContext.restarting) {
     return <RestartingPage />;
   }
+
+  // Merge dynamic JS entries fetched after JIT build with the static jsMap
+  const mergedJsMap = pageConfig._jsEntries ? { ...jsMap, ...pageConfig._jsEntries } : jsMap;
+
+  // Merge JIT-discovered icon data into the static icons object.
+  // createIcon.js looks up Icons[name] on every render from the captured reference,
+  // so mutating the original object makes new icons available immediately.
+  if (pageConfig._dynamicIcons) {
+    for (const [name, data] of Object.entries(pageConfig._dynamicIcons)) {
+      if (!types.icons[name]) {
+        types.icons[name] = GenIcon(data);
+      }
+    }
+  }
+
   return (
     <Client
       auth={auth}
@@ -48,7 +89,7 @@ const Page = ({
         ...config,
         pageConfig,
       }}
-      jsMap={jsMap}
+      jsMap={mergedJsMap}
       lowdefy={lowdefy}
       resetContext={resetContext}
       router={router}

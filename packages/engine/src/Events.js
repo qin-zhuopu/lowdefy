@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ class Events {
       actions: (type.isObject(actions) ? actions.try : actions) || [],
       catchActions: (type.isObject(actions) ? actions.catch : []) || [],
       debounce: type.isObject(actions) ? actions.debounce : null,
+      shortcut: type.isObject(actions) ? actions.shortcut ?? null : null,
       history: [],
       loading: false,
     };

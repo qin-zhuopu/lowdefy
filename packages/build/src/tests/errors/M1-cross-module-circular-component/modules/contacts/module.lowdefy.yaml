@@ -1,0 +1,18 @@
+name: Contacts
+
+dependencies:
+  - id: companies
+
+pages:
+  - id: contact-list
+    type: Box
+    blocks:
+      - _ref:
+          module: companies
+          component: company-selector
+
+components:
+  - id: contact-selector
+    type: Component
+    component:
+      _ref: components/contact-selector.yaml

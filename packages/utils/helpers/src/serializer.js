@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,92 +16,200 @@
   limitations under the License.
 */
 
+import {
+  ActionError,
+  BlockError,
+  BuildError,
+  ConfigError,
+  ConfigWarning,
+  LowdefyInternalError,
+  OperatorError,
+  PluginError,
+  RequestError,
+  ServiceError,
+  UserError,
+} from '@lowdefy/errors';
+
+import extractErrorProps from './extractErrorProps.js';
 import type from './type.js';
 import stableStringify from './stableStringify.js';
 
-const makeReplacer = (customReplacer, isoStringDates) => (key, value) => {
-  let dateReplacer = (date) => ({ '~d': date.valueOf() });
-  if (isoStringDates) {
-    dateReplacer = (date) => ({ '~d': date.toISOString() });
-  }
-  let newValue = value;
-  if (customReplacer) {
-    newValue = customReplacer(key, value);
-  }
-  if (type.isError(newValue)) {
-    return {
-      '~e': {
-        name: newValue.name,
-        message: newValue.message,
-        value: newValue.toString(),
-      },
-    };
-  }
-  if (type.isObject(newValue)) {
-    Object.keys(newValue).forEach((k) => {
-      if (type.isDate(newValue[k])) {
-        // shallow copy original value before reassigning a value in order not to mutate original value
-        newValue = { ...newValue };
-        newValue[k] = dateReplacer(newValue[k]);
-      }
-    });
-    if (newValue['~r']) {
-      Object.defineProperty(newValue, '~r', {
-        value: newValue['~r'],
-        enumerable: true,
-        writable: true,
-        configurable: true,
-      });
+const lowdefyErrorTypes = {
+  ActionError,
+  BlockError,
+  BuildError,
+  ConfigError,
+  ConfigWarning,
+  LowdefyInternalError,
+  OperatorError,
+  PluginError,
+  RequestError,
+  ServiceError,
+  UserError,
+};
+
+function propsToError(data) {
+  const ErrorClass = lowdefyErrorTypes[data.name] || Error;
+  const error = Object.create(ErrorClass.prototype);
+  for (const [k, v] of Object.entries(data)) {
+    if (k === 'cause' && v !== null && typeof v === 'object' && v.message !== undefined) {
+      error[k] = propsToError(v);
+    } else {
+      error[k] = v;
     }
-    if (newValue['~k']) {
-      Object.defineProperty(newValue, '~k', {
-        value: newValue['~k'],
-        enumerable: true,
-        writable: true,
-        configurable: true,
+  }
+  return error;
+}
+
+const makeReplacer =
+  ({ replacer, isoStringDates, skipMarkers, omitErrorProps } = {}) =>
+  (key, value) => {
+    let dateReplacer = (date) => ({ '~d': date.valueOf() });
+    if (isoStringDates) {
+      dateReplacer = (date) => ({ '~d': date.toISOString() });
+    }
+    let newValue = value;
+    if (replacer) {
+      newValue = replacer(key, value);
+    }
+    if (type.isError(newValue)) {
+      return { '~e': extractErrorProps(newValue, { omit: omitErrorProps }) };
+    }
+    if (type.isObject(newValue)) {
+      Object.keys(newValue).forEach((k) => {
+        if (type.isDate(newValue[k])) {
+          // shallow copy original value before reassigning a value in order not to mutate original value
+          newValue = { ...newValue };
+          newValue[k] = dateReplacer(newValue[k]);
+        }
       });
+      if (!skipMarkers) {
+        // Capture marker values before shallow copy (spread doesn't copy non-enumerable props)
+        const markerR = newValue['~r'];
+        const markerK = newValue['~k'];
+        const markerL = newValue['~l'];
+        if (markerR || markerK || markerL) {
+          // Shallow copy to avoid mutating the original object's property descriptors
+          if (newValue === value) {
+            newValue = { ...newValue };
+          }
+          if (markerR) {
+            Object.defineProperty(newValue, '~r', {
+              value: markerR,
+              enumerable: true,
+              writable: true,
+              configurable: true,
+            });
+          }
+          if (markerK) {
+            Object.defineProperty(newValue, '~k', {
+              value: markerK,
+              enumerable: true,
+              writable: true,
+              configurable: true,
+            });
+          }
+          if (markerL) {
+            Object.defineProperty(newValue, '~l', {
+              value: markerL,
+              enumerable: true,
+              writable: true,
+              configurable: true,
+            });
+          }
+        }
+      }
+      return newValue;
+    }
+    if (type.isArray(newValue)) {
+      const mappedArray = newValue.map((item) => {
+        if (type.isDate(item)) {
+          return dateReplacer(item);
+        }
+        return item;
+      });
+      // Preserve ~l, ~k, ~r on arrays by wrapping in a marker object
+      if (
+        !skipMarkers &&
+        (newValue['~l'] !== undefined ||
+          newValue['~k'] !== undefined ||
+          newValue['~r'] !== undefined)
+      ) {
+        const wrapper = { '~arr': mappedArray };
+        if (newValue['~r'] !== undefined) wrapper['~r'] = newValue['~r'];
+        if (newValue['~k'] !== undefined) wrapper['~k'] = newValue['~k'];
+        if (newValue['~l'] !== undefined) wrapper['~l'] = newValue['~l'];
+        return wrapper;
+      }
+      return mappedArray;
     }
     return newValue;
-  }
-  if (type.isArray(newValue)) {
-    return newValue.map((item) => {
-      if (type.isDate(item)) {
-        return dateReplacer(item);
-      }
-      return item;
-    });
-  }
-  return newValue;
-};
+  };
 
 const makeReviver = (customReviver) => (key, value) => {
   let newValue = value;
   if (type.isObject(newValue)) {
-    if (newValue['~r']) {
-      Object.defineProperty(newValue, '~r', {
-        value: newValue['~r'],
-        enumerable: false,
-        writable: true,
-        configurable: true,
-      });
-    }
-    if (newValue['~k']) {
-      Object.defineProperty(newValue, '~k', {
-        value: newValue['~k'],
-        enumerable: false,
-        writable: true,
-        configurable: true,
-      });
+    // Restore arrays that were wrapped with ~arr marker
+    if (type.isArray(newValue['~arr'])) {
+      const arr = newValue['~arr'];
+      if (newValue['~r']) {
+        Object.defineProperty(arr, '~r', {
+          value: newValue['~r'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      if (newValue['~k']) {
+        Object.defineProperty(arr, '~k', {
+          value: newValue['~k'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      if (newValue['~l']) {
+        Object.defineProperty(arr, '~l', {
+          value: newValue['~l'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      newValue = arr;
+    } else {
+      if (newValue['~r']) {
+        Object.defineProperty(newValue, '~r', {
+          value: newValue['~r'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      if (newValue['~k']) {
+        Object.defineProperty(newValue, '~k', {
+          value: newValue['~k'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
+      if (newValue['~l']) {
+        Object.defineProperty(newValue, '~l', {
+          value: newValue['~l'],
+          enumerable: false,
+          writable: true,
+          configurable: true,
+        });
+      }
     }
   }
   if (customReviver) {
-    newValue = customReviver(key, value);
+    newValue = customReviver(key, newValue);
   }
   if (type.isObject(newValue)) {
     if (!type.isUndefined(newValue['~e'])) {
-      const error = new Error(newValue['~e'].message);
-      error.name = newValue['~e'].name;
-      return error;
+      return propsToError(newValue['~e']);
     }
     if (!type.isUndefined(newValue['~d'])) {
       const result = new Date(newValue['~d']);
@@ -122,7 +230,18 @@ const serialize = (json, options = {}) => {
     }
     return { '~d': json.valueOf() };
   }
-  return JSON.parse(JSON.stringify(json, makeReplacer(options.replacer, options.isoStringDates)));
+  // skipMarkers is deliberately not threaded here - serialize has never applied
+  // it, and its callers depend on markers surviving.
+  return JSON.parse(
+    JSON.stringify(
+      json,
+      makeReplacer({
+        replacer: options.replacer,
+        isoStringDates: options.isoStringDates,
+        omitErrorProps: options.omitErrorProps,
+      })
+    )
+  );
 };
 
 const serializeToString = (json, options = {}) => {
@@ -136,13 +255,22 @@ const serializeToString = (json, options = {}) => {
   }
   if (options.stable) {
     return stableStringify(json, {
-      replacer: makeReplacer(options.replacer),
+      replacer: makeReplacer({
+        replacer: options.replacer,
+        skipMarkers: options.skipMarkers,
+        omitErrorProps: options.omitErrorProps,
+      }),
       space: options.space,
     });
   }
   return JSON.stringify(
     json,
-    makeReplacer(options.replacer, options.isoStringDates),
+    makeReplacer({
+      replacer: options.replacer,
+      isoStringDates: options.isoStringDates,
+      skipMarkers: options.skipMarkers,
+      omitErrorProps: options.omitErrorProps,
+    }),
     options.space
   );
 };
@@ -162,7 +290,10 @@ const copy = (json, options = {}) => {
   if (type.isDate(json)) return new Date(json.valueOf());
 
   return JSON.parse(
-    JSON.stringify(json, makeReplacer(options.replacer)),
+    JSON.stringify(
+      json,
+      makeReplacer({ replacer: options.replacer, omitErrorProps: options.omitErrorProps })
+    ),
     makeReviver(options.reviver)
   );
 };

@@ -12,19 +12,35 @@
 - _ref: concepts/lowdefy-schema.yaml
 - _ref: concepts/menus.yaml
 - _ref: concepts/references-and-templates.yaml
+- _ref: concepts/modules.yaml
+- _ref: concepts/module-authoring.yaml
 - _ref: concepts/page-and-app-state.yaml
+- _ref: concepts/selectors.yaml
 - _ref: concepts/blocks.yaml
 - _ref: concepts/layout-overview.yaml
 - _ref: concepts/connections-and-requests.yaml
 - _ref: concepts/events-and-actions.yaml
+- _ref: concepts/keyboard-shortcuts.yaml
+- _ref: concepts/i18n.yaml
 - _ref: concepts/operators.yaml
 - _ref: concepts/secrets.yaml
+- _ref: concepts/logger.yaml
 - _ref: concepts/lists.yaml
 - _ref: concepts/hosting-files.yaml
 - _ref: concepts/custom-html.yaml
 - _ref: concepts/custom-styling.yaml
+- _ref: concepts/theming.yaml
 - _ref: concepts/cli.yaml
-- _ref: concepts/licenses.yaml
+- _ref: concepts/api.yaml
+
+- _ref: agents/introduction.yaml
+- _ref: agents/agent-properties.yaml
+- _ref: agents/endpoint-tools.yaml
+- _ref: agents/mcp-tools.yaml
+- _ref: agents/multi-agent.yaml
+- _ref: agents/server-hooks.yaml
+- _ref: agents/AgentChat.yaml
+- _ref: agents/AgentConversations.yaml
 
 - _ref: deployment/docker.yaml
 - _ref: deployment/node-server.yaml
@@ -39,7 +55,7 @@
 - _ref: users/users-introduction.yaml
 - _ref: users/auth-providers.yaml
 - _ref: users/login-and-logout.yaml
-- _ref: users/protected-pages.yaml
+- _ref: users/protected-pages-apis.yaml
 - _ref: users/roles.yaml
 - _ref: users/user-object.yaml
 - _ref: users/auth-configuration.yaml
@@ -47,8 +63,17 @@
 - _ref: users/reference/next-auth-providers.yaml
 - _ref: users/reference/OpenIDConnectProvider.yaml
 - _ref: users/reference/MongoDBAdapter.yaml
+- _ref: users/reference/MultiAppMongoDBAdapter.yaml
 - _ref: users/reference/Auth0LogoutCallback.yaml
 
+- _ref: testing/e2e-introduction.yaml
+- _ref: testing/e2e-getting-started.yaml
+- _ref: testing/e2e-writing-tests.yaml
+- _ref: testing/e2e-mocking.yaml
+- _ref: testing/e2e-auth.yaml
+- _ref: testing/e2e-configuration.yaml
+
+- _ref: blocks/input/InputGallery.yaml
 - _ref: blocks/input/AutoComplete.yaml
 - _ref: blocks/input/ButtonSelector.yaml
 - _ref: blocks/input/CheckboxSelector.yaml
@@ -66,6 +91,7 @@
 - _ref: blocks/input/PhoneNumberInput.yaml
 - _ref: blocks/input/RadioSelector.yaml
 - _ref: blocks/input/RatingSlider.yaml
+- _ref: blocks/input/SegmentedSelector.yaml
 - _ref: blocks/input/S3UploadButton.yaml
 - _ref: blocks/input/S3UploadDragger.yaml
 - _ref: blocks/input/S3UploadPhoto.yaml
@@ -73,7 +99,11 @@
 - _ref: blocks/input/Switch.yaml
 - _ref: blocks/input/TextArea.yaml
 - _ref: blocks/input/TextInput.yaml
+- _ref: blocks/input/TiptapInput.yaml
+- _ref: blocks/input/TiptapMentionInput.yaml
 - _ref: blocks/input/TitleInput.yaml
+- _ref: blocks/input/TreeInput.yaml
+- _ref: blocks/input/TreeMultipleSelector.yaml
 - _ref: blocks/input/TreeSelector.yaml
 - _ref: blocks/input/WeekSelector.yaml
 
@@ -82,11 +112,17 @@
 - _ref: blocks/display/Avatar.yaml
 - _ref: blocks/display/Breadcrumb.yaml
 - _ref: blocks/display/Button.yaml
+- _ref: blocks/display/Calendar.yaml
 - _ref: blocks/display/DangerousHtml.yaml
 - _ref: blocks/display/DangerousMarkdown.yaml
+- _ref: blocks/display/DiffGit.yaml
+- _ref: blocks/display/DiffList.yaml
+- _ref: blocks/display/DiffSideBySide.yaml
+- _ref: blocks/display/DiffTimeline.yaml
 - _ref: blocks/display/Divider.yaml
-- _ref: blocks/display/DocSearch.yaml
+- _ref: blocks/display/DropdownButton.yaml
 - _ref: blocks/display/EChart.yaml
+- _ref: blocks/display/FloatButton.yaml
 - _ref: blocks/display/Html.yaml
 - _ref: blocks/display/Icon.yaml
 - _ref: blocks/display/Img.yaml
@@ -94,19 +130,22 @@
 - _ref: blocks/display/MarkdownWithCode.yaml
 - _ref: blocks/display/Menu.yaml
 - _ref: blocks/display/Message.yaml
-- _ref: blocks/display/MobileMenu.yaml
 - _ref: blocks/display/Notification.yaml
 - _ref: blocks/display/Paragraph.yaml
 - _ref: blocks/display/Progress.yaml
+- _ref: blocks/display/QRCode.yaml
 - _ref: blocks/display/S3Download.yaml
+- _ref: blocks/display/Search.yaml
 - _ref: blocks/display/Skeleton.yaml
 - _ref: blocks/display/SkeletonAvatar.yaml
 - _ref: blocks/display/SkeletonButton.yaml
 - _ref: blocks/display/SkeletonInput.yaml
 - _ref: blocks/display/SkeletonParagraph.yaml
 - _ref: blocks/display/Statistic.yaml
+- _ref: blocks/display/Steps.yaml
 - _ref: blocks/display/Tag.yaml
 - _ref: blocks/display/Title.yaml
+- _ref: blocks/display/Tour.yaml
 
 - _ref: blocks/container/Alert.yaml
 - _ref: blocks/container/Affix.yaml
@@ -115,11 +154,13 @@
 - _ref: blocks/container/Card.yaml
 - _ref: blocks/container/Carousel.yaml
 - _ref: blocks/container/Collapse.yaml
-- _ref: blocks/container/Comment.yaml
+- _ref: blocks/container/ConfigProvider.yaml
 - _ref: blocks/container/ConfirmModal.yaml
 - _ref: blocks/container/Content.yaml
 - _ref: blocks/container/Descriptions.yaml
 - _ref: blocks/container/Drawer.yaml
+- _ref: blocks/container/DropdownMenu.yaml
+- _ref: blocks/container/Flex.yaml
 - _ref: blocks/container/Footer.yaml
 - _ref: blocks/container/GoogleMaps.yaml
 - _ref: blocks/container/GoogleMapsHeatmap.yaml
@@ -127,20 +168,32 @@
 - _ref: blocks/container/Header.yaml
 - _ref: blocks/container/Label.yaml
 - _ref: blocks/container/Layout.yaml
+- _ref: blocks/container/Masonry.yaml
+- _ref: blocks/container/MobileMenu.yaml
 - _ref: blocks/container/Modal.yaml
 - _ref: blocks/container/PageHeaderMenu.yaml
+- _ref: blocks/container/PageSidebarLayout.yaml
 - _ref: blocks/container/PageSiderMenu.yaml
 - _ref: blocks/container/Popover.yaml
 - _ref: blocks/container/Result.yaml
 - _ref: blocks/container/Sider.yaml
 - _ref: blocks/container/Span.yaml
+- _ref: blocks/container/Splitter.yaml
 - _ref: blocks/container/Spinner.yaml
 - _ref: blocks/container/Tabs.yaml
 - _ref: blocks/container/Tooltip.yaml
+- _ref: blocks/container/Watermark.yaml
 
 - _ref: blocks/list/ControlledList.yaml
 - _ref: blocks/list/List.yaml
+- _ref: blocks/list/ListSelector.yaml
+- _ref: blocks/list/MasonryList.yaml
 # - _ref: blocks/list/TimelineList.yaml # TODO:
+
+- _ref: connections/Anthropic.yaml
+- _ref: connections/Google.yaml
+- _ref: connections/Mcp.yaml
+- _ref: connections/OpenAI.yaml
 
 - _ref: connections/AmazonRedshift.yaml
 - _ref: connections/AWSS3.yaml
@@ -152,13 +205,13 @@
 - _ref: connections/MongoDB.yaml
 - _ref: connections/MSSQL.yaml
 - _ref: connections/MySQL.yaml
-# - _ref: connections/OracleDB.yaml
 - _ref: connections/PostgreSQL.yaml
 - _ref: connections/Redis.yaml
 - _ref: connections/SendGridMail.yaml
 - _ref: connections/SQLite.yaml
 - _ref: connections/Stripe.yaml
 
+- _ref: actions/CallAPI.yaml
 - _ref: actions/CallMethod.yaml
 - _ref: actions/CopyToClipboard.yaml
 - _ref: actions/DisplayMessage.yaml
@@ -173,8 +226,10 @@
 - _ref: actions/Reset.yaml
 - _ref: actions/ResetValidation.yaml
 - _ref: actions/ScrollTo.yaml
+- _ref: actions/SetDarkMode.yaml
 - _ref: actions/SetFocus.yaml
 - _ref: actions/SetGlobal.yaml
+- _ref: actions/SetLocale.yaml
 - _ref: actions/SetState.yaml
 - _ref: actions/Throw.yaml
 - _ref: actions/UpdateSession.yaml
@@ -183,9 +238,12 @@
 
 - _ref: operators/_actions.yaml
 - _ref: operators/_and.yaml
+- _ref: operators/_api.yaml
+- _ref: operators/_app.yaml
 - _ref: operators/_args.yaml
 - _ref: operators/_array.yaml
 - _ref: operators/_base64.yaml
+- _ref: operators/_boolean.yaml
 - _ref: operators/_build.yaml
 - _ref: operators/_change_case.yaml
 - _ref: operators/_date.yaml
@@ -204,8 +262,11 @@
 - _ref: operators/_index.yaml
 - _ref: operators/_input.yaml
 - _ref: operators/_intl.yaml
+- _ref: operators/_item.yaml
 - _ref: operators/_js.yaml
 - _ref: operators/_json.yaml
+- _ref: operators/_jsonata.yaml
+- _ref: operators/_locale.yaml
 - _ref: operators/_location.yaml
 - _ref: operators/_log.yaml
 - _ref: operators/_lt.yaml
@@ -213,7 +274,8 @@
 - _ref: operators/_math.yaml
 - _ref: operators/_media.yaml
 - _ref: operators/_menu.yaml
-- _ref: operators/_moment.yaml
+- _ref: operators/_module.yaml
+- _ref: operators/_dayjs.yaml
 - _ref: operators/_mql.yaml
 - _ref: operators/_ne.yaml
 - _ref: operators/_not.yaml
@@ -230,10 +292,13 @@
 - _ref: operators/_request_details.yaml
 - _ref: operators/_secret.yaml
 - _ref: operators/_state.yaml
+- _ref: operators/_step.yaml
 - _ref: operators/_string.yaml
 - _ref: operators/_subtract.yaml
 - _ref: operators/_sum.yaml
 - _ref: operators/_switch.yaml
+- _ref: operators/_t.yaml
+- _ref: operators/_theme.yaml
 - _ref: operators/_type.yaml
 - _ref: operators/_uri.yaml
 - _ref: operators/_url_query.yaml
@@ -242,6 +307,21 @@
 - _ref: operators/_var.yaml
 - _ref: operators/_yaml.yaml
 
+- _ref: controls/for.yaml
+- _ref: controls/if.yaml
+- _ref: controls/log.yaml
+- _ref: controls/parallel.yaml
+- _ref: controls/parallel_for.yaml
+- _ref: controls/reject.yaml
+- _ref: controls/return.yaml
+- _ref: controls/set_state.yaml
+- _ref: controls/switch.yaml
+- _ref: controls/throw.yaml
+- _ref: controls/try.yaml
+# - _ref: controls/while.yaml # TODO: Add back when while control implemented
+
+- _ref: migration/upgrade-guide.yaml
 - _ref: migration/v3-to-v4.yaml
+- _ref: migration/v4-to-v5.yaml
 
 - _ref: 404.yaml

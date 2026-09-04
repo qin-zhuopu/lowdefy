@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,27 +15,18 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
-const Span = ({ blockId, content, events, methods, properties }) => (
+const Span = ({ blockId, classNames, content, events, methods, properties, styles }) => (
   <span
     id={blockId}
     data-testid={blockId}
     onClick={() => methods.triggerEvent({ name: 'onClick' })}
-    className={methods.makeCssClass([
-      { outline: 'none', cursor: events.onClick && 'pointer' },
-      properties.style,
-    ])}
+    className={classNames?.element}
+    style={{ outline: 'none', cursor: events.onClick && 'pointer', ...styles?.element }}
   >
     {properties.content || (content.content && content.content())}
   </span>
 );
 
-Span.defaultProps = blockDefaultProps;
-Span.meta = {
-  category: 'container',
-  icons: [],
-  styles: [],
-};
-
-export default Span;
+export default withBlockDefaults(Span);

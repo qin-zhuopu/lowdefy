@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ class HtmlComponent extends React.Component {
     }
   }
   render() {
-    const { div, id, methods, style } = this.props;
+    const { className, div, id, style } = this.props;
     if (div === true) {
       return (
         <div
@@ -62,7 +62,8 @@ class HtmlComponent extends React.Component {
               this.div = el;
             }
           }}
-          className={methods.makeCssClass(style)}
+          className={className}
+          style={style}
           onMouseUp={this.onTextSelection}
         />
       );
@@ -76,7 +77,8 @@ class HtmlComponent extends React.Component {
             this.div = el;
           }
         }}
-        className={methods.makeCssClass(style)}
+        className={className}
+        style={style}
         onMouseUp={this.onTextSelection}
       />
     );

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import getBlockMatcher from '../getBlockMatcher.js';
 
 function createResetValidation({ context }) {
   return function resetValidation(params) {
-    context._internal.RootBlocks.resetValidation(getBlockMatcher(params));
+    context._internal.RootSlots.resetValidation(getBlockMatcher(params));
   };
 }
 

@@ -1,5 +1,345 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/errors@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.1
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Minor Changes
+
+- 0108f38: feat: First-class i18n / locale support for Lowdefy apps.
+
+  Apps can now declare supported locales and message catalogs under
+  `config.i18n`, switch language at runtime, and translate their own
+  strings with ICU MessageFormat. Ant Design's component strings (date
+  pickers, modal Ok/Cancel, pagination, form validation messages),
+  dayjs date formatting, and the engine's built-in framework strings
+  (loading toasts, validation summaries, popup blocker warnings, error
+  page) all localize automatically once `config.i18n` is set.
+
+  ```yaml
+  config:
+    i18n:
+      defaultLocale: en-US
+      locales:
+        - { code: en-US, label: English, antd: en_US, dayjs: en }
+        - { code: de-DE, label: Deutsch, antd: de_DE, dayjs: de }
+      messages:
+        en-US: { greeting: 'Hello, {name}!' }
+        de-DE: { greeting: 'Hallo, {name}!' }
+  ```
+
+  **New schema** — `config.i18n` with `defaultLocale`, `locales[]`, and
+  `messages`. Validated at build time; only declared locales are bundled
+  (antd and dayjs locale imports are codegen'd, no ~150KB unused). The
+  missing-key fallback is always `en-US`, so plugin and module authors
+  should ship `en-US` translations as a baseline.
+
+  **New operators**
+
+  - [`_t`](/_t) — translate operator with ICU MessageFormat. Resolution
+    order: active locale → fallback locale → built-in framework message
+    → key.
+
+    ```yaml
+    _t:
+      key: cart.items
+      values: { count: { _state: itemCount } }
+    ```
+
+  - [`_locale`](/_locale) — read `active` / `default` / `fallback`
+    (always `'en-US'`) / `supported` locale state. Use with `Selector`
+    to build a language picker.
+
+  **New action** — [`SetLocale`](/SetLocale) sets the user's preferred
+  locale (persisted to `localStorage`). Pass `'auto'` to clear the
+  preference and fall back to the browser language or default.
+
+  **Built-in framework strings.** Engine and client strings (`'Loading'`,
+  `'Success'`, `'This field is required'`, validation summaries, popup
+  blocker, error page) live in a built-in catalog and surface as English
+  by default. Authors override per-locale by adding the same key to
+  `config.i18n.messages`:
+
+  ```yaml
+  messages:
+    de-DE:
+      engine.action.loading: 'Laden'
+      engine.validation.fieldRequired: 'Pflichtfeld'
+  ```
+
+  See the [Internationalization concept page](/i18n) for the full list
+  of overridable keys.
+
+  **Ant Design block cleanup.** `Modal`/`ConfirmModal` `okText`/`cancelText`
+  and date picker placeholders (`DateSelector`, `DateRangeSelector`,
+  `DateTimeSelector`, `MonthSelector`, `WeekSelector`) no longer hardcode
+  English defaults — they fall through to antd's `ConfigProvider locale`,
+  so a German app gets `'OK'` / `'Abbrechen'` / `'Datum auswählen'`
+  without per-block configuration. The antd `ConfigProvider` block
+  itself now accepts a `locale` prop for subtree overrides.
+
+  **Server-side translation.** API requests resolve the user's active
+  locale from the `Accept-Language` header and thread it into the server
+  operator parser, so `_t` works the same in server-side actions and
+  requests as on the client.
+
+  **Translation engine.** A new `translate()` helper in `@lowdefy/helpers`
+  backs both the `_t` operator and the engine/client adapter (installed
+  on `lowdefy._internal.translate`). One source of truth for the lookup
+  chain; no duplication. Adds `intl-messageformat` as a foundational dep.
+
+  **Plugin-author surface.** Action and block plugins receive
+  `methods.translate(key, values)` and `methods.getLocale()` for runtime
+  translation in their JS code. Plugin packages can ship default
+  messages via a `./messages` export — the build merges them into the
+  app's i18n catalog (user app messages > plugin messages > framework
+  builtins > key).
+
+  **DatePicker and NumberInput auto-localization.** Date selector blocks
+  (`DateSelector`, `DateRangeSelector`, `DateTimeSelector`,
+  `MonthSelector`) and `NumberInput` derive their default `format` /
+  `decimalSeparator` from the active locale via `Intl.DateTimeFormat` /
+  `Intl.NumberFormat`. A German user sees `DD.MM.YYYY` and `1234,56`
+  automatically; an en-US user sees `MM/DD/YYYY` and `1234.56`.
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/errors@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 1d18a13: feat(actions): `holdValue` flag on `Request` and `CallAPI` actions.
+
+  `Request` and `CallAPI` actions now accept a `holdValue: true` flag that retains the previous response value while a new call is loading. UI bound to `_request: <id>` or `_api: <endpointId>` keeps showing the previous response instead of flashing to `null` during a refetch. The previous response is also retained if the new call errors — the error is still observable via `_request_details` / `_api`.
+
+  ```yaml
+  - id: refresh_table
+    type: Request
+    params:
+      requestId: my_table_request
+      holdValue: true
+  ```
+
+  The `Request` action's object-form params now also support `{ requestId, holdValue }` and `{ requestIds, holdValue }` shapes alongside the existing `{ all }` shape.
+
+### Patch Changes
+
+- @lowdefy/errors@5.2.0
+- @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.1.0
+- @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+### Minor Changes
+
+- c8f4a41063: Add `theme.darkMode` config with system preference support.
+
+  **System Dark Mode (`theme.darkMode`)**
+
+  - New `theme.darkMode` config key accepts `'system'` (default), `'light'`, or `'dark'`
+  - When set to `'system'`, the app follows the OS dark mode preference and updates live when it changes
+  - When set to `'light'` or `'dark'`, the developer locks the mode — user preferences are stored but not applied
+
+  **SetDarkMode Action**
+
+  - Now accepts string params: `darkMode: 'system' | 'light' | 'dark'`
+  - Without params, cycles through light, dark, and system preferences
+
+  **`_media` Operator**
+
+  - New `_media: darkModePreference` returns the user's preference (`'system'`, `'light'`, or `'dark'`)
+  - `_media: darkMode` continues to return the effective boolean state
+
+  **Dark Mode Rendering**
+
+  - Notification, Message, and ConfirmModal render with correct dark mode colors via `App.useApp()` hooks
+  - Loader blocks (Skeleton, Spinner) use antd design tokens instead of hardcoded colors
+  - 404 page and loading states use theme-aware backgrounds
+  - Mobile menu drawer background matches the active theme
+
+### Patch Changes
+
+- Updated dependencies [905d5d406]
+  - @lowdefy/helpers@5.0.0
+  - @lowdefy/errors@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.3
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/errors@4.7.1
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/errors@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+- f673e3ab3: feat(errors): Add UserError class and thread actionId through request pipeline
+
+  **UserError Class**
+
+  - New `UserError` in `@lowdefy/errors` for expected user-facing errors (validation failures, intentional throws)
+  - UserError logs to browser console only — never sent to the server terminal
+  - `Throw` action now throws `UserError` instead of custom `ThrowActionError`
+
+  **Engine Error Routing**
+
+  - `Actions.logActionError()` routes errors by type: `UserError` → `console.error()`, all others → `logError()` (terminal)
+  - Deduplication by error message + action ID prevents repeated logging
+
+  **actionId Threading**
+
+  - `actionId` threaded from `callAction` through `createRequest` to `Requests.callRequests`
+  - Server-dev request handler logs request trace via `logger.ui.dim()` for dimmed output
+  - Enables request logs to include the triggering action for better debugging context
+
+### Patch Changes
+
+- 8250d8d3e: fix(errors): Remove redundant try/catch in operator runners, add cause chains to remaining throws
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+- Updated dependencies [f673e3ab3]
+  - @lowdefy/errors@4.6.0
+  - @lowdefy/helpers@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

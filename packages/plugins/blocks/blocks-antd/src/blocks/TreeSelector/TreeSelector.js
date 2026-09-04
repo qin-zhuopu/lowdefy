@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,90 +14,116 @@
   limitations under the License.
 */
 
-import React, { useState, useEffect } from 'react';
-import { Tree } from 'antd';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import React, { useState } from 'react';
+import { TreeSelect } from 'antd';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
+import { type } from '@lowdefy/helpers';
 
-const transformData = (data, valueMap, prefix = '') => {
-  return data.map(({ children, disabled, disableCheckbox, label, value }, i) => {
-    const key = `${prefix}-${i}`;
-    valueMap[key] = prefix ? [value, ...valueMap[prefix]] : [value];
-    return {
-      children: children && transformData(children, valueMap, key),
-      disabled,
-      disableCheckbox,
-      key,
-      renderTitle: label,
-    };
-  });
-};
+import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
+import useSelectorOptions from '../../useSelectorOptions.js';
+import getSelectedIndex from '../../getSelectedIndex.js';
+import getTreeData, { ROOT_PID } from '../../getTreeData.js';
 
-const getValueKeys = (value, valueMap) => {
-  for (const key in valueMap) {
-    if (JSON.stringify(value) === JSON.stringify(valueMap[key])) {
-      return key
-        .split('-')
-        .slice(1)
-        .reduce((acc, curr, i) => [...acc, acc[i - 1] ? acc[i - 1] + '-' + curr : '-' + curr], []);
-    }
-  }
-  return [];
-};
+const TreeSelector = ({
+  blockId,
+  classNames = {},
+  components: { Icon },
+  events,
+  loading,
+  methods,
+  properties,
+  required,
+  styles = {},
+  validation,
+  value,
+}) => {
+  const [elementId] = useState((0 | (Math.random() * 9e2)) + 1e2);
+  const entries = useSelectorOptions({ properties, methods });
+  const treeData = getTreeData({ entries, properties });
+  // primaryKey / parentKey are structural (node id + parent ref); the stored value is the valueKey
+  // value, so selection is matched on valueKey — hide primaryKey from getSelectedIndex.
+  const matchProps = { ...properties, primaryKey: undefined };
 
-const TreeSelector = ({ blockId, properties, content, methods, value }) => {
-  const treeData = properties.options;
-  const valueMap = {};
-  const transformedData = transformData(treeData, valueMap);
-  const [selectedKeys, setSelectedKeys] = useState([]);
-  const [expandedKeys, setExpandedKeys] = useState([]);
-
-  useEffect(() => {
-    let nextValue;
-    if (value === null || (Array.isArray(value) && !value.length)) {
-      nextValue = [];
-    } else {
-      nextValue = getValueKeys(value, valueMap);
-    }
-    setSelectedKeys([nextValue[nextValue.length - 1]]);
-    setExpandedKeys([...new Set([...nextValue.slice(0, nextValue.length - 1), ...expandedKeys])]);
-  }, [value]);
-
-  const onSelect = (selectedKeys) => {
-    methods.setValue(selectedKeys.map((key) => valueMap[key]).flat());
-    methods.triggerEvent({ name: 'onChange' });
-    setSelectedKeys(selectedKeys);
-  };
-
-  const onExpand = (nextExpandedKeys) => {
-    setExpandedKeys(nextExpandedKeys);
-  };
+  let antdVariant = properties.variant;
+  if (properties.bordered === false) antdVariant = 'borderless';
 
   return (
-    <Tree
-      id={blockId}
-      checkable={properties.checkable}
-      disabled={properties.disabled}
-      defaultExpandAll={properties.defaultExpandAll}
-      showLine={properties.showLine}
-      selectable={properties.selectable}
-      multiple={false}
-      content={content.options && content.options()}
-      treeData={transformedData}
-      onSelect={onSelect}
-      onExpand={onExpand}
-      titleRender={({ renderTitle }) => renderHtml({ html: renderTitle, methods })}
-      selectedKeys={selectedKeys}
-      expandedKeys={expandedKeys}
+    <Label
+      blockId={blockId}
+      methods={methods}
+      classNames={classNames}
+      components={{ Icon }}
+      events={events}
+      properties={{ title: properties.title, size: properties.size, ...properties.label }}
+      required={required}
+      styles={styles}
+      validation={validation}
+      content={{
+        content: () => (
+          <div style={{ width: '100%' }}>
+            <div id={`${blockId}_${elementId}_popup`} />
+            <TreeSelect
+              id={`${blockId}_input`}
+              variant={antdVariant}
+              className={classNames.element}
+              style={{ width: '100%', ...styles.element }}
+              disabled={properties.disabled || loading}
+              allowClear={properties.allowClear !== false}
+              placeholder={
+                properties.placeholder ?? methods.translate('blocks.treeSelector.placeholder')
+              }
+              status={validation.status}
+              size={properties.size}
+              autoFocus={properties.autoFocus}
+              getPopupContainer={() => document.getElementById(`${blockId}_${elementId}_popup`)}
+              treeDataSimpleMode={{ id: 'id', pId: 'pId', rootPId: ROOT_PID }}
+              treeData={treeData}
+              treeDefaultExpandAll={properties.treeDefaultExpandAll}
+              showSearch={properties.showSearch !== false}
+              treeNodeFilterProp="title"
+              treeTitleRender={(node) => renderHtml({ html: `${node.title}`, methods })}
+              notFoundContent={
+                properties.notFoundContent ?? methods.translate('blocks.treeSelector.notFound')
+              }
+              suffixIcon={
+                properties.suffixIcon && (
+                  <Icon
+                    blockId={`${blockId}_suffixIcon`}
+                    classNames={{ element: classNames.suffixIcon }}
+                    events={events}
+                    properties={properties.suffixIcon}
+                    styles={{ element: styles.suffixIcon }}
+                  />
+                )
+              }
+              clearIcon={
+                properties.clearIcon && (
+                  <Icon
+                    blockId={`${blockId}_clearIcon`}
+                    classNames={{ element: classNames.clearIcon }}
+                    events={events}
+                    properties={properties.clearIcon}
+                    styles={{ element: styles.clearIcon }}
+                  />
+                )
+              }
+              value={getSelectedIndex(value, entries, { properties: matchProps })}
+              onChange={(idx) => {
+                const val = type.isNone(idx) ? null : entries[idx].value;
+                methods.setValue(val);
+                methods.triggerEvent({ name: 'onChange', event: { value: val } });
+              }}
+              onBlur={() => methods.triggerEvent({ name: 'onBlur' })}
+              onFocus={() => methods.triggerEvent({ name: 'onFocus' })}
+              onClear={() => methods.triggerEvent({ name: 'onClear' })}
+              onSearch={(v) => methods.triggerEvent({ name: 'onSearch', event: { value: v } })}
+            />
+          </div>
+        ),
+      }}
     />
   );
 };
 
-TreeSelector.defaultProps = blockDefaultProps;
-TreeSelector.meta = {
-  category: 'input',
-  valueType: 'array',
-  icons: [],
-  styles: ['blocks/TreeSelector/style.less'],
-};
-
-export default TreeSelector;
+export default withTheme('TreeSelect', withBlockDefaults(TreeSelector));

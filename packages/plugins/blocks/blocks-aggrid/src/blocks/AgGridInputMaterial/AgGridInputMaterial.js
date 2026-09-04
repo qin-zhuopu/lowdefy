@@ -1,5 +1,5 @@
 /*
-  Copyright 2021 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,10 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+
+import antdStyles from '../../ag-grid-antd.module.css';
+import { themeMaterialAntd, useGridTheme } from '../../theme/themeLowdefy.js';
 
 import AgGridInput from '../../AgGridInput.js';
 
@@ -26,36 +29,31 @@ const AgGridInputMaterial = ({
   methods,
   properties,
   required,
+  styles,
   validation,
   value,
-}) => (
-  <div
-    id={blockId}
-    className={`ag-theme-material ${methods.makeCssClass({
-      width: '100%',
-      height: properties.height ?? 500,
-      ...properties.style,
-    })}`}
-  >
-    <AgGridInput
-      blockId={blockId}
-      events={events}
-      loading={loading}
-      methods={methods}
-      properties={properties}
-      required={required}
-      validation={validation}
-      value={value}
-    />
-  </div>
-);
+}) => {
+  const theme = useGridTheme(themeMaterialAntd, properties.themeParams);
 
-AgGridInputMaterial.defaultProps = blockDefaultProps;
-AgGridInputMaterial.meta = {
-  category: 'input',
-  valueType: 'array',
-  icons: [],
-  styles: ['blocks/AgGridInputMaterial/style.less'],
+  return (
+    <div
+      id={blockId}
+      className={`ag-theme-material ${antdStyles.antdTheme}`}
+      style={{ width: '100%', height: properties.height ?? 500, ...styles?.element }}
+    >
+      <AgGridInput
+        blockId={blockId}
+        events={events}
+        loading={loading}
+        methods={methods}
+        properties={properties}
+        required={required}
+        theme={theme}
+        validation={validation}
+        value={value}
+      />
+    </div>
+  );
 };
 
-export default AgGridInputMaterial;
+export default withBlockDefaults(AgGridInputMaterial);

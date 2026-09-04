@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-props-no-spreading */
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ const MAP_PROPS = {
 };
 
 // Implements https://react-google-maps-api-docs.netlify.app/#googlemap
-const Map = ({ blockId, children, content, methods, properties }) => {
+const Map = ({ blockId, children, classNames = {}, content, methods, properties, styles = {} }) => {
   const [map, setMap] = useState();
   const [bounds, setBounds] = useState();
 
@@ -106,7 +106,8 @@ const Map = ({ blockId, children, content, methods, properties }) => {
     <GoogleMap
       {...properties.map} // https://react-google-maps-api-docs.netlify.app/#googlemap
       id={blockId}
-      mapContainerClassName={methods.makeCssClass([STYLE_DEFAULTS, properties.style])}
+      mapContainerClassName={classNames.element}
+      mapContainerStyle={{ ...STYLE_DEFAULTS, ...styles.element }}
       center={MAP_PROPS.center}
       zoom={MAP_PROPS.zoom}
       onLoad={(newMap, event) => {

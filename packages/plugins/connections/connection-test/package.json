@@ -1,0 +1,32 @@
+{
+  "name": "@lowdefy/connection-test",
+  "version": "5.6.0",
+  "license": "Apache-2.0",
+  "description": "Lowdefy test connection for debugging requests and errors.",
+  "homepage": "https://lowdefy.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lowdefy/lowdefy.git"
+  },
+  "type": "module",
+  "exports": {
+    "./connections": "./src/connections.js",
+    "./types": "./src/types.js"
+  },
+  "files": [
+    "src/*",
+    "dist/*"
+  ],
+  "scripts": {
+    "build": "echo 'No compilation needed — exports directly from src.'"
+  },
+  "dependencies": {
+    "@lowdefy/errors": "5.6.0"
+  },
+  "devDependencies": {
+    "@lowdefy/node-utils": "5.6.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

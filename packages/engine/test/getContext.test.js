@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -28,54 +28,28 @@ const getLowdefy = () => {
     _internal: {
       displayMessage: () => () => {},
       updateBlock,
+      translate: (key) => key,
       operators: {},
       actions: {},
       blockComponents: {
-        TextInput: {
-          meta: {
-            category: 'input',
-            valueType: 'string',
-          },
-        },
-        Box: {
-          meta: {
-            category: 'container',
-          },
-        },
-        Button: {
-          meta: {
-            category: 'display',
-          },
-        },
-        List: {
-          meta: {
-            category: 'list',
-            valueType: 'array',
-          },
-        },
-        Paragraph: {
-          meta: {
-            category: 'display',
-          },
-        },
-        Switch: {
-          meta: {
-            category: 'input',
-            valueType: 'boolean',
-          },
-        },
-        MultipleSelector: {
-          meta: {
-            category: 'input',
-            valueType: 'array',
-          },
-        },
-        NumberInput: {
-          meta: {
-            category: 'input',
-            valueType: 'number',
-          },
-        },
+        TextInput: {},
+        Box: {},
+        Button: {},
+        List: {},
+        Paragraph: {},
+        Switch: {},
+        MultipleSelector: {},
+        NumberInput: {},
+      },
+      blockMetas: {
+        TextInput: { category: 'input', valueType: 'string' },
+        Box: { category: 'container' },
+        Button: { category: 'display' },
+        List: { category: 'list', valueType: 'array' },
+        Paragraph: { category: 'display' },
+        Switch: { category: 'input', valueType: 'boolean' },
+        MultipleSelector: { category: 'input', valueType: 'array' },
+        NumberInput: { category: 'input', valueType: 'number' },
       },
     },
   };
@@ -100,9 +74,9 @@ test('memoize context and reset', () => {
   const c1 = getContext({ config, lowdefy, resetContext: { reset: true, setReset: () => {} } });
   const c2 = getContext({ config, lowdefy, resetContext: { reset: false, setReset: () => {} } });
   expect(c1).toBe(c2);
-  expect(c1._internal.RootBlocks.id).toEqual(c2._internal.RootBlocks.id);
+  expect(c1._internal.RootSlots.id).toEqual(c2._internal.RootSlots.id);
   const c3 = getContext({ config, lowdefy, resetContext: { reset: true, setReset: () => {} } });
-  expect(c1._internal.RootBlocks.id).not.toEqual(c3._internal.RootBlocks.id);
+  expect(c1._internal.RootSlots.id).not.toEqual(c3._internal.RootSlots.id);
 });
 
 test('create context', () => {
@@ -116,7 +90,7 @@ test('create context', () => {
   const context = getContext({ config, lowdefy, resetContext });
   expect(context._internal.Actions).toBeDefined();
   expect(context._internal.Requests).toBeDefined();
-  expect(context._internal.RootBlocks).toBeDefined();
+  expect(context._internal.RootSlots).toBeDefined();
   expect(context._internal.State).toBeDefined();
   expect(context._internal.runOnInit).toBeDefined();
   expect(context._internal.runOnInitAsync).toBeDefined();

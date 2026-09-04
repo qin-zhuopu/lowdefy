@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -30,6 +30,11 @@ function custom_filter_default_value({ params }) {
 
   const filterObject = ({ obj, path }) => {
     Object.keys(obj).forEach((key) => {
+      // Strip internal build markers from display
+      if (key === '~k' || key === '~r' || key === '~l') {
+        delete obj[key];
+        return;
+      }
       const propPath = path.concat([key]);
       if (type.isObject(obj[key])) {
         filterObject({ obj: obj[key], path: propPath });
@@ -38,7 +43,10 @@ function custom_filter_default_value({ params }) {
       if (obj[key] === dv) {
         delete obj[key];
       }
-      if (obj[key] === null || isEmptyObject(obj[key])) {
+      if (obj[key] === null || obj[key] === undefined) {
+        delete obj[key];
+      }
+      if (isEmptyObject(obj[key])) {
         delete obj[key];
       }
     });

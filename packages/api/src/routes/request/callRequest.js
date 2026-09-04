@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -21,28 +21,43 @@ import callRequestResolver from './callRequestResolver.js';
 import checkConnectionRead from './checkConnectionRead.js';
 import checkConnectionWrite from './checkConnectionWrite.js';
 import evaluateOperators from './evaluateOperators.js';
-import getConnection from './getConnection.js';
-import getConnectionConfig from './getConnectionConfig.js';
+import getConnection from '../connections/getConnection.js';
+import getConnectionConfig from '../connections/getConnectionConfig.js';
 import getRequestConfig from './getRequestConfig.js';
 import getRequestResolver from './getRequestResolver.js';
 import validateSchemas from './validateSchemas.js';
 
+import createEvaluateOperators from '../../context/createEvaluateOperators.js';
+import redactResponse from '../../response/redactResponse.js';
+
 async function callRequest(context, { blockId, pageId, payload, requestId }) {
   const { logger } = context;
+
+  context.blockId = blockId;
+  context.pageId = pageId;
+  const requestPayload = serializer.deserialize(payload);
+  context.payload = requestPayload;
+  context.evaluateOperators = createEvaluateOperators(context);
+
   logger.debug({ event: 'debug_request', blockId, pageId, payload, requestId });
   const requestConfig = await getRequestConfig(context, { pageId, requestId });
-  const connectionConfig = await getConnectionConfig(context, { requestConfig });
+  const connectionConfig = await getConnectionConfig(context, {
+    connectionId: requestConfig.connectionId,
+    configKey: requestConfig['~k'],
+  });
   authorizeRequest(context, { requestConfig });
 
   const connection = getConnection(context, { connectionConfig });
   const requestResolver = getRequestResolver(context, { connection, requestConfig });
-  const deserializedPayload = serializer.deserialize(payload);
 
   const { connectionProperties, requestProperties } = evaluateOperators(context, {
     connectionConfig,
-    payload: deserializedPayload,
+    payload: requestPayload,
     requestConfig,
+    state: {},
+    steps: {},
   });
+
   checkConnectionRead(context, {
     connectionConfig,
     connectionProperties,
@@ -63,9 +78,8 @@ async function callRequest(context, { blockId, pageId, payload, requestId }) {
     requestProperties,
   });
   const response = await callRequestResolver(context, {
-    blockId,
     connectionProperties,
-    payload: deserializedPayload,
+    endpointDepth: 0,
     requestConfig,
     requestProperties,
     requestResolver,
@@ -74,7 +88,7 @@ async function callRequest(context, { blockId, pageId, payload, requestId }) {
     id: requestConfig.id,
     success: true,
     type: requestConfig.type,
-    response: serializer.serialize(response),
+    response: redactResponse(context, response),
   };
 }
 

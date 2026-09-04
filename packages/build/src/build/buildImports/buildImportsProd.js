@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 */
 
 import buildIconImports from './buildIconImports.js';
-import buildStyleImports from './buildStyleImports.js';
 import defaultIconsProd from './defaultIconsProd.js';
 
 function buildImportClassProd(types) {
@@ -30,6 +29,7 @@ function buildImportsProd({ components, context }) {
   const blocks = buildImportClassProd(components.types.blocks);
   return {
     actions: buildImportClassProd(components.types.actions),
+    agents: buildImportClassProd(components.types.agents),
     auth: {
       adapters: buildImportClassProd(components.types.auth.adapters),
       callbacks: buildImportClassProd(components.types.auth.callbacks),
@@ -44,7 +44,6 @@ function buildImportsProd({ components, context }) {
       client: buildImportClassProd(components.types.operators.client),
       server: buildImportClassProd(components.types.operators.server),
     },
-    styles: buildStyleImports({ blocks, context }),
   };
 }
 

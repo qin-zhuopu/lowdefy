@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,21 +14,35 @@
   limitations under the License.
 */
 
+import { type } from '@lowdefy/helpers';
+
 function js(operatorContext) {
   const { jsMap, operators, location, params } = operatorContext;
+  const hash = type.isString(params) ? params : params?.fn;
+  const args = type.isObject(params) ? params.args : undefined;
+  if (!jsMap[hash]) {
+    throw new Error(
+      `_js function not found. The function may not have been built yet. Received hash: ${hash}`
+    );
+  }
   try {
-    return jsMap[params]({
+    return jsMap[hash]({
+      args,
+      item: (p) => operators._item({ ...operatorContext, params: p }),
+      lowdefyApp: (p) => operators._app({ ...operatorContext, params: p }),
       payload: (p) => operators._payload({ ...operatorContext, params: p }),
       secret: (p) => operators._secret({ ...operatorContext, params: p }),
+      state: (p) => operators._state({ ...operatorContext, params: p }),
+      step: (p) => operators._step({ ...operatorContext, params: p }),
       user: (p) => operators._user({ ...operatorContext, params: p }),
     });
   } catch (error) {
-    throw new Error(
-      `Operator Error: ${error.message} at ${location}. Received function: ${jsMap[
-        params
-      ].toString()}`
-    );
+    throw new Error(`_js function execution error. Function: ${jsMap[hash].toString()}`, {
+      cause: error,
+    });
   }
 }
+
+js.dynamic = true;
 
 export default js;

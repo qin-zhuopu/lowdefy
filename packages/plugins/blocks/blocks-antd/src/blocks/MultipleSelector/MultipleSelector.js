@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,29 +15,39 @@
 */
 
 import React, { useState } from 'react';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
 import { get, type } from '@lowdefy/helpers';
 import { Select } from 'antd';
 
-import getUniqueValues from '../../getUniqueValues.js';
-import getValueIndex from '../../getValueIndex.js';
+import useSelectorOptions from '../../useSelectorOptions.js';
+import getSelectedIndex from '../../getSelectedIndex.js';
+import getContrastTextColor from '../../getContrastTextColor.js';
+import getOptionColorStyle from '../../getOptionColorStyle.js';
 import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
 import Tag from '../Tag/Tag.js';
 
 const Option = Select.Option;
 
-const tagRender = (props, option, methods, components) => {
+const tagRender = (props, option, methods, components, isOutline) => {
   const { label, closable, onClose } = props;
+  // An explicit tag.color wins; otherwise the per-option color drives the pill.
+  const color = option?.tag?.color ?? option?.color;
+  const contrast = getContrastTextColor(color);
+  // Hex color → explicit solid/outlined pill (dark-mode safe), following the
+  // input variant. Preset name (or none) → antd's Tag color handling.
+  const colorStyle = contrast ? getOptionColorStyle({ color, isOutline }) : {};
   return (
     <Tag
       components={components}
       methods={methods}
       onClose={onClose}
+      styles={{ element: { marginRight: 3, ...colorStyle, ...(option?.tag?.style ?? {}) } }}
       properties={{
         title: label ?? '',
         ...(option?.tag ?? {}),
+        color: contrast ? undefined : color,
         closable,
-        style: { marginRight: 3, ...(option?.tag?.style ?? {}) },
       }}
     />
   );
@@ -45,42 +55,68 @@ const tagRender = (props, option, methods, components) => {
 
 const MultipleSelector = ({
   blockId,
-  components: { Icon },
+  classNames = {},
+  components: { Icon, ShortcutBadge },
   events,
   loading,
   methods,
   properties,
   required,
+  styles = {},
   validation,
   value,
 }) => {
   const [fetchState, setFetch] = useState(false);
   const [elementId] = useState((0 | (Math.random() * 9e2)) + 1e2);
-  const uniqueValueOptions = getUniqueValues(properties.options ?? []);
+  const uniqueValueOptions = useSelectorOptions({ properties, methods });
+  // Auto-enable custom tag rendering when any option carries a color/tag, so
+  // per-option pill colors work without requiring renderTags.
+  const hasTagStyling = uniqueValueOptions.some(
+    (opt) => !type.isPrimitive(opt) && (opt.color || opt.tag)
+  );
+  // `outlined` → outlined colored tags; `solid` (or default) → filled colored tags.
+  const isOutline = properties.variant === 'outlined';
+  // `solid` is not a valid antd Select input variant — use outlined for the frame.
+  let antdVariant = properties.variant;
+  if (properties.variant === 'solid') antdVariant = 'outlined';
+  if (properties.bordered === false) antdVariant = 'borderless';
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={{ Icon }}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       required={required}
+      styles={styles}
       validation={validation}
       content={{
         content: () => (
-          <div className={methods.makeCssClass({ width: '100%' })}>
+          <div style={{ width: '100%' }}>
             <div id={`${blockId}_${elementId}_popup`} />
             <Select
               id={`${blockId}_input`}
               allowClear={properties.allowClear !== false}
               autoClearSearchValue={properties.autoClearSearchValue}
               autoFocus={properties.autoFocus}
-              bordered={properties.bordered}
-              className={methods.makeCssClass([{ width: '100%' }, properties.inputStyle])}
+              variant={antdVariant}
+              className={classNames.element}
+              classNames={{ content: classNames.selector }}
+              style={{ width: '100%', ...styles.element }}
+              styles={{ content: styles.selector }}
               disabled={properties.disabled || loading}
               getPopupContainer={() => document.getElementById(`${blockId}_${elementId}_popup`)}
               mode="multiple"
               tagRender={
-                properties.renderTags &&
-                ((props) => tagRender(props, uniqueValueOptions[props.value], methods, { Icon }))
+                (properties.renderTags || hasTagStyling) &&
+                ((props) =>
+                  tagRender(
+                    props,
+                    uniqueValueOptions[props.value],
+                    methods,
+                    { Icon, ShortcutBadge },
+                    isOutline
+                  ))
               }
               maxTagCount={properties.maxTagCount}
               notFoundContent={
@@ -94,13 +130,15 @@ const MultipleSelector = ({
               showArrow={get(properties, 'showArrow', { default: true })}
               size={properties.size}
               status={validation.status}
-              value={loading ? [] : getValueIndex(value, uniqueValueOptions, true)}
+              value={loading ? [] : getSelectedIndex(value, uniqueValueOptions, { properties, multiple: true })}
               suffixIcon={
                 properties.suffixIcon && (
                   <Icon
                     blockId={`${blockId}_suffixIcon`}
+                    classNames={{ element: classNames.suffixIcon }}
                     events={events}
                     properties={properties.suffixIcon}
+                    styles={{ element: styles.suffixIcon }}
                   />
                 )
               }
@@ -108,8 +146,10 @@ const MultipleSelector = ({
                 properties.clearIcon && (
                   <Icon
                     blockId={`${blockId}_clearIcon`}
+                    classNames={{ element: classNames.clearIcon }}
                     events={events}
                     properties={properties.clearIcon}
+                    styles={{ element: styles.clearIcon }}
                   />
                 )
               }
@@ -117,8 +157,10 @@ const MultipleSelector = ({
                 properties.selectedIcon && (
                   <Icon
                     blockId={`${blockId}_selectedIcon`}
+                    classNames={{ element: classNames.selectedIcon }}
                     events={events}
                     properties={properties.selectedIcon}
+                    styles={{ element: styles.selectedIcon }}
                   />
                 )
               }
@@ -159,7 +201,8 @@ const MultipleSelector = ({
               {uniqueValueOptions.map((opt, i) =>
                 type.isPrimitive(opt) ? (
                   <Option
-                    className={methods.makeCssClass(properties.optionsStyle)}
+                    style={styles.options}
+                    className={classNames.options}
                     id={`${blockId}_${i}`}
                     key={i}
                     value={`${i}`}
@@ -168,7 +211,12 @@ const MultipleSelector = ({
                   </Option>
                 ) : (
                   <Option
-                    className={methods.makeCssClass([properties.optionsStyle, opt.style])}
+                    style={{
+                      ...styles.options,
+                      ...opt.style,
+                      ...(opt.color ? { color: opt.color } : {}),
+                    }}
+                    className={classNames.options}
                     disabled={opt.disabled}
                     filterstring={opt.filterString}
                     id={`${blockId}_${i}`}
@@ -189,12 +237,4 @@ const MultipleSelector = ({
   );
 };
 
-MultipleSelector.defaultProps = blockDefaultProps;
-MultipleSelector.meta = {
-  valueType: 'array',
-  category: 'input',
-  icons: [...Label.meta.icons],
-  styles: ['blocks/MultipleSelector/style.less'],
-};
-
-export default MultipleSelector;
+export default withTheme('Select', withBlockDefaults(MultipleSelector));

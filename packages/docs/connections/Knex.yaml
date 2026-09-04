@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ _ref:
         type: MarkdownWithCode
         properties:
           content: |
-            [`Knex.js`](http://knexjs.org) is a SQL query builder that can be used to connect to [PostgreSQL](/PostgreSQL), [MS SQL Server](/MSSQL), [MySQL](/MySQL), [MariaDB](/MariaDB), [SQLite](/SQLite), [Oracle](/Oracle), and [Amazon Redshift](/AmazonRedshift) databases.
+            [`Knex.js`](http://knexjs.org) is a SQL query builder that can be used to connect to [PostgreSQL](/PostgreSQL), [MS SQL Server](/MSSQL), [MySQL](/MySQL), [MariaDB](/MariaDB), [SQLite](/SQLite), Oracle, and [Amazon Redshift](/AmazonRedshift) databases.
 
             The Knex connection can be used to execute raw SQL queries using the `KnexRaw` requests, or the Knex query builder can be used with the `KnexBuilder` request.
 
@@ -73,17 +73,6 @@ _ref:
               type: Link
               params:
                 pageId: MySQL
-      - id: oracle_link
-        type: Anchor
-        properties:
-          title: Oracle Database
-          icon: AiOutlineLink
-        events:
-          onClick:
-            - id: link,
-              type: Link
-              params:
-                pageId: OracleDB
       - id: postgresql_link
         type: Anchor
         properties:
@@ -119,15 +108,15 @@ _ref:
 
             #### Properties
             - `client: enum`: __Required__ - The database client to use. One of:
+              - `better-sqlite3`
+              - `sqlite` (alias of `better-sqlite3`)
               - `mssql`
-              - `mysql`
+              - `mysql2`
               - `oracledb`
               - `postgres`
               - `pg` (alias of `postgres`)
               - `postgresql` (alias of `postgres`)
               - `redshift`
-              - `sqlite3`
-              - `sqlite` (alias of `sqlite3`)
             - `connection: object | string`: __Required__ - Connection string or object to pass to the database client. See the specific client documentation for more details.
             - `searchPath: string`:  Set PostgreSQL search path.
             - `version: string`:  Set database version.
@@ -141,7 +130,7 @@ _ref:
               - id: mysql
                 type: Knex
                 properties:
-                  client: mysql
+                  client: mysql2
                   connection:
                     host:
                       _secret: MYSQL_HOST

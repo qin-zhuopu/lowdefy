@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import { validate } from '@lowdefy/ajv';
 import { MongoClient } from 'mongodb';
 import MongoDBInsertOne from './MongoDBInsertOne.js';
 import clearTestMongoDb from '../../../../test/clearTestMongoDb.js';
+import findLogCollectionRecordTestMongoDb from '../../../../test/findLogCollectionRecordTestMongoDb.js';
 
 const { checkRead, checkWrite } = MongoDBInsertOne.meta;
 const schema = MongoDBInsertOne.schema;
@@ -25,6 +26,7 @@ const schema = MongoDBInsertOne.schema;
 const databaseUri = process.env.MONGO_URL;
 const databaseName = 'test';
 const collection = 'insertOne';
+const logCollection = 'logCollection';
 
 beforeAll(() => {
   return clearTestMongoDb({ collection });
@@ -45,6 +47,43 @@ test('insertOne', async () => {
   });
 });
 
+test('insertOne logCollection', async () => {
+  const request = { doc: { _id: 'insertOne_log' } };
+  const connection = {
+    databaseUri,
+    databaseName,
+    collection,
+    changeLog: { collection: logCollection, meta: { meta: true } },
+    write: true,
+  };
+  const res = await MongoDBInsertOne({
+    request,
+    blockId: 'blockId',
+    connectionId: 'connectionId',
+    pageId: 'pageId',
+    payload: { payload: true },
+    requestId: 'insertOne_log',
+    connection,
+  });
+  expect(res).toEqual({
+    acknowledged: true,
+    insertedId: 'insertOne_log',
+  });
+  const logged = await findLogCollectionRecordTestMongoDb({
+    logCollection,
+    requestId: 'insertOne_log',
+  });
+  expect(logged).toMatchObject({
+    blockId: 'blockId',
+    connectionId: 'connectionId',
+    pageId: 'pageId',
+    payload: { payload: true },
+    requestId: 'insertOne_log',
+    type: 'MongoDBInsertOne',
+    meta: { meta: true },
+  });
+});
+
 test('insertOne options', async () => {
   const request = {
     doc: { _id: 'insertOne_options' },
@@ -60,6 +99,46 @@ test('insertOne options', async () => {
   expect(res).toEqual({
     acknowledged: true,
     insertedId: 'insertOne_options',
+  });
+});
+
+test('insertOne logCollection options', async () => {
+  const request = {
+    doc: { _id: 'insertOne_options_log' },
+    options: { writeConcern: { w: 'majority' } },
+  };
+  const connection = {
+    databaseUri,
+    databaseName,
+    collection,
+    changeLog: { collection: logCollection, meta: { meta: true } },
+    write: true,
+  };
+  const res = await MongoDBInsertOne({
+    request,
+    blockId: 'blockId',
+    connectionId: 'connectionId',
+    pageId: 'pageId',
+    payload: { payload: true },
+    requestId: 'insertOne_options_log',
+    connection,
+  });
+  expect(res).toEqual({
+    acknowledged: true,
+    insertedId: 'insertOne_options_log',
+  });
+  const logged = await findLogCollectionRecordTestMongoDb({
+    logCollection,
+    requestId: 'insertOne_options_log',
+  });
+  expect(logged).toMatchObject({
+    blockId: 'blockId',
+    connectionId: 'connectionId',
+    pageId: 'pageId',
+    payload: { payload: true },
+    requestId: 'insertOne_options_log',
+    type: 'MongoDBInsertOne',
+    meta: { meta: true },
   });
 });
 

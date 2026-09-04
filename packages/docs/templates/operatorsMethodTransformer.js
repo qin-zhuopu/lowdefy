@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
 */
 
 function transformer(obj) {
-  // console.log(JSON.stringify(obj, null, 2));
-  if (!obj.methods) {
+  if (!obj.methods || !obj.page.blocks) {
     return obj.page;
   }
-  const contentArray = obj.page.blocks[1].areas.content.blocks[0].blocks[1].blocks;
+  if (!obj.page.blocks) {
+    return obj.page;
+  }
+  const contentArray = obj.page.blocks[0].slots.content.blocks[0].blocks[1].blocks;
   const operatorName = obj.page.properties.title;
 
   contentArray.push({
@@ -31,7 +33,6 @@ function transformer(obj) {
   });
 
   obj.methods.forEach((method) => {
-    // console.log(method);
     contentArray.push({
       id: `${method.name}_link`,
       type: 'Anchor',
@@ -55,7 +56,6 @@ function transformer(obj) {
 
   // const methodsBlocks = [];
   obj.methods.forEach((method) => {
-    // console.log(method);
     contentArray.push({
       id: `${method.name}_title`,
       type: 'Markdown',
@@ -66,9 +66,7 @@ function transformer(obj) {
     contentArray.push({
       id: `${method.name}_types`,
       type: 'Markdown',
-      style: {
-        '.markdown-body': { fontSize: '14px' },
-      },
+      class: 'text-sm',
       properties: {
         content: method.types,
       },

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,8 +15,10 @@
 */
 
 export { default as _and } from './operators/shared/and.js';
+export { default as _app } from './operators/shared/app.js';
 export { default as _args } from './operators/shared/args.js';
 export { default as _array } from './operators/shared/array.js';
+export { default as _boolean } from './operators/shared/boolean.js';
 export { default as _date } from './operators/shared/date.js';
 export { default as _divide } from './operators/shared/divide.js';
 export { default as _eq } from './operators/shared/eq.js';
@@ -28,6 +30,7 @@ export { default as _if_none } from './operators/shared/if_none.js';
 export { default as _if } from './operators/shared/if.js';
 export { default as _intl } from './operators/shared/intl.js';
 export { default as _json } from './operators/shared/json.js';
+export { default as _locale } from './operators/shared/locale.js';
 export { default as _log } from './operators/shared/log.js';
 export { default as _lt } from './operators/shared/lt.js';
 export { default as _lte } from './operators/shared/lte.js';
@@ -41,14 +44,17 @@ export { default as _or } from './operators/shared/or.js';
 export { default as _product } from './operators/shared/product.js';
 export { default as _random } from './operators/shared/random.js';
 export { default as _regex } from './operators/shared/regex.js';
+export { default as _state } from './operators/shared/state.js';
 export { default as _string } from './operators/shared/string.js';
 export { default as _subtract } from './operators/shared/subtract.js';
 export { default as _sum } from './operators/shared/sum.js';
 export { default as _switch } from './operators/shared/switch.js';
+export { default as _t } from './operators/shared/t.js';
 export { default as _type } from './operators/shared/type.js';
 export { default as _uri } from './operators/shared/uri.js';
 export { default as _user } from './operators/shared/user.js';
 
+export { default as _api } from './operators/client/api.js';
 export { default as _index } from './operators/client/_index.js';
 export { default as _actions } from './operators/client/actions.js';
 export { default as _base64 } from './operators/client/base64.js';
@@ -62,5 +68,5 @@ export { default as _media } from './operators/client/media.js';
 export { default as _menu } from './operators/client/menu.js';
 export { default as _request_details } from './operators/client/request_details.js';
 export { default as _request } from './operators/client/request.js';
-export { default as _state } from './operators/client/state.js';
+export { default as _theme } from './operators/client/theme.js';
 export { default as _url_query } from './operators/client/url_query.js';

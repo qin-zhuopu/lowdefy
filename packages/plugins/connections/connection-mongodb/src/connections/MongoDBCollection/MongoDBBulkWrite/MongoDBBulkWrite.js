@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -21,15 +21,8 @@ import schema from './schema.js';
 async function MongodbBulkWrite({ connection, request }) {
   const deserializedRequest = deserialize(request);
   const { operations, options } = deserializedRequest;
-  const { collection, client } = await getCollection({ connection });
-  let response;
-  try {
-    response = await collection.bulkWrite(operations, options);
-  } catch (error) {
-    await client.close();
-    throw error;
-  }
-  await client.close();
+  const { collection } = await getCollection({ connection });
+  const response = await collection.bulkWrite(operations, options);
   return serialize(response);
 }
 

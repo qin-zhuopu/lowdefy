@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -229,10 +229,11 @@ _ref:
                   path: pages/page1.yaml
                   transformer: transformers/addFooter.js
             ```
+
       - _ref:
           path: templates/navigation_buttons.yaml
           vars:
-            previous_page_title: Page and App State
-            previous_page_id: page-and-app-state
-            next_page_title: Menus
-            next_page_id: menus
+            previous_page_title: APIs
+            previous_page_id: lowdefy-api
+            next_page_title: Modules
+            next_page_id: modules

@@ -1,0 +1,7 @@
+name: Contacts
+
+connections:
+  - _ref: connections/contacts-db.yaml
+
+pages:
+  - _ref: pages/contact-list.yaml

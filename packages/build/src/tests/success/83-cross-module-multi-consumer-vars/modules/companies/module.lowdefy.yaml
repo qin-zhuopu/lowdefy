@@ -1,0 +1,7 @@
+name: Companies
+
+dependencies:
+  - id: shared
+
+pages:
+  - _ref: pages/company-list.yaml

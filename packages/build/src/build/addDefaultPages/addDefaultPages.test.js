@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 import { jest } from '@jest/globals';
 
 import addDefaultPages from './addDefaultPages.js';
-import testContext from '../../test/testContext.js';
+import testContext from '../../test-utils/testContext.js';
 
 const mockLogWarn = jest.fn();
 
@@ -40,14 +40,20 @@ test('addDefaultPages, no pages array', () => {
         id: '404',
         type: 'Result',
         style: {
+          background: 'var(--ant-color-bg-layout)',
           minHeight: '100vh',
         },
         properties: {
+          icon: {
+            color: 'var(--ant-color-primary)',
+            name: 'AiOutlineFileSearch',
+            size: 80,
+          },
           status: 'info',
           subTitle: 'Sorry, the page you are visiting does not exist.',
           title: '404',
         },
-        areas: {
+        slots: {
           extra: {
             blocks: [
               {
@@ -85,14 +91,20 @@ test('addDefaultPages, empty pages array', () => {
         id: '404',
         type: 'Result',
         style: {
+          background: 'var(--ant-color-bg-layout)',
           minHeight: '100vh',
         },
         properties: {
+          icon: {
+            color: 'var(--ant-color-primary)',
+            name: 'AiOutlineFileSearch',
+            size: 80,
+          },
           status: 'info',
           subTitle: 'Sorry, the page you are visiting does not exist.',
           title: '404',
         },
-        areas: {
+        slots: {
           extra: {
             blocks: [
               {
@@ -134,14 +146,20 @@ test('addDefaultPages, pages without 404 page', () => {
         id: '404',
         type: 'Result',
         style: {
+          background: 'var(--ant-color-bg-layout)',
           minHeight: '100vh',
         },
         properties: {
+          icon: {
+            color: 'var(--ant-color-primary)',
+            name: 'AiOutlineFileSearch',
+            size: 80,
+          },
           status: 'info',
           subTitle: 'Sorry, the page you are visiting does not exist.',
           title: '404',
         },
-        areas: {
+        slots: {
           extra: {
             blocks: [
               {
@@ -203,9 +221,7 @@ test('addDefaultPages, with a page not an object', () => {
   const components = {
     pages: [null],
   };
-  expect(() => addDefaultPages({ components, context })).toThrow(
-    'pages[0] is not an object. Received null'
-  );
+  expect(() => addDefaultPages({ components, context })).toThrow('pages[0] is not an object.');
 });
 
 test('addDefaultPages, pages are copied', () => {

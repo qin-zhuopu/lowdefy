@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,39 +17,88 @@
 */
 
 import { type } from '@lowdefy/helpers';
+import { ConfigError } from '@lowdefy/errors';
+
+import collectExceptions from '../utils/collectExceptions.js';
 import countOperators from '../utils/countOperators.js';
 import createCheckDuplicateId from '../utils/createCheckDuplicateId.js';
+import validateId from '../utils/validateId.js';
+
+function validateConnection(connection, context) {
+  const configKey = connection?.['~k'];
+  if (!type.isObject(connection)) {
+    collectExceptions(
+      context,
+      new ConfigError('Connection should be an object.', { received: connection, configKey })
+    );
+    return false;
+  }
+  if (type.isUndefined(connection.id)) {
+    collectExceptions(
+      context,
+      new ConfigError('Connection id missing.', { configKey })
+    );
+    return false;
+  }
+  if (!type.isString(connection.id)) {
+    collectExceptions(
+      context,
+      new ConfigError('Connection id is not a string.', { received: connection.id, configKey })
+    );
+    return false;
+  }
+  if (type.isNone(connection.type)) {
+    collectExceptions(
+      context,
+      new ConfigError(`Connection type is not defined at connection "${connection.id}".`, {
+        configKey,
+      })
+    );
+    return false;
+  }
+  if (!type.isString(connection.type)) {
+    collectExceptions(
+      context,
+      new ConfigError(`Connection type is not a string at connection "${connection.id}".`, {
+        received: connection.type,
+        configKey,
+      })
+    );
+    return false;
+  }
+  return true;
+}
 
 function buildConnections({ components, context }) {
+  // Store connection IDs for validation in buildRequests
+  context.connectionIds = new Set();
+
   const checkDuplicateConnectionId = createCheckDuplicateId({
     message: 'Duplicate connectionId "{{ id }}".',
   });
-  if (type.isArray(components.connections)) {
-    components.connections.forEach((connection) => {
-      if (type.isUndefined(connection.id)) {
-        throw new Error(`Connection id missing.`);
-      }
-      if (!type.isString(connection.id)) {
-        throw new Error(
-          `Connection id is not a string. Received ${JSON.stringify(connection.id)}.`
-        );
-      }
-      checkDuplicateConnectionId({ id: connection.id });
-      if (!type.isString(connection.type)) {
-        throw new Error(
-          `Connection type is not a string at connection "${
-            connection.id
-          }". Received ${JSON.stringify(connection.type)}.`
-        );
-      }
-      context.typeCounters.connections.increment(connection.type);
-      connection.connectionId = connection.id;
-      connection.id = `connection:${connection.id}`;
-      countOperators(connection.properties || {}, {
-        counter: context.typeCounters.operators.server,
-      });
+
+  (components.connections ?? []).forEach((connection) => {
+    if (!validateConnection(connection, context)) return;
+
+    const configKey = connection['~k'];
+
+    checkDuplicateConnectionId({ id: connection.id, configKey });
+    validateId({ id: connection.id, field: 'Connection id', configKey });
+
+    // Track type usage for buildTypes validation
+    context.typeCounters.connections.increment(connection.type, configKey);
+
+    // Store connectionId for request validation and rename id
+    connection.connectionId = connection.id;
+    context.connectionIds.add(connection.connectionId);
+    connection.id = `connection:${connection.id}`;
+
+    // Count operators in connection properties
+    countOperators(connection.properties ?? {}, {
+      counter: context.typeCounters.operators.server,
     });
-  }
+  });
+
   return components;
 }
 

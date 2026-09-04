@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,10 +14,17 @@
   limitations under the License.
 */
 
-import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
-import { Menu } from 'antd';
+import React, { useCallback, useContext } from 'react';
+import { Layout, Menu } from 'antd';
 import { type, get } from '@lowdefy/helpers';
+
+const SiderContext = Layout._InternalSiderContext;
+
+import { withBlockDefaults } from '@lowdefy/block-utils';
+import withTheme from '../withTheme.js';
+import useItemShortcuts from '../useItemShortcuts.js';
+import { buildMenuItems } from '../buildMenuItems.js';
+import './style.module.css';
 
 const getDefaultMenu = (menus, menuId = 'default', links) => {
   if (type.isArray(links)) return links;
@@ -26,22 +33,53 @@ const getDefaultMenu = (menus, menuId = 'default', links) => {
   return menu.links ?? [];
 };
 
-const getTitle = ({ id, properties, pageId, url }) => properties?.title ?? pageId ?? url ?? id;
+function collectLinkShortcuts(links) {
+  const result = [];
+  (links ?? []).forEach((link) => {
+    if (link.type === 'MenuLink' || !link.type) {
+      if (link.properties?.shortcut) {
+        result.push({ key: link.pageId ?? link.id, shortcut: link.properties.shortcut });
+      }
+    }
+    if (link.links) {
+      result.push(...collectLinkShortcuts(link.links));
+    }
+  });
+  return result;
+}
 
-const MenuComp = ({
+function makeWrapGroupLabel(Link) {
+  return function wrapGroupLabel({ link, labelText, classNames: labelClass, styles: labelStyle }) {
+    const { class: _omitClass, style: _omitStyle, ...linkRest } = link;
+    return (
+      <Link
+        {...linkRest}
+        id={link.pageId ?? link.id}
+        className={labelClass || undefined}
+        style={labelStyle}
+      >
+        {labelText}
+      </Link>
+    );
+  };
+}
+
+function MenuComp({
   blockId,
-  components: { Icon, Link },
+  classNames = {},
+  components: { Icon, Link, ShortcutBadge },
   events,
   menus,
   methods,
   pageId,
   properties,
   rename,
-}) => {
-  const styles = {
+  styles = {},
+}) {
+  const horizontalStyles = {
     lineHeight: '64px',
     width: '100%',
-    display: properties.mode === 'horizontal' && 'inline-block',
+    display: properties.mode === 'horizontal' ? 'inline-block' : undefined,
   };
   const exProps = {};
   if (properties.mode === 'inline') {
@@ -49,16 +87,51 @@ const MenuComp = ({
     exProps.inlineIndent = properties.inlineIndent;
   }
   const menu = getDefaultMenu(menus, properties.menuId, properties.links);
-  const theme = properties.theme ?? 'dark';
+  const theme = properties.theme;
+  const { siderCollapsed } = useContext(SiderContext) ?? {};
+  const isCollapsed = properties.collapsed === true || siderCollapsed === true;
+
+  // Back-compat: the prior cssKey for the menu item icon was `icon`; the shared helper
+  // standardises on `itemIcon`. Map either through so existing YAML keeps working.
+  const itemsClassNames = { ...classNames, itemIcon: classNames.itemIcon ?? classNames.icon };
+  const itemsStyles = { ...styles, itemIcon: styles.itemIcon ?? styles.icon };
+  const items = buildMenuItems({
+    links: menu,
+    events,
+    components: { Icon, Link, ShortcutBadge },
+    classNames: itemsClassNames,
+    styles: itemsStyles,
+    wrapGroupLabel: makeWrapGroupLabel(Link),
+    nestedGroupAsGroup: true,
+    getKey: (link) => link.pageId ?? link.id,
+  });
+
+  const shortcutItems = collectLinkShortcuts(menu);
+  const onShortcutMatch = useCallback(
+    (key) => {
+      methods.triggerEvent({
+        name: get(rename, 'events.onSelect', { default: 'onSelect' }),
+        event: { key },
+      });
+    },
+    [methods, rename]
+  );
+  useItemShortcuts({ items: shortcutItems, onMatch: onShortcutMatch });
+
   return (
     <Menu
       id={blockId}
+      className={classNames.element}
+      style={{ ...horizontalStyles, ...styles.element }}
+      items={items}
       expandIcon={
         properties.expandIcon && (
           <Icon
             blockId={`${blockId}_expandIcon`}
+            classNames={{ element: classNames.expandIcon }}
             events={events}
             properties={properties.expandIcon}
+            styles={{ element: styles.expandIcon }}
           />
         )
       }
@@ -66,11 +139,10 @@ const MenuComp = ({
       mode={properties.mode}
       selectable={true}
       theme={theme}
-      className={methods.makeCssClass([styles, properties.style])}
       defaultOpenKeys={
         properties.defaultOpenKeys ??
         (properties.mode === 'inline' &&
-          properties.collapsed !== true && [
+          !isCollapsed && [
             (
               menu.find((link) =>
                 (link.links || [])
@@ -108,165 +180,8 @@ const MenuComp = ({
         })
       }
       {...exProps}
-    >
-      {menu.map((link, i) => {
-        switch (link.type) {
-          case 'MenuDivider':
-            return (
-              <Menu.Divider
-                key={link.id}
-                className={methods.makeCssClass([link.style])}
-                dashed={link.properties?.dashed}
-              />
-            );
-          case 'MenuGroup':
-            return (
-              <Menu.SubMenu
-                key={link.pageId ?? link.id}
-                title={
-                  <Link
-                    id={link.pageId ?? link.id ?? i}
-                    className={methods.makeCssClass(link.style, true)}
-                    {...link}
-                  >
-                    {getTitle(link)}
-                  </Link>
-                }
-                icon={
-                  link.properties?.icon && (
-                    <Icon
-                      blockId={`${link.id}_icon`}
-                      events={events}
-                      properties={link.properties.icon}
-                    />
-                  )
-                }
-              >
-                {get(link, 'links', { default: [] }).map((subLink, j) => {
-                  switch (subLink.type) {
-                    case 'MenuDivider':
-                      return (
-                        <Menu.Divider
-                          key={subLink.id ?? j}
-                          className={methods.makeCssClass([subLink.style])}
-                          dashed={subLink.properties?.dashed}
-                        />
-                      );
-                    case 'MenuGroup':
-                      return (
-                        <Menu.ItemGroup
-                          key={subLink.pageId ?? subLink.id}
-                          title={
-                            <Link
-                              id={subLink.pageId ?? subLink.id ?? j}
-                              className={methods.makeCssClass(subLink.style, true)}
-                              {...subLink}
-                            >
-                              {getTitle(subLink)}
-                            </Link>
-                          }
-                        >
-                          {subLink.links.map((subLinkGroup, k) => {
-                            if (subLinkGroup.type === 'MenuDivider') {
-                              return (
-                                <Menu.Divider
-                                  key={`${subLink.id}_${k}`}
-                                  className={methods.makeCssClass([subLink.style])}
-                                  dashed={subLink.properties?.dashed}
-                                />
-                              );
-                            }
-                            return (
-                              <Menu.Item
-                                key={subLinkGroup.pageId ?? subLinkGroup.id}
-                                danger={get(subLinkGroup, 'properties.danger')}
-                                icon={
-                                  subLinkGroup.properties?.icon && (
-                                    <Icon
-                                      blockId={`${subLinkGroup.id}_icon`}
-                                      events={events}
-                                      properties={subLinkGroup.properties.icon}
-                                    />
-                                  )
-                                }
-                              >
-                                <Link
-                                  id={subLinkGroup.pageId ?? subLinkGroup.id ?? k}
-                                  className={methods.makeCssClass(subLinkGroup.style, true)}
-                                  {...subLinkGroup}
-                                >
-                                  {getTitle(subLinkGroup)}
-                                </Link>
-                              </Menu.Item>
-                            );
-                          })}
-                        </Menu.ItemGroup>
-                      );
-                    case 'MenuLink':
-                    default:
-                      return (
-                        <Menu.Item
-                          key={subLink.pageId ?? subLink.id}
-                          danger={get(subLink, 'properties.danger')}
-                          icon={
-                            subLink.properties?.icon && (
-                              <Icon
-                                blockId={`${subLink.id}_icon`}
-                                events={events}
-                                properties={subLink.properties.icon}
-                              />
-                            )
-                          }
-                        >
-                          <Link
-                            id={subLink.pageId ?? subLink.id ?? j}
-                            className={methods.makeCssClass(subLink.style, true)}
-                            {...subLink}
-                          >
-                            {getTitle(subLink)}
-                          </Link>
-                        </Menu.Item>
-                      );
-                  }
-                })}
-              </Menu.SubMenu>
-            );
-          case 'MenuLink':
-          default:
-            return (
-              <Menu.Item
-                key={link.pageId ?? link.id}
-                danger={get(link, 'properties.danger')}
-                icon={
-                  link.properties?.icon && (
-                    <Icon
-                      blockId={`${link.id}_icon`}
-                      events={events}
-                      properties={link.properties.icon}
-                    />
-                  )
-                }
-              >
-                <Link
-                  id={link.pageId ?? link.id ?? i}
-                  className={methods.makeCssClass(link.style, true)}
-                  {...link}
-                >
-                  {getTitle(link)}
-                </Link>
-              </Menu.Item>
-            );
-        }
-      })}
-    </Menu>
+    />
   );
-};
+}
 
-MenuComp.defaultProps = blockDefaultProps;
-MenuComp.meta = {
-  category: 'display',
-  icons: [],
-  styles: ['blocks/Menu/style.less'],
-};
-
-export default MenuComp;
+export default withTheme('Menu', withBlockDefaults(MenuComp));

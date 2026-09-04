@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { get, mergeObjects, type } from '@lowdefy/helpers';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
 import Affix from '../Affix/Affix.js';
 import Breadcrumb from '../Breadcrumb/Breadcrumb.js';
@@ -28,141 +28,138 @@ import Layout from '../Layout/Layout.js';
 import Menu from '../Menu/Menu.js';
 import MobileMenu from '../MobileMenu/MobileMenu.js';
 import Sider from '../Sider/Sider.js';
+import {
+  getDarkMode,
+  renderHeaderActions,
+  registerDarkModeMethod,
+  registerLocaleMethod,
+} from '../headerActions.js';
+
+function getInitialSiderState({ properties }) {
+  const storageKey = `lf-${properties.siderStorageKey ?? 'sider'}-open`;
+  try {
+    const stored = localStorage.getItem(storageKey);
+    if (stored === 'true') return true;
+    if (stored === 'false') return false;
+  } catch {
+    // localStorage unavailable (SSR, privacy mode)
+  }
+  return !properties.sider?.initialCollapsed;
+}
+
+function writeSiderState({ properties, open }) {
+  const storageKey = `lf-${properties.siderStorageKey ?? 'sider'}-open`;
+  try {
+    localStorage.setItem(storageKey, String(open));
+  } catch {
+    // localStorage unavailable
+  }
+}
 
 const PageSiderMenu = ({
   basePath,
   blockId,
-  components: { Icon, Link },
+  classNames = {},
+  components: { Icon, Link, ShortcutBadge },
   events,
   content,
   menus,
   methods,
   pageId,
   properties,
+  styles = {},
 }) => {
-  const [openSiderState, setSiderOpen] = useState(!properties.sider?.initialCollapsed);
+  const [openSiderState, setSiderOpen] = useState(() => getInitialSiderState({ properties }));
   useEffect(() => {
+    registerDarkModeMethod(methods);
+    registerLocaleMethod(methods);
     methods.registerMethod('toggleSiderOpen', () => {
-      methods._toggleSiderOpen({ open: !openSiderState });
-      setSiderOpen(!openSiderState);
+      const next = !openSiderState;
+      methods._setSiderOpen({ open: next });
+      setSiderOpen(next);
+      writeSiderState({ properties, open: next });
     });
     methods.registerMethod('setSiderOpen', ({ open }) => {
-      methods._toggleSiderOpen({ open });
+      methods._setSiderOpen({ open });
       setSiderOpen(open);
+      writeSiderState({ properties, open });
     });
   });
-  const styles = {
-    layout: { minHeight: '100vh' },
-    header: {
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 46px',
-      xs: { padding: '0 10px' },
-      sm: { padding: '0 15px' },
-      md: { padding: '0 30px' },
-      lg: { padding: '0 46px' },
-      flexDirection: 'row-reverse',
-    },
-    headerContent: {
-      alignItems: 'center',
-      flex: '1 1 auto',
-      display: 'flex',
-      justifyContent: 'flex-end',
-    },
-    logo: {
-      margin: '0 30px 0 0',
-      flex: '0 1 auto',
-      width: 130,
-      xs: { margin: '0 5px', width: 40 },
-      sm: { margin: '0 10px', width: 130 },
-      md: { margin: '0 15px' },
-    },
-    desktop: {
-      display: 'none',
-      lg: { display: 'block' },
-    },
-    mobile: {
-      display: 'block',
-      lg: { display: 'none' },
-    },
-    mdMenu: {
-      paddingLeft: '1rem',
-    },
-    body: {
-      padding: '0 40px 40px 40px',
-      xs: { padding: '0 5px 5px 5px' },
-      sm: { padding: '0 10px 10px 10px' },
-      md: { padding: '0 20px 20px 20px' },
-      lg: { padding: '0 40px 40px 40px' },
-    },
-    sider: {
-      display: 'flex',
-      height: '100%',
-      flexDirection: 'column',
-    },
-    content: {},
-    breadcrumb: {
-      margin: '16px 0',
-    },
-    noBreadcrumb: {
-      padding: '20px 0',
-      xs: { padding: '5px 0' },
-      sm: { padding: '5px 0' },
-      md: { padding: '10px 0' },
-    },
-  };
+
   return (
     <Layout
       blockId={blockId}
-      components={{ Icon, Link }}
+      components={{ Icon, Link, ShortcutBadge }}
       events={events}
-      properties={{ style: mergeObjects([styles.layout, properties.style]) }}
+      styles={{
+        element: mergeObjects([{ minHeight: '100vh' }, styles.element]),
+      }}
       content={{
-        // TODO: use next/image
         content: () => (
           <>
             <Header
               blockId={`${blockId}_header`}
-              components={{ Icon, Link }}
+              components={{ Icon, Link, ShortcutBadge }}
+              classNames={{ element: classNames.header }}
               events={events}
-              properties={mergeObjects([{ style: styles.header }, properties.header])}
+              properties={{}}
+              styles={{
+                element: mergeObjects([
+                  {
+                    background: 'var(--ant-color-bg-container)',
+                    flexDirection: 'row-reverse',
+                    borderBottom: '1px solid var(--ant-color-border)',
+                  },
+                  styles.header,
+                ]),
+              }}
               content={{
                 content: () => (
                   <>
-                    <div className={methods.makeCssClass(styles.headerContent)}>
+                    <div className="flex flex-auto items-center justify-end">
                       {content.header &&
                         content.header(
-                          mergeObjects([{ width: 'auto' }, properties.header?.contentStyle])
+                          mergeObjects([
+                            { width: 'auto', alignItems: 'center', flexWrap: 'nowrap' },
+                            styles.headerContent,
+                          ])
                         )}
-                      <div className={methods.makeCssClass([styles.mobile, styles.mdMenu])}>
-                        <MobileMenu
-                          blockId={`${blockId}_mobile_menu`}
-                          components={{ Icon, Link }}
-                          basePath={basePath}
-                          events={events}
-                          methods={methods}
-                          menus={menus}
-                          pageId={pageId}
-                          properties={mergeObjects([
-                            {
-                              mode: 'inline',
-                              theme: get(properties, 'sider.theme') ?? 'light',
-                            },
-                            properties.menu,
-                            properties.menuMd,
-                          ])}
-                          rename={{
-                            methods: {
-                              toggleOpen: 'toggleMobileMenuOpen',
-                              setOpen: 'setMobileMenuOpen',
-                            },
-                            events: {
-                              onClose: 'onMobileMenuClose',
-                              onOpen: 'onMobileMenuOpen',
-                            },
-                          }}
-                        />
-                      </div>
+                      {renderHeaderActions({
+                        blockId,
+                        classNames,
+                        styles,
+                        properties,
+                        methods,
+                        events,
+                        components: { Icon, Link, ShortcutBadge },
+                        iconsColor: properties.iconsColor,
+                      })}
+                      <MobileMenu
+                        classNames={{ element: classNames.mobileMenu ?? 'block lg:hidden pl-4' }}
+                        styles={{ element: styles.mobileMenu }}
+                        blockId={`${blockId}_mobile_menu`}
+                        components={{ Icon, Link, ShortcutBadge }}
+                        basePath={basePath}
+                        events={events}
+                        methods={methods}
+                        menus={menus}
+                        pageId={pageId}
+                        properties={mergeObjects([
+                          { mode: 'inline' },
+                          properties.menu,
+                          properties.menuMd,
+                        ])}
+                        rename={{
+                          methods: {
+                            toggleOpen: 'toggleMobileMenuOpen',
+                            setOpen: 'setMobileMenuOpen',
+                          },
+                          events: {
+                            onClose: 'onMobileMenuClose',
+                            onOpen: 'onMobileMenuOpen',
+                          },
+                        }}
+                      />
                     </div>
                     <Link home={true}>
                       <picture>
@@ -170,19 +167,21 @@ const PageSiderMenu = ({
                           media={`(min-width:${properties.logo?.breakpoint ?? 577}px)`}
                           srcSet={
                             properties.logo?.src ??
-                            `${basePath}/logo-${properties.header?.theme ?? 'dark'}-theme.png`
+                            `${basePath}/logo-${getDarkMode() ? 'dark' : 'light'}-theme.png`
                           }
                         />
                         <img
                           src={
                             properties.logo?.srcMobile ??
                             properties.logo?.src ??
-                            `${basePath}/logo-square-${
-                              properties.header?.theme ?? 'dark'
-                            }-theme.png`
+                            `${basePath}/logo-square-${getDarkMode() ? 'dark' : 'light'}-theme.png`
                           }
                           alt={properties.logo?.alt ?? 'Lowdefy'}
-                          className={methods.makeCssClass([styles.logo, properties.logo?.style])}
+                          className={
+                            classNames.logo ??
+                            'mr-[30px] shrink w-10 sm:w-[130px] mx-1.5 sm:mx-2.5 md:mx-4'
+                          }
+                          style={styles.logo}
                         />
                       </picture>
                     </Link>
@@ -192,24 +191,30 @@ const PageSiderMenu = ({
             />
             <Layout
               blockId={`${blockId}_layout`}
-              components={{ Icon, Link }}
+              components={{ Icon, Link, ShortcutBadge }}
               events={events}
-              properties={properties.layout}
+              properties={{ hasSider: true, ...properties.layout }}
+              styles={{ element: styles.layout }}
+              classNames={{ element: classNames.layout }}
               content={{
                 content: () => (
                   <>
                     <Sider
                       blockId={`${blockId}_sider`}
-                      components={{ Icon, Link }}
+                      components={{ Icon, Link, ShortcutBadge }}
                       events={events}
                       methods={methods}
-                      properties={mergeObjects([
-                        {
-                          theme: get(properties, 'sider.theme') ?? 'light',
-                          style: styles.desktop,
-                        },
-                        properties.sider,
-                      ])}
+                      properties={{
+                        ...(properties.sider ?? {}),
+                        initialCollapsed: !openSiderState,
+                      }}
+                      classNames={{ element: classNames.sider ?? 'hidden lg:block' }}
+                      styles={{
+                        element: mergeObjects([
+                          { borderInlineEnd: '1px solid var(--ant-color-border)' },
+                          styles.sider,
+                        ]),
+                      }}
                       rename={{
                         methods: {
                           toggleOpen: '_toggleSiderOpen',
@@ -218,33 +223,32 @@ const PageSiderMenu = ({
                       }}
                       content={{
                         content: () => (
-                          <div style={styles.sider}>
+                          <div
+                            style={{
+                              display: 'flex',
+                              height: '100%',
+                              flexDirection: 'column',
+                            }}
+                          >
                             <Menu
                               blockId={`${blockId}_menu`}
-                              components={{ Icon, Link }}
+                              components={{ Icon, Link, ShortcutBadge }}
                               basePath={basePath}
+                              classNames={{ element: classNames.menu ?? 'hidden lg:block' }}
                               events={events}
                               methods={methods}
                               menus={menus}
                               pageId={pageId}
                               properties={mergeObjects([
-                                {
-                                  mode: 'inline',
-                                  theme: get(properties, 'sider.theme') ?? 'light',
-                                  // collapsed: !openSiderState,
-                                },
-                                { style: styles.desktop },
+                                { mode: 'inline' },
                                 properties.menu,
                                 properties.menuLg,
                               ])}
+                              styles={{ element: styles.menu }}
                               rename={{
-                                methods: {
-                                  toggleOpen: 'toggleMobileMenuOpen',
-                                  setOpen: 'setMobileMenuOpen',
-                                },
                                 events: {
                                   onClick: 'onMenuItemClick',
-                                  onSelect: 'onMenuItemCSelect',
+                                  onSelect: 'onMenuItemSelect',
                                   onToggleMenuGroup: 'onToggleMenuGroup',
                                 },
                               }}
@@ -252,10 +256,10 @@ const PageSiderMenu = ({
                             <div style={{ flex: '1 0 auto' }}>
                               {content.sider && content.sider()}
                             </div>
-                            {!get(properties, 'sider.hideToggleButton') ?? (
+                            {!get(properties, 'sider.hideToggleButton') && (
                               <Affix
                                 blockId={`${blockId}_toggle_sider_affix`}
-                                components={{ Icon, Link }}
+                                components={{ Icon, Link, ShortcutBadge }}
                                 events={events}
                                 properties={{ offsetBottom: 0 }}
                                 methods={methods}
@@ -266,38 +270,30 @@ const PageSiderMenu = ({
                                 }}
                                 content={{
                                   content: () => (
-                                    <div
-                                      style={{
-                                        background:
-                                          get(properties, 'sider.theme') === 'dark'
-                                            ? '#30393e'
-                                            : 'white',
+                                    <Button
+                                      blockId={`${blockId}_toggle_sider`}
+                                      components={{ Icon, Link, ShortcutBadge }}
+                                      events={events}
+                                      properties={{
+                                        hideTitle: true,
+                                        color: 'default',
+                                        variant: 'filled',
+                                        block: true,
+                                        icon: {
+                                          name: openSiderState
+                                            ? 'AiOutlineMenuFold'
+                                            : 'AiOutlineMenuUnfold',
+                                        },
+                                        ...(properties.toggleSiderButton ?? {}),
                                       }}
-                                    >
-                                      <Button
-                                        blockId={`${blockId}_toggle_sider`}
-                                        components={{ Icon, Link }}
-                                        events={events}
-                                        properties={{
-                                          hideTitle: true,
-                                          type: 'link',
-                                          block: true,
-                                          icon: {
-                                            name: openSiderState
-                                              ? 'AiOutlineMenuFold'
-                                              : 'AiOutlineMenuUnfold',
-                                          },
-                                          ...(properties.toggleSiderButton ?? {}),
-                                        }}
-                                        methods={methods}
-                                        onClick={() => methods.toggleSiderOpen()}
-                                        rename={{
-                                          events: {
-                                            onClick: 'onToggleSider',
-                                          },
-                                        }}
-                                      />
-                                    </div>
+                                      methods={methods}
+                                      onClick={() => methods.toggleSiderOpen()}
+                                      rename={{
+                                        events: {
+                                          onClick: 'onToggleSider',
+                                        },
+                                      }}
+                                    />
                                   ),
                                 }}
                               />
@@ -308,9 +304,19 @@ const PageSiderMenu = ({
                     />
                     <Content
                       blockId={`${blockId}_content`}
-                      components={{ Icon, Link }}
+                      components={{ Icon, Link, ShortcutBadge }}
+                      classNames={{ element: classNames.content }}
                       events={events}
-                      properties={mergeObjects([{ style: styles.body }, properties.content])}
+                      properties={properties.content ?? {}}
+                      styles={{
+                        element: mergeObjects([
+                          {
+                            padding: '0 40px 40px 40px',
+                            minWidth: 0,
+                          },
+                          styles.content,
+                        ]),
+                      }}
                       content={{
                         content: () => (
                           <>
@@ -318,13 +324,14 @@ const PageSiderMenu = ({
                               <Breadcrumb
                                 blockId={`${blockId}_breadcrumb`}
                                 basePath={basePath}
-                                components={{ Icon, Link }}
+                                components={{ Icon, Link, ShortcutBadge }}
+                                classNames={{ element: classNames.breadcrumb }}
                                 events={events}
                                 methods={methods}
-                                properties={mergeObjects([
-                                  { style: styles.breadcrumb },
-                                  properties.breadcrumb,
-                                ])}
+                                properties={properties.breadcrumb}
+                                styles={{
+                                  element: mergeObjects([{ margin: '16px 0' }, styles.breadcrumb]),
+                                }}
                                 rename={{
                                   events: {
                                     onClick: 'onBreadcrumbClick',
@@ -332,15 +339,19 @@ const PageSiderMenu = ({
                                 }}
                               />
                             ) : (
-                              <div className={methods.makeCssClass(styles.noBreadcrumb)} />
+                              <div className="py-1.5 sm:py-1.5 md:py-2.5 lg:py-5" />
                             )}
                             {content.content && content.content()}
                             {content.footer && (
                               <Footer
                                 blockId={`${blockId}_footer`}
-                                components={{ Icon, Link }}
+                                components={{ Icon, Link, ShortcutBadge }}
+                                classNames={{ element: classNames.footer }}
                                 events={events}
                                 properties={properties.footer}
+                                styles={{
+                                  element: styles.footer,
+                                }}
                                 content={{
                                   content: () => content.footer(),
                                 }}
@@ -361,11 +372,4 @@ const PageSiderMenu = ({
   );
 };
 
-PageSiderMenu.defaultProps = blockDefaultProps;
-PageSiderMenu.meta = {
-  category: 'container',
-  icons: ['AiOutlineMenuFold', 'AiOutlineMenuUnfold', ...MobileMenu.meta.icons],
-  styles: ['blocks/PageSiderMenu/style.less'],
-};
-
-export default PageSiderMenu;
+export default withBlockDefaults(PageSiderMenu);

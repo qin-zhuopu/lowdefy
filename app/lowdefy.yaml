@@ -1,0 +1,35 @@
+lowdefy: '4'
+name: Lowdefy CI
+
+plugins:
+  - name: '@lowdefy/connection-shell-runner'
+    version: 'workspace:*'
+
+connections:
+  - id: runner
+    type: ShellRunner
+    properties:
+      # Allow write requests (CreateJob/TriggerJob/Cancel/Rerun/Delete). The
+      # framework rejects requests whose meta.checkWrite is true unless the
+      # connection sets write: true (see api checkConnectionWrite).
+      write: true
+      # dbPath is intentionally not pinned here so the SQLite location stays
+      # portable across environments. getDb.js resolves the location from the
+      # LOWDEFY_JENKINS_DB env var (set to /data/jenkins.sqlite in the container /
+      # Render deploy), and otherwise falls back to a stable file in the system
+      # temp directory for local dev. getDb mkdir -p's the parent directory.
+
+menus:
+  - id: default
+    links:
+      - id: jobs
+        type: MenuLink
+        pageId: jobs
+        properties:
+          title: Jobs
+          icon: AiOutlineUnorderedList
+
+pages:
+  - _ref: pages/jobs.yaml
+  - _ref: pages/executions.yaml
+  - _ref: pages/execution.yaml

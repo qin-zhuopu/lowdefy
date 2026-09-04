@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,34 @@ name: '@lowdefy/docs'
 lowdefy: local
 license: Apache-2.0
 
+theme:
+  antd:
+    token:
+      borderRadius: 6
+    darkToken:
+      colorBgLayout: '#131419'
+      colorBgContainer: '#1a1b22'
+      colorBgElevated: '#252731'
+      colorBorder: '#353743'
+      colorBorderSecondary: '#252731'
+    darkComponents:
+      Layout:
+        bodyBg: '#131419'
+        headerBg: '#0e0f13'
+        siderBg: '#0e0f13'
+        triggerBg: '#1a1b22'
+        triggerColor: '#e4e4e7'
+      Menu:
+        darkItemBg: '#0e0f13'
+        darkSubMenuItemBg: '#0e0f13'
+        darkPopupBg: '#1a1b22'
+        darkItemSelectedBg: '#252731'
+        darkItemHoverBg: '#1a1b22'
 cli:
   disableTelemetry: true
   watchIgnore:
     - public/sitemap.xml
+    - public/search-index.json
 
 plugins:
   - name: '@lowdefy/docs'
@@ -60,10 +84,34 @@ connections:
         _secret: MONGODB_URI
       read: false
       write: true
+  - id: companies
+    type: MongoDBCollection
+    properties:
+      collection: example-companies
+      databaseUri:
+        _secret: MONGODB_URI
+      read: false
+      write: false
+  - id: files
+    type: AwsS3Bucket
+    properties:
+      accessKeyId:
+        _secret: UPLOADS_S3_ACCESS_KEY_ID
+      secretAccessKey:
+        _secret: UPLOADS_S3_SECRET_ACCESS_KEY
+      region:
+        _secret: UPLOADS_S3_REGION
+      bucket:
+        _secret: UPLOADS_S3_BUCKET
+      write: false
+      read: false
 menus:
   _ref: menus.yaml
 
 pages:
   _ref:
     path: pages.yaml
-    transformer: templates/generateSitemap.js
+    transformer: templates/generateSiteAssets.js
+    vars:
+      menus:
+        _ref: menus.yaml

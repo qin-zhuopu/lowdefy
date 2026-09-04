@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,13 +15,21 @@
 */
 import path from 'path';
 import { pathToFileURL } from 'url';
+import { ConfigError } from '@lowdefy/errors';
 
 async function getUserJavascriptFunction({ context, filePath }) {
   try {
-    return (await import(pathToFileURL(path.join(context.directories.config, filePath)))).default;
+    const fileUrl = pathToFileURL(path.resolve(context.directories.config, filePath));
+    // Bust Node.js module cache so edits to resolver/transformer JS files are
+    // picked up during dev rebuilds. Each import gets a unique URL.
+    fileUrl.searchParams.set('t', Date.now());
+    // webpackIgnore tells Next.js webpack to leave this dynamic import alone
+    // when bundling server-dev API routes — otherwise webpack rewrites import()
+    // into __webpack_require__() which can't handle file:// URLs for loading
+    // user-provided resolver/transformer JS files from the config directory.
+    return (await import(/* webpackIgnore: true */ fileUrl.href)).default;
   } catch (error) {
-    context.logger.error(`Error importing ${filePath}.`);
-    throw Error(error);
+    throw new ConfigError(`Error importing ${filePath}.`, { cause: error, filePath });
   }
 }
 

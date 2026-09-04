@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,8 +31,7 @@ events:
 
 properties:
   title: {{ pageTitle }}
-  header:
-    theme: light
+  darkModeToggle: true
   menu:
     forceSubMenuRender: true
     links: []
@@ -46,14 +45,13 @@ properties:
         - _eq:
             - _media: size
             - lg
-  content:
-    style:
-      background: '#FFFFFF'
-  footer:
-    style:
-      background: '#FFFFFF'
-      padding: 16px 0px 0px 0px
-areas:
+style:
+  .content:
+    background: var(--ant-color-bg-container)
+  .footer:
+    background: var(--ant-color-bg-container)
+    padding: 16px 0px 0px 0px
+slots:
   header:
     blocks:
       _ref: templates/header.yaml
@@ -76,12 +74,12 @@ areas:
       - id: affix_breadcrumb
         type: Affix
         style:
-          background: '#FFFFFF'
+          background: var(--ant-color-bg-container)
         blocks:
           - id: breadcrumb
             type: Breadcrumb
             style:
-              background: '#FFFFFF'
+              background: var(--ant-color-bg-container)
               margin: 0px -32px 0px -32px
               padding: 8px 32px 8px 32px
             properties:
@@ -111,7 +109,7 @@ areas:
         type: Box
         layout:
           flex: 0 1 800px
-          contentGutter: 16
+          gap: 16
         style:
           marginTop: 32
         blocks:
@@ -125,7 +123,7 @@ areas:
           - id: content
             type: Box
             layout:
-              contentGutter: 16
+              gap: 16
             blocks:
               _var: content
           {% if discussionsLink %}
@@ -146,7 +144,7 @@ areas:
             type: Box
             layout:
               span: 12
-              contentGutter: 16
+              gap: 16
             blocks:
               - id: md_author
                 type: MarkdownWithCode
@@ -167,7 +165,7 @@ areas:
             type: Box
             layout:
               span: 12
-              contentGutter: 16
+              gap: 16
             blocks:
               - id: md_author
                 type: MarkdownWithCode

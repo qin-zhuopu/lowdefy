@@ -1,5 +1,208 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 03bbcf1: fix(connection-knex): Pass a numeric port to the database driver.
+
+  A port taken from a connection string or a `_secret` reached the driver as a string, which `mssql` (tedious) rejects with `The "config.options.port" property must be of type number`. The Knex connection now coerces a string port to a number for every client, and fails with a `ConfigError` when the port is not a valid port number.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/errors@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.1
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/errors@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/errors@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 596fddc: chore(connection-knex): update knex and SQL drivers; replace `sqlite3` with `better-sqlite3`; replace `mysql` with `mysql2`.
+
+  Bumped knex and its dialect drivers, and consolidated onto the actively-maintained drivers — replaced `sqlite3` with `better-sqlite3` and `mysql` with `mysql2`. Subsumes the prior `sqlite3@5.1.7` darwin-arm64 fix.
+
+  `@lowdefy/connection-knex` dependency changes:
+
+  - `knex` `2.5.1` → `3.2.9`. Knex 3.x drops Node < 16; Lowdefy already requires Node 18+. The `knex(config)`, `.raw()`, and dynamic query-builder API surface used by `KnexRaw` / `KnexBuilder` is unchanged.
+  - `pg` `8.11.3` → `8.20.0`.
+  - **Removed** `mssql`. Knex's `mssql` dialect actually requires `tedious` (not the `mssql` package), and Lowdefy never imported `mssql` directly — it was only ever a vehicle for pulling tedious into the install tree. `client: mssql` in user YAML is unchanged: the knex client name stays the same, only the underlying npm package shipped with `connection-knex` changes.
+  - **Added** `tedious` `19.2.1` as the SQL Server driver — the package knex actually loads when `client: mssql` is used.
+  - **Removed** `sqlite3`. The driver is in maintenance-only mode upstream (the v6 release marked the repo unmaintained).
+  - **Added** `better-sqlite3` `12.9.0` as the SQLite driver. Selectable as `client: better-sqlite3` (or `client: sqlite`, which is now an alias of `better-sqlite3` — see runtime client handling below).
+  - **Removed** `mysql`. Unmaintained upstream since 2020.
+  - **Added** `mysql2` `3.22.3` as the MySQL / MariaDB driver. Selectable as `client: mysql2` in connection YAML.
+
+  Runtime client handling (in `createKnex`):
+
+  - `client: sqlite` is silently remapped to `client: better-sqlite3`. `sqlite` was historically a knex-level alias of `sqlite3`; this preserves the YAML alias while the underlying driver changes.
+  - `client: sqlite3` now throws a `ConfigError` with a migration message: `Knex connection "client: sqlite3" is no longer supported. Use "client: better-sqlite3" or "client: sqlite" instead.` Existing apps using `client: sqlite3` need to update their connection YAML.
+  - `client: mysql` now throws a `ConfigError` with a migration message: `Knex connection "client: mysql" is no longer supported. Use "client: mysql2" instead.` Existing apps using `client: mysql` need to update their connection YAML. `mysql` is **not** silently remapped because knex treats `mysql` and `mysql2` as separate dialects with subtly different SQL formatters, not aliases — the migration is a deliberate user choice.
+
+  `pnpm.onlyBuiltDependencies` allowlist for `better-sqlite3`:
+
+  `better-sqlite3` runs a native-binding install script (`prebuild-install` with a `node-gyp rebuild` fallback). pnpm 10 silently suppresses postinstall scripts for unapproved packages, which leaves the binding unbuilt and crashes `KnexRaw` / `KnexBuilder` at runtime.
+
+  - Added `better-sqlite3` to the allowlist on `@lowdefy/server`, `@lowdefy/server-dev`, and `@lowdefy/server-e2e`. These are the install roots in the CLI fetch flow under `.lowdefy/{dev,build}/`, where pnpm honors the per-package `pnpm.onlyBuiltDependencies` field.
+  - Also added the same allowlist to the monorepo root `package.json`. The per-package field is ignored at workspace-root install (pnpm 10 only honors it on the install root), so contributors running `pnpm install` at the repo root would otherwise have to `pnpm rebuild better-sqlite3` manually.
+
+### Patch Changes
+
+- @lowdefy/errors@5.2.0
+- @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+### Patch Changes
+
+- Updated dependencies [905d5d406]
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+
+## 4.6.0
+
+### Patch Changes
+
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

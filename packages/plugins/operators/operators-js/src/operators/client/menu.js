@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,10 +14,35 @@
   limitations under the License.
 */
 
-import { getFromArray } from '@lowdefy/operators';
+import { getFromArray, getFromObject } from '@lowdefy/operators';
+import { type } from '@lowdefy/helpers';
 
-function _menu({ params, menus, location }) {
-  return getFromArray({ params, array: menus, key: 'menuId', operator: '_menu', location });
+function _menu({ params, arrayIndices, menus, location }) {
+  // Support dot-path access: _menu: menuId.path.into.links
+  if (type.isString(params) && params.includes('.')) {
+    const dotIndex = params.indexOf('.');
+    const menuId = params.slice(0, dotIndex);
+    const path = params.slice(dotIndex + 1);
+    const menu = menus.find((item) => item.menuId === menuId);
+    if (!menu) return undefined;
+    const links = menu.links ?? [];
+    return getFromObject({
+      params: path,
+      object: links,
+      arrayIndices,
+      operator: '_menu',
+      location,
+    });
+  }
+  const result = getFromArray({ params, array: menus, key: 'menuId', operator: '_menu', location });
+  // When selecting a single menu, return its links array directly.
+  // _menu: true and { all: true } return the full menus array (result is an array).
+  if (result && !Array.isArray(result)) {
+    return result.links ?? [];
+  }
+  return result;
 }
+
+_menu.dynamic = true;
 
 export default _menu;

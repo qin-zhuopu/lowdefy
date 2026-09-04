@@ -1,0 +1,107 @@
+/*
+  Copyright 2020-2026 Lowdefy, Inc
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+import { type } from '@lowdefy/helpers';
+import { ConfigError } from '@lowdefy/errors';
+
+import validateId from '../../../utils/validateId.js';
+
+function validateStep(step, { endpointId }) {
+  const configKey = step['~k'];
+  if (Object.keys(step).length === 0) {
+    throw new ConfigError(`Step is not defined at endpoint "${endpointId}".`, { configKey });
+  }
+  if (type.isUndefined(step.id)) {
+    throw new ConfigError(`Step id missing at endpoint "${endpointId}".`, { configKey });
+  }
+  if (!type.isString(step.id)) {
+    throw new ConfigError(`Step id is not a string at endpoint "${endpointId}".`, {
+      received: step.id,
+      configKey,
+    });
+  }
+  validateId({ id: step.id, field: 'Step id', location: `endpoint "${endpointId}"`, configKey });
+  if (type.isNone(step.type)) {
+    throw new ConfigError(
+      `Step type is not defined at "${step.id}" on endpoint "${endpointId}".`,
+      { configKey }
+    );
+  }
+  if (!type.isString(step.type)) {
+    throw new ConfigError(
+      `Step type is not a string at "${step.id}" on endpoint "${endpointId}".`,
+      { received: step.type, configKey }
+    );
+  }
+
+  if (step.type === 'CallApi') {
+    if (type.isNone(step.properties?.endpointId)) {
+      throw new ConfigError(
+        `Endpoint step "${step.id}" at endpoint "${endpointId}" requires properties.endpointId.`,
+        { configKey }
+      );
+    }
+    if (!type.isString(step.properties.endpointId) && !type.isObject(step.properties.endpointId)) {
+      throw new ConfigError(
+        `Endpoint step "${step.id}" at endpoint "${endpointId}" properties.endpointId is not a string.`,
+        { received: step.properties.endpointId, configKey }
+      );
+    }
+    if (!type.isNone(step.connectionId)) {
+      throw new ConfigError(
+        `Endpoint step "${step.id}" at endpoint "${endpointId}" should not have a connectionId.`,
+        { configKey }
+      );
+    }
+    return;
+  }
+
+  if (step.type === 'ValidateSchema') {
+    if (type.isNone(step.properties?.schema)) {
+      throw new ConfigError(
+        `ValidateSchema step "${step.id}" at endpoint "${endpointId}" requires properties.schema.`,
+        { configKey }
+      );
+    }
+    if (type.isNone(step.properties?.data)) {
+      throw new ConfigError(
+        `ValidateSchema step "${step.id}" at endpoint "${endpointId}" requires properties.data.`,
+        { configKey }
+      );
+    }
+    if (!type.isNone(step.connectionId)) {
+      throw new ConfigError(
+        `ValidateSchema step "${step.id}" at endpoint "${endpointId}" should not have a connectionId.`,
+        { configKey }
+      );
+    }
+    return;
+  }
+
+  if (type.isUndefined(step.connectionId)) {
+    throw new ConfigError(`Step connectionId missing at endpoint "${endpointId}".`, {
+      configKey,
+    });
+  }
+  if (!type.isString(step.connectionId)) {
+    throw new ConfigError(`Step connectionId is not a string at endpoint "${endpointId}".`, {
+      received: step.connectionId,
+      configKey,
+    });
+  }
+}
+
+export default validateStep;

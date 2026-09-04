@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ The run script does the following:
     - <build-dir>/config.json changes, rebuild and restart server.
 
   If user styles change:
-    - <public-dir>/styles.less changes, rebuild and restart server.
+    - <public-dir>/styles.css changes, rebuild and restart server.
 
   If new plugin type in an existing plugin package is used:
     - <build-dir>/plugins/** changes,  rebuild next and restart server.
@@ -76,20 +76,10 @@ The run script does the following:
   pinging the /api/ping route, until it detects a new server has started, and then reloads the window.
  */
 
-/* TODO:
-Not killing server on errors properly
-when:
-- initial build fails
-*/
-
 const context = await getContext();
 
 try {
-  try {
-    await context.initialBuild();
-  } catch (error) {
-    context.logger.error(error);
-  }
+  await context.initialBuild();
 
   // We are not waiting for the startWatchers promise to resolve (all watchers have fired the ready event)
   // because chokidar sometimes doesn't fire this event, and it seems like there isn't an issue with not waiting.

@@ -1,5 +1,201 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/block-utils@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.5.1
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/block-utils@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Patch Changes
+
+- c91003d: refactor(blocks-loaders): Modernize skeleton shimmer animation.
+
+  The skeleton placeholder now uses a compositor-accelerated `transform: translateX` shimmer on a `::after` pseudo-element, replacing the older `left`-animated `::before` gradient. The shimmer is softer (three-stop gradient over secondary/quaternary fills), the base element uses `isolation: isolate` to scope its stacking context, and `prefers-reduced-motion` disables the animation for accessibility.
+
+  `SkeletonInput` and `SkeletonParagraph` also switch to a flex-column layout with gap spacing: tighter rhythm between rows, distinct border radii for the label vs input, and a slightly wider trailing line (60%) in paragraphs for a more readable look. Purely visual — no API changes.
+
+  - @lowdefy/block-utils@5.2.0
+  - @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.1.0
+- @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- 29eb199c7f: Restructure block metadata from component static properties to dedicated `meta.js` files.
+
+  ### Breaking Changes
+
+  - **`schema.js` renamed to `meta.js`**: Block definitions moved from `schema.js` to `meta.js`. The `meta.js` files export `category`, `icons`, `valueType`, `cssKeys`, `events`, and `properties` (JSON Schema).
+  - **`schemas.js` barrel renamed to `metas.js`**: Block packages export `./metas` instead of `./schemas`.
+  - **`.meta` removed from components**: Block components no longer have a `.meta` static property. Metadata is loaded from the `blockMetas.json` build artifact at runtime.
+  - **`blockMetas.json` build artifact**: The build pipeline writes `plugins/blockMetas.json` containing category, valueType, and initValue for each block type.
+  - **`buildBlockSchema(meta)`**: New function in `@lowdefy/block-utils` generates complete JSON Schema from meta objects with operator support and CSS slot key validation.
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+- f430f02dde: Migrate all blocks from `defaultProps` to `withBlockDefaults` wrapper for React 19 compatibility.
+
+  ### Breaking Changes
+
+  - **`defaultProps` removed**: React 19 silently ignores `defaultProps` on function components. All ~101 block components now use a `withBlockDefaults` wrapper from `@lowdefy/block-utils`.
+  - **`withBlockDefaults` API**: New export from `@lowdefy/block-utils` that wraps block components with default property injection. Antd blocks use `withTheme` which absorbs defaults; non-antd blocks use the generic wrapper.
+
+- f430f02dde: Replace the Less/Emotion styling system with unified `style` and `class` properties using `.` prefixed CSS slot keys.
+
+  ### Breaking Changes
+
+  - **Less removed**: `.less` files are no longer supported. All styling uses CSS, CSS Modules, or Tailwind utilities.
+  - **`makeCssClass` removed**: Blocks no longer call `methods.makeCssClass()`. They receive `classNames` and `styles` objects as props, keyed by CSS slot names (`element`, `icon`, `header`, `body`, etc.).
+  - **`mediaToCssObject` removed** from `@lowdefy/block-utils`.
+  - **`style` replaces `styles`**: The `style` (singular) property handles all styling. Using `styles` (plural) throws a `ConfigError`.
+  - **`class` property added**: New `class` property for CSS classes (Tailwind utilities, custom classes). Supports string, array, or object with `.` slot keys.
+  - **`properties.style` moved**: Block-specific `properties.style` maps to `style: { .element }` at build time.
+  - **Inline style props removed**: `headerStyle`, `bodyStyle`, `maskStyle`, `contentWrapperStyle`, `contentStyle`, `labelStyle`, `valueStyle`, `tabBarStyle`, `overlayStyle` are replaced by CSS slot keys (e.g., `style: { .header }`, `style: { .body }`).
+
+  ### CSS Slot Keys
+
+  `.` prefixed keys target specific parts of a block:
+
+  | Key                                | Target                                                  |
+  | ---------------------------------- | ------------------------------------------------------- |
+  | `.block`                           | Layout wrapper (grid column)                            |
+  | `.element`                         | Component root element                                  |
+  | `.header`, `.body`, `.cover`, etc. | Antd semantic sub-elements (declared in `meta.cssKeys`) |
+
+  Flat shorthand (no `.` keys) maps to `.block`:
+
+  ```yaml
+  # These are equivalent:
+  style: { marginTop: 20 }
+  style:
+    .block: { marginTop: 20 }
+  ```
+
+### Patch Changes
+
+- Updated dependencies [29eb199c7f]
+- Updated dependencies [130a569d36]
+- Updated dependencies [905d5d406]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/block-utils@5.0.0
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.3
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.1
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/block-utils@4.7.0
+
+## 4.6.0
+
+### Patch Changes
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/block-utils@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.2
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.1
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.0
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

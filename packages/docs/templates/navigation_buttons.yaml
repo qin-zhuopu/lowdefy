@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ style:
   marginTop: 40px
   marginBottom: 80px
 layout:
-  contentGutter: 16
+  gap: 16
 blocks:
   - id: previous_button
     type: Button
@@ -31,7 +31,6 @@ blocks:
       size: large
       title:
         _var: previous_page_title
-      type: default
     events:
       onClick:
         - id: link_back
@@ -54,7 +53,6 @@ blocks:
       size: large
       title:
         _var: next_page_title
-      type: default
     events:
       onClick:
         - id: link_forward

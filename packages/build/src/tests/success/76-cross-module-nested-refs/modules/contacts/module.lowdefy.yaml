@@ -1,0 +1,7 @@
+name: Contacts
+
+dependencies:
+  - id: layout
+
+pages:
+  - _ref: pages/contact-list.yaml

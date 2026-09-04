@@ -1,5 +1,781 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 3ead269: feat(helpers): Reject prototype-pollution key names in dot paths and key maps.
+
+  `__proto__`, `constructor`, `prototype`, `__defineGetter__`, `__defineSetter__`,
+  `__lookupGetter__` and `__lookupSetter__` are no longer accepted as path segments or as keys
+  in maps built from user-supplied values.
+
+  Previously these names were silently _filtered_ on write, which was worse than rejecting
+  them: `SetState: { 'a.__proto__.b': 1 }` quietly wrote to `a.b` instead — a different
+  location than the one you asked for. Reads could also walk up the prototype chain.
+
+  What you will see now:
+
+  - `:set_state` and the `SetState` action raise a config error naming the offending key and
+    pointing at the line in your YAML.
+  - Data-reading operators (`_state`, `_get`, `_user`, `_payload`, ...) return their default
+    instead of a value.
+  - A module entry id, an agent or endpoint id, or a `LOWDEFY_SECRET_*` environment variable
+    using one of these names now fails at build or boot with a message naming it, instead of
+    silently vanishing.
+
+  Apps that do not use these names are unaffected. If you have a form field, state key, or API
+  response property named `constructor`, rename it.
+
+  Deep merges of configuration are hardened the same way, but skip reserved keys rather than
+  raising — a reserved name arriving inside a merged _value_ is dropped so a single poisoned
+  field can't abort an otherwise valid merge.
+
+  `@lowdefy/helpers` also now exports `isReserved(key)`, so plugin and connection authors can
+  test a key against this policy directly instead of catching a `ReservedKeyError`.
+
+- 9e19a21: fix: Anonymous calls to protected agents are rejected.
+
+  The `/api/agent` route ran agents without checking the session: on an app with `auth.api.protected: true`, a session-less caller could still execute any agent — tool calls failed endpoint auth, but the model call ran on the app's provider account. Agents now follow the `auth.api` config exactly like endpoints: `public`, `protected`, and `roles` patterns match agent ids, and unauthorized calls fail with the same error as an unknown agent id. Sub-agent invocations are authorized against the same session per call, matching how in-run endpoint tool calls are authorized.
+
+  Note for apps using wildcard patterns in `auth.api.public` or `auth.api.roles`: those patterns now also match agent ids.
+
+- 79bbd84: fix(api): Redact server internals from every client-bound error, not just the 500 response.
+
+  Errors sent to a browser or an API caller now have `received` and `stack` stripped at
+  **every** level of the error, and a non-`Error` `cause` dropped unless the error is a
+  `UserError`. Two live leaks are closed:
+
+  - The 500 handlers stripped fields from the outermost error only, so `cause.stack` — and
+    the absolute server paths in its frames — reached production browsers.
+  - An endpoint result body (`callEndpoint` and the agent route) and a request response body
+    (`callRequest`) were not redacted at all. They carried `received`, which on the request
+    path holds the **evaluated** request properties, so a `_secret` resolved into a request
+    header crossed the wire at HTTP 200.
+
+  `source` is now guaranteed config-relative (`pages/home.yaml:5`, never `/var/task/...`),
+  and `configKey` is kept again: the browser deduplicates errors on `message:configKey`, so
+  stripping it collapsed two different errors that happened to share a message and silently
+  dropped the second.
+
+  **Breaking for app config that reads `error.received`.** Server-originated errors no longer
+  carry it, so `_actions` and `_request_details` expose `received` as `undefined`, and the
+  browser console no longer prints the `Received: <json>` line for them. This is deliberate —
+  the field can contain your own resolved secrets. The error `message` is unchanged, and
+  server logs still record `received` and `stack` in full in every environment, including dev.
+
+  Also fixes internal errors being logged twice. A `LowdefyInternalError` never gets a
+  `source`, and the browser used `source` to decide whether the server had already logged an
+  error, so it POSTed every internal error back to `/api/client-error` for a second log. The
+  browser now reads the `handled` flag the server sets when it logs.
+
+- 824f4be: fix(helpers): Serialized errors mark the values they cannot carry instead of dropping them.
+
+  An error is turned into plain data in three places: the `err` field of a server log line, an error
+  sent to a browser or API caller, and — new in this release — a dot-path read of an error value from
+  config. That conversion used to lose fields silently and let a few live values through. Every own
+  field of an error now appears, with anything unserializable replaced by a marker string:
+
+  - A field holding a class instance no longer vanishes. A Node error carrying a `socket`, `agent` or
+    similar field had that key dropped from the log line altogether, which is indistinguishable from
+    the error not having the field; it now logs as `'[Object: Socket]'`. The instance's internals are
+    still never expanded.
+  - A field holding a function, a bigint or a symbol was passed through live. That leaked a closure
+    over server state into serialized output, and a bigint field made `JSON.stringify` of the result
+    throw `TypeError: Do not know how to serialize a BigInt`. These are now `'[Function: handler]'`,
+    `'[BigInt: 10]'` and `'[Symbol: s]'`.
+  - A circular `cause`, or an own field pointing back at the error itself, had its key dropped. Both
+    are now `'[Circular]'`.
+  - A `cause` chain longer than three levels ended with the fourth `cause` key simply absent. It is
+    now `'[Truncated]'`.
+
+  The markers are literal strings, so they show up wherever the serialized error does: a log line's
+  `err.agent` reads `[Object: Socket]`, and `_actions: someAction.error.someField` can now resolve to
+  `'[Object: Socket]'` rather than to the operator default.
+
+  `extractErrorProps` also takes a new `omit` option — `extractErrorProps(error, { omit: (error) =>
+['stack'] })`, called once per error node in the `cause` walk so a policy can key on the node it is
+  looking at. `serializer.serialize` accepts the same function as `omitErrorProps` and passes it down.
+  This is plugin and server API; app config is unaffected by it.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [6785e0e]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/operators@5.6.0
+  - @lowdefy/node-utils@5.6.0
+  - @lowdefy/operators-js@5.6.0
+  - @lowdefy/nunjucks@5.6.0
+  - @lowdefy/ajv@5.6.0
+  - @lowdefy/errors@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/operators@5.5.1
+- @lowdefy/operators-js@5.5.1
+- @lowdefy/ajv@5.5.1
+- @lowdefy/errors@5.5.1
+- @lowdefy/helpers@5.5.1
+- @lowdefy/node-utils@5.5.1
+- @lowdefy/nunjucks@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/operators@5.5.0
+- @lowdefy/operators-js@5.5.0
+- @lowdefy/ajv@5.5.0
+- @lowdefy/errors@5.5.0
+- @lowdefy/helpers@5.5.0
+- @lowdefy/node-utils@5.5.0
+- @lowdefy/nunjucks@5.5.0
+
+## 5.4.0
+
+### Minor Changes
+
+- 5e498dd: feat: Add ajv-formats + ajv-keywords plugins, a `compile({ schema })` export, and a `ValidateSchema` routine step
+
+  **Breaking change:** `@lowdefy/ajv` now registers `ajv-formats` and `ajv-keywords` on the shared Ajv instance. Schemas that use `format: date-time` / `email` / `uri` / `uuid` / etc. or the `instanceof` keyword previously slipped through `validate()` un-validated; they are now checked. Schemas that were already invalid against these definitions will surface errors they did not before.
+
+  **Additions**
+
+  - `addFormats(ajv)` — registers all standard JSON Schema formats (`date`, `date-time`, `time`, `email`, `uri`, `uuid`, `regex`, `ipv4`, `ipv6`, …).
+  - `addKeywords(ajv, ['instanceof', 'transform', 'regexp'])` — registers three `ajv-keywords` extensions:
+    - `instanceof` — match JS class instances (e.g. `{ instanceof: 'Date' }`).
+    - `transform` — normalise string values during validation (`transform: ['trim', 'toUpperCase']`); mutates the parent object in place. Useful for upload pipelines that need cleaned values before downstream processing.
+    - `regexp` — full regex with flags (`regexp: '/^l[0-9]+$/i'` or `regexp: { pattern: '...', flags: 'i' }`); fills the gap left by JSON Schema's `pattern:` which has no flag support.
+  - New `compile({ schema })` named export — returns a `(data) => { valid, errors }` function so callers can pre-compile a schema and reuse the validator across many calls without re-resolving through `Ajv.prototype.validate`.
+
+  **Internal**
+
+  - The configured Ajv instance is extracted into a new `src/ajvInstance.js`. Both `validate.js` and `compile.js` share it.
+  - Plugin registration order is `ajv-formats` → `ajv-keywords` → `ajv-errors` so the `errorMessage` keyword can attach to format / instanceof errors.
+
+  **`ValidateSchema` routine step (built-in)**
+
+  A new connectionless server routine step (sibling to `CallApi`) that runs `@lowdefy/ajv` `validate` inside a routine. Properties:
+
+  - `schema` — JSON Schema (required, operators evaluated).
+  - `data` — value to validate (required, operators evaluated).
+  - `throwOnInvalid` — boolean, default `true`. On invalid + `true`, the routine short-circuits with `status: 'error'` and the AJV errors attached as `error.cause`. On invalid + `false`, the routine continues and the step result `{ valid, errors }` is available to downstream steps as `_step.<stepId>`.
+
+  Example:
+
+  ```yaml
+  routine:
+    - id: validate_input
+      type: ValidateSchema
+      properties:
+        schema:
+          type: object
+          required: [email]
+          properties:
+            email: { type: string, format: email }
+        data:
+          _payload: true
+  ```
+
+  Wired through the existing build → runtime path used by `CallApi`: `setStepId` assigns a `validate:` id prefix, `validateStep` enforces required props and forbids `connectionId`, `countStepTypes` skips it, and `runRoutine` dispatches the prefix to a new `handleValidateSchema` handler in `@lowdefy/api`.
+
+  **Use case**
+
+  The hydra `data-upload` plugin uses `compile({ schema })` to build a row validator from a tool's `columns[]` once per import and runs it against every row in the upload — pre-compilation avoids per-row dictionary lookup on large XLSX files.
+
+- 60401aa: feat: Add `_app` operator and structured app metadata.
+
+  A new runtime operator `_app` reads the app's declared metadata —
+  `slug`, `name`, `version`, `description`, `license`, `lowdefyVersion`,
+  `gitSha`. It works on both client and server, including inside
+  `modules-mongodb` request filters, and inside `_js` functions via a
+  bound `lowdefyApp(p)` callable.
+
+  The root `lowdefy.yaml` schema gains two new optional fields:
+
+  - `slug` — a kebab-case identifier (`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`),
+    validated at build time. Build fails with a clear error if invalid.
+  - `description` — a free-form string.
+
+  `gitSha` resolves through a fallback chain: `LOWDEFY_GIT_SHA` env var
+  when set non-empty → `git rev-parse HEAD` → `null`. This lets apps
+  deployed without `.git` (Docker, Vercel, Netlify, Render, hermetic
+  PaaS sandboxes) pin the SHA explicitly by mapping their platform's
+  commit env var via shell expansion in the build command.
+
+  Build emits a new `appMeta.json` artifact alongside `app.json`. The
+  existing `app.git_sha` field is removed; consumers (internal telemetry)
+  read `gitSha` from `appMeta` instead.
+
+  See the `_app` operator reference for the full key set and examples.
+
+- f11addd: feat: Extend i18n coverage to Lowdefy agents.
+
+  Builds on the i18n / locale support from
+  `feat-i18n-locale-support.md`. End-user-visible strings in the agent
+  runtime and the `AgentChat` block now localize automatically when
+  `config.i18n` is configured.
+
+  **Agent runtime errors.** HTTP 4xx/5xx responses from the agent
+  endpoint (`Only POST requests are supported.`, `Invalid agent path`,
+  `Agent "X" does not exist.`, `Agent type "Y" can not be found.`,
+  `Endpoint execution failed`, etc.) translate per request via the
+  `Accept-Language` header against `agent.runtime.*` builtin keys.
+
+  **AgentChat block UI.** Framework-rendered strings in the chat UI go
+  through `methods.translate` against new `agent.*` builtin keys:
+
+  - `agent.sender.placeholder` — `'Type a message...'`
+  - `agent.toolApproval.{approve,reject}` — `'Approve'` / `'Reject'`
+  - `agent.message.{copy,feedback,regenerate,delete}` — message actions
+  - `agent.toolResult.{completed,completedNoData,empty,emptyList,showMore,showLess}` — tool result captions
+
+  Override per locale via `config.i18n.messages.{locale}` — same
+  mechanism as any other built-in message.
+
+  **antd X locale wiring.** The app shell now uses
+  `@ant-design/x@2.7.x`'s `XProvider` at the root (drop-in superset of
+  antd's `ConfigProvider`) with a merged antd + antd-X locale pack.
+  antd X ships only `en_US` and `zh_CN` packs; other locales fall back
+  to `en_US` for X-native strings (`'New chat'`, `'Stop loading'`,
+  `'Like'`/`'Dislike'`, bubble edit `'OK'`/`'Cancel'`). Apps can
+  override these in unsupported locales via the new `agent.antdx.*`
+  reference keys.
+
+  **Plugin-author surface.** Agent hook endpoints (`onStart`,
+  `onStepStart`, `onToolCallStart`, `onToolCallFinish`, `onStepFinish`,
+  `onFinish`) now receive `locale: <activeCode>` in their payload, so
+  hook routines can branch on the user's locale.
+
+  **System prompt translation.** `agent.properties.instructions` passes
+  through the operator parser at request time — `_t:` works there for
+  locale-aware system prompts.
+
+  ```yaml
+  agents:
+    - id: assistant
+      type: AISDKAgent
+      connectionId: anthropic
+      properties:
+        agent:
+          model: claude-sonnet-4
+          instructions:
+            _t: agent.systemPrompt
+  ```
+
+  **What stays English** (explicit choices):
+
+  - Built-in tool descriptions used in the model prompt (English-trained
+    models perform best with English tool descriptions).
+  - Build-time agent validation errors (developer diagnostics).
+  - Console warnings (ops diagnostics).
+  - The `[File truncated — showing first NKB...]` notice in the
+    `read-file` built-in tool (model-facing).
+  - Model-streamed natural-language output (owned by the model).
+
+- 0108f38: feat: First-class i18n / locale support for Lowdefy apps.
+
+  Apps can now declare supported locales and message catalogs under
+  `config.i18n`, switch language at runtime, and translate their own
+  strings with ICU MessageFormat. Ant Design's component strings (date
+  pickers, modal Ok/Cancel, pagination, form validation messages),
+  dayjs date formatting, and the engine's built-in framework strings
+  (loading toasts, validation summaries, popup blocker warnings, error
+  page) all localize automatically once `config.i18n` is set.
+
+  ```yaml
+  config:
+    i18n:
+      defaultLocale: en-US
+      locales:
+        - { code: en-US, label: English, antd: en_US, dayjs: en }
+        - { code: de-DE, label: Deutsch, antd: de_DE, dayjs: de }
+      messages:
+        en-US: { greeting: 'Hello, {name}!' }
+        de-DE: { greeting: 'Hallo, {name}!' }
+  ```
+
+  **New schema** — `config.i18n` with `defaultLocale`, `locales[]`, and
+  `messages`. Validated at build time; only declared locales are bundled
+  (antd and dayjs locale imports are codegen'd, no ~150KB unused). The
+  missing-key fallback is always `en-US`, so plugin and module authors
+  should ship `en-US` translations as a baseline.
+
+  **New operators**
+
+  - [`_t`](/_t) — translate operator with ICU MessageFormat. Resolution
+    order: active locale → fallback locale → built-in framework message
+    → key.
+
+    ```yaml
+    _t:
+      key: cart.items
+      values: { count: { _state: itemCount } }
+    ```
+
+  - [`_locale`](/_locale) — read `active` / `default` / `fallback`
+    (always `'en-US'`) / `supported` locale state. Use with `Selector`
+    to build a language picker.
+
+  **New action** — [`SetLocale`](/SetLocale) sets the user's preferred
+  locale (persisted to `localStorage`). Pass `'auto'` to clear the
+  preference and fall back to the browser language or default.
+
+  **Built-in framework strings.** Engine and client strings (`'Loading'`,
+  `'Success'`, `'This field is required'`, validation summaries, popup
+  blocker, error page) live in a built-in catalog and surface as English
+  by default. Authors override per-locale by adding the same key to
+  `config.i18n.messages`:
+
+  ```yaml
+  messages:
+    de-DE:
+      engine.action.loading: 'Laden'
+      engine.validation.fieldRequired: 'Pflichtfeld'
+  ```
+
+  See the [Internationalization concept page](/i18n) for the full list
+  of overridable keys.
+
+  **Ant Design block cleanup.** `Modal`/`ConfirmModal` `okText`/`cancelText`
+  and date picker placeholders (`DateSelector`, `DateRangeSelector`,
+  `DateTimeSelector`, `MonthSelector`, `WeekSelector`) no longer hardcode
+  English defaults — they fall through to antd's `ConfigProvider locale`,
+  so a German app gets `'OK'` / `'Abbrechen'` / `'Datum auswählen'`
+  without per-block configuration. The antd `ConfigProvider` block
+  itself now accepts a `locale` prop for subtree overrides.
+
+  **Server-side translation.** API requests resolve the user's active
+  locale from the `Accept-Language` header and thread it into the server
+  operator parser, so `_t` works the same in server-side actions and
+  requests as on the client.
+
+  **Translation engine.** A new `translate()` helper in `@lowdefy/helpers`
+  backs both the `_t` operator and the engine/client adapter (installed
+  on `lowdefy._internal.translate`). One source of truth for the lookup
+  chain; no duplication. Adds `intl-messageformat` as a foundational dep.
+
+  **Plugin-author surface.** Action and block plugins receive
+  `methods.translate(key, values)` and `methods.getLocale()` for runtime
+  translation in their JS code. Plugin packages can ship default
+  messages via a `./messages` export — the build merges them into the
+  app's i18n catalog (user app messages > plugin messages > framework
+  builtins > key).
+
+  **DatePicker and NumberInput auto-localization.** Date selector blocks
+  (`DateSelector`, `DateRangeSelector`, `DateTimeSelector`,
+  `MonthSelector`) and `NumberInput` derive their default `format` /
+  `decimalSeparator` from the active locale via `Intl.DateTimeFormat` /
+  `Intl.NumberFormat`. A German user sees `DD.MM.YYYY` and `1234,56`
+  automatically; an en-US user sees `MM/DD/YYYY` and `1234.56`.
+
+- 302e330: feat(api): Add `callApi({ endpointId, payload })` to the request-resolver argument bag.
+
+  Request resolvers (the JS resolvers shipped by connection plugins — e.g. `plugin-http`'s `get`, `plugin-mongodb`'s `find`) now receive a `callApi` function in their argument bag. Calling it invokes another Lowdefy endpoint in-process with the same semantics as the routine `:call_api` step: depth cap (10), caller's user identity, isolated routine context, inherited parser closure (`_user`, `_secret`, `_env`, `_payload`), and `InternalApi` endpoints reachable. Returns the target routine's response or throws on failure — `UserError` for `:throw`/`:reject`, original Lowdefy error class preserved otherwise.
+
+  Supporting improvements landed alongside:
+
+  - `_state` is now scoped to the routine frame. `:set_state` writes no longer leak across routine boundaries. Two sibling `:call_api` invocations see independent state.
+  - `UserError` now accepts and forwards `cause`. `controlThrow` (`:throw`) and `controlReject` (`:reject`) construct `UserError` so routine-step and JS-boundary surfaces carry the same class for user-authored failures.
+  - `callRequestResolver` passes all Lowdefy errors (those with `isLowdefyError === true`) through unchanged. Only raw errors are wrapped into `RequestError` / `ServiceError`. A deep `callApi` chain no longer accumulates redundant `cause` nesting.
+  - `runRoutine` guards against double `handleError` invocations when the same error crosses multiple `runRoutine` boundaries on a `callApi` chain.
+  - The endpoint-invocation sequence (`depth check → load config → authorize → child routineContext → runRoutine`) is factored into a shared `invokeEndpoint` helper used by both the routine `:call_api` step and the new `callApi` function.
+
+  **Behavior change:** any app that accidentally relied on `:set_state` writes leaking across routine boundaries (e.g., a routine called via `:call_api` reading state set by its caller) will break. The leakage was a bug, not a contract — there is no backwards-compatibility shim.
+
+### Patch Changes
+
+- b6e555f: fix(api,build): Render MenuDivider items in menus.
+
+  MenuDivider items defined in a menu's `links` were silently dropped at request time by `filterMenuList`, which only let `MenuLink` and `MenuGroup` items through. Dividers now pass the filter and render via the existing Antd menu block code. A post-pass removes orphaned dividers (leading, trailing, or adjacent to another divider) so an item left dangling after auth-based filtering does not produce a broken-looking separator. The `menuDivider` shape was also added to the build schema so configs containing dividers no longer trigger a schema warning, and `buildMenu` now assigns `auth: { public: true }` to dividers for consistency with other menu items.
+
+- Updated dependencies [5e498dd]
+- Updated dependencies [60401aa]
+- Updated dependencies [25225ab]
+- Updated dependencies [ba1d3bd]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/ajv@5.4.0
+  - @lowdefy/operators@5.4.0
+  - @lowdefy/operators-js@5.4.0
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/errors@5.4.0
+  - @lowdefy/node-utils@5.4.0
+  - @lowdefy/nunjucks@5.4.0
+
+## 5.3.0
+
+### Minor Changes
+
+- 6955341: feat: Add AI agent support with multi-provider chat and tool use
+
+  **Agent Runtime (`@lowdefy/ai-utils`)**
+
+  - `handleAgentChat` orchestrates the full agent lifecycle: tool merging, MCP client lifecycle, hook callbacks, and stream composition
+  - `ToolLoopAgent` handles multi-turn tool calling, streaming responses, and artifact cleaning
+  - `createAgentUIStreamResponse` converts agent output to a streaming HTTP response for the client
+  - `buildAgentTools` merges endpoint tools, MCP tools, and sub-agent tools into AI SDK tool objects
+  - `buildPrepareStep` enables dynamic tool phasing per step
+  - `buildUpdatePageStateTool` provides a built-in tool for the agent to write to page state via the AgentChat block
+  - File system agent tools: `listFiles`, `readFile`, `searchFiles`, `statFile`, `resolvePath` for sandboxed access to agent-scoped file directories
+  - `pruneMessages` for context compaction
+  - `experimental_repairToolCall` integration
+  - Sub-agent support — agents can be exposed as tools to other agents
+  - Reserved tool name collision detection (e.g. `update-page-state`)
+  - Server-side hooks (`instructions`, `onStart`, `onStepStart`, `onToolCallStart`, `onToolCallFinish`, `onStepFinish`, `onFinish`) callable as Lowdefy endpoints
+  - Provider-agnostic design using the Vercel AI SDK — supports reasoning/thinking display, `providerOptions` passthrough, and source citation streaming via `sendSources`
+  - Strip `data:` URL prefix from file attachments before AI SDK processing
+
+  **AgentChat Block (`@lowdefy/blocks-antd-x`)**
+
+  - New `AgentChat` composite block built on Ant Design X with real-time streaming display
+  - Sequential message part rendering with configurable reasoning/thinking display
+  - Tool approval UI for endpoint and MCP tools marked `confirm: true`
+  - File attachment support (configurable accept types and max size) with S3 upload integration
+  - Drawer display mode with a `FloatButton` trigger for embedding chat on any page
+  - Source citation rendering for `source-url` and `source-document` parts
+  - Mermaid diagrams, LaTeX, and syntax-highlighted code blocks (with copy + language label) — toggled via `renderMermaid` and `codeHighlighter`
+  - Copy, feedback, regenerate, and delete message actions
+  - Suggestions and `Sender.Header` / `Sender.Switch` UI affordances
+  - Configurable roles, avatars, and names per message role
+  - Event bridging for agent lifecycle events (`onSuccess`, `onError`, `onFinish`, `onFeedback`)
+  - `sharedState` two-way binding lets the agent read and write page state via the `update-page-state` tool
+
+  **`AgentConversations` Block (`@lowdefy/blocks-antd-x`)**
+
+  - New standalone conversations sidebar block, extracted from AgentChat for independent placement
+
+  **Connection Plugins**
+
+  - `@lowdefy/connection-anthropic`: Anthropic connection with `AnthropicAgent` resolver supporting Claude models
+  - `@lowdefy/connection-openai`: OpenAI connection with `OpenAIAgent` resolver supporting GPT models
+  - `@lowdefy/connection-google`: Google AI connection with `GeminiAgent` resolver, including `thinkingConfig` and `safetySettings` sugar props
+  - `@lowdefy/connection-ai-gateway`: Vercel AI Gateway connection with `AIGatewayAgent` resolver for routing to multiple providers through a single endpoint
+
+  **MCP Integration (`@lowdefy/connection-mcp`, `@lowdefy/ai-utils`, `@lowdefy/build`)**
+
+  - New `Mcp` connection type for HTTP, SSE, and stdio transport config
+  - Agents can reference MCP connections via `connectionId` or inline config with build-time validation
+  - Runtime MCP client creation with automatic tool discovery, merging, and cleanup
+  - Tool approval support via `confirm: true` on both endpoint tools and MCP sources
+
+  **Build Pipeline (`@lowdefy/build`)**
+
+  - `buildAgents` validates agent config (model, tools, sub-agents, MCP) and normalizes tool definitions
+  - `writeAgents` writes agent artifacts for server consumption
+  - Sub-agent circular reference detection
+  - Tool object format with `confirm` support
+  - MCP `connectionId` normalization (inline config vs reference)
+  - Lazy module variable resolution for agent properties referenced from modules
+  - Agent schema validation integrated into the build pipeline
+  - `copyAgentFileSystems` emits an `agentFileSystems.json` manifest so the production server can include each agent's `fileSystem.basePath` directory in Next.js file tracing — agents that read files now work on Vercel and standalone (`output: 'standalone'`) deployments without manual `next.config.js` configuration
+
+  **API (`@lowdefy/api`)**
+
+  - Agent route handler (`callAgent`) for streaming agent responses
+  - Endpoint tool execution context with operator evaluation
+  - Sub-agent resolver methods for agents-as-tools
+  - MCP `connectionId` resolution at request time
+  - `getAgentConfig` and `getAgentResolver` helpers for runtime agent resolution
+
+  **Servers (`@lowdefy/server`, `@lowdefy/server-dev`)**
+
+  - Agent API route (`/api/agent/[...path]`) added to both production and development servers
+  - `urlQuery` validation
+  - 10 MB request body limit for file attachments
+  - Server-side hooks for agent lifecycle callbacks (`instructions`, `onFinish`)
+
+### Patch Changes
+
+- @lowdefy/operators@5.3.0
+- @lowdefy/operators-js@5.3.0
+- @lowdefy/ajv@5.3.0
+- @lowdefy/errors@5.3.0
+- @lowdefy/helpers@5.3.0
+- @lowdefy/node-utils@5.3.0
+- @lowdefy/nunjucks@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 73fa2b9: feat: Internal API endpoint calls
+
+  **Endpoint-to-Endpoint Calls (`@lowdefy/api`)**
+
+  - API endpoint routines can call other endpoints server-side via `CallApi` steps, without HTTP
+  - Each called endpoint runs in an isolated context with its own `steps` and `payload` namespaces
+  - Recursive endpoint call depth is capped at 10 to prevent infinite loops
+  - `InternalApi` endpoints are blocked from HTTP access — they return the same response as a missing endpoint
+
+  **Build Support (`@lowdefy/build`)**
+
+  - `CallApi` routine steps validated at build time: require `properties.endpointId`, reject `connectionId`
+  - `InternalApi` endpoint type accepted alongside `Api`
+  - Client-side `CallAPI` actions targeting `InternalApi` endpoints produce a build warning (error in production)
+
+  **Operator Parser (`@lowdefy/operators`)**
+
+  - `ServerParser.parse()` accepts `steps` and `payload` per call for routine context isolation
+
+### Patch Changes
+
+- Updated dependencies [1d18a13]
+- Updated dependencies [73fa2b9]
+- Updated dependencies [69a59c0]
+- Updated dependencies [0d44433]
+- Updated dependencies [1e964c4]
+  - @lowdefy/operators-js@5.2.0
+  - @lowdefy/operators@5.2.0
+  - @lowdefy/ajv@5.2.0
+  - @lowdefy/errors@5.2.0
+  - @lowdefy/helpers@5.2.0
+  - @lowdefy/node-utils@5.2.0
+  - @lowdefy/nunjucks@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- Updated dependencies [af8ef77cb]
+  - @lowdefy/operators-js@5.1.0
+  - @lowdefy/operators@5.1.0
+  - @lowdefy/ajv@5.1.0
+  - @lowdefy/errors@5.1.0
+  - @lowdefy/helpers@5.1.0
+  - @lowdefy/node-utils@5.1.0
+  - @lowdefy/nunjucks@5.1.0
+
+## 5.0.0
+
+### Minor Changes
+
+- f430f02dde: Add theme token system. Use `_theme` operator to access Ant Design v6 design tokens (colors, spacing, typography) at runtime. Theme is configured via `theme.antd.token` and `theme.antd.algorithm` in `lowdefy.yaml`. The `_theme` operator resolves the full computed token set including antd defaults.
+
+### Patch Changes
+
+- Updated dependencies [155c0b9724]
+- Updated dependencies [e3e922538]
+- Updated dependencies [c8f4a41063]
+- Updated dependencies [fd8225b7a1]
+- Updated dependencies [905d5d406]
+- Updated dependencies [8b9f926d1]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/nunjucks@5.0.0
+  - @lowdefy/operators-js@5.0.0
+  - @lowdefy/helpers@5.0.0
+  - @lowdefy/node-utils@5.0.0
+  - @lowdefy/ajv@5.0.0
+  - @lowdefy/operators@5.0.0
+  - @lowdefy/errors@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- 9de3276dc: fix(api): Validate session.user.roles is an array of strings.
+
+  Misconfigured `auth.userFields` mapping roles to a non-array provider field (e.g., a string) caused silent authorization bypasses via `String.prototype.includes` substring matching. Session roles are now validated after session assembly, throwing a clear `ConfigError` pointing to the auth configuration. Added a defense-in-depth guard in `createAuthorize` for the same check.
+
+- Updated dependencies [c5ce5b972]
+  - @lowdefy/operators-js@4.7.3
+  - @lowdefy/operators@4.7.3
+  - @lowdefy/ajv@4.7.3
+  - @lowdefy/errors@4.7.3
+  - @lowdefy/helpers@4.7.3
+  - @lowdefy/node-utils@4.7.3
+  - @lowdefy/nunjucks@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/operators@4.7.2
+- @lowdefy/operators-js@4.7.2
+- @lowdefy/ajv@4.7.2
+- @lowdefy/errors@4.7.2
+- @lowdefy/helpers@4.7.2
+- @lowdefy/node-utils@4.7.2
+- @lowdefy/nunjucks@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- Updated dependencies [fac48c10a]
+  - @lowdefy/operators-js@4.7.1
+  - @lowdefy/operators@4.7.1
+  - @lowdefy/ajv@4.7.1
+  - @lowdefy/errors@4.7.1
+  - @lowdefy/helpers@4.7.1
+  - @lowdefy/node-utils@4.7.1
+  - @lowdefy/nunjucks@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/operators@4.7.0
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/operators-js@4.7.0
+  - @lowdefy/node-utils@4.7.0
+  - @lowdefy/nunjucks@4.7.0
+  - @lowdefy/ajv@4.7.0
+  - @lowdefy/errors@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+- 43a5243da: feat(server-dev): Add mock user support for e2e testing
+
+  Set `LOWDEFY_DEV_USER` env var or `auth.dev.mockUser` in config to bypass login in dev server.
+
+### Patch Changes
+
+- aebca6ab51: refactor: Consolidate error classes into @lowdefy/errors package with environment-specific subpaths
+
+  **Error Package Restructure**
+
+  - New `@lowdefy/errors` package with all error classes (`ConfigError`, `PluginError`, `ServiceError`, `UserError`, `LowdefyInternalError`, `ConfigWarning`)
+    - `@lowdefy/errors/build` - Build-time errors with sync resolution via keyMap/refMap
+  - Moved ConfigMessage, resolveConfigLocation from node-utils to errors/build
+
+  **TC39 Standard Constructor Signatures**
+
+  - All error constructors standardized to `new MyError(message, { cause, ...options })`:
+    ```javascript
+    new ConfigError('Property must be a string.', { configKey });
+    new OperatorError(e.message, { cause: e, typeName: '_if', received: params });
+    new ServiceError(undefined, { cause: error, service: 'MongoDB', configKey });
+    ```
+  - Plugins throw simple errors without knowing about configKey
+  - Interface layer adds configKey before re-throwing
+
+  **configKey Added to ALL Errors**
+
+  - Interface layer now adds configKey to ALL error types (not just PluginError):
+    - ConfigError: adds configKey if not present, re-throws
+    - ServiceError: created via `new ServiceError(undefined, { cause: error, service, configKey })`
+    - Plain Error: wraps in PluginError with configKey
+  - Helps developers trace any error back to its config source, including service/network errors
+
+  **Cause Chain Support**
+
+  - All error classes use TC39 `error.cause` instead of custom stack copying
+  - CLI logger walks cause chain displaying `Caused by:` lines
+  - `extractErrorProps` recursively serializes Error causes for pino JSON logs
+  - ConfigError and PluginError extract `received` and `configKey` from `cause`:
+    ```javascript
+    new ConfigError(undefined, { cause: plainError }); // extracts cause.received and cause.configKey
+    new PluginError(undefined, { cause: plainError }); // same extraction
+    ```
+
+  **Error Display**
+
+  - `errorToDisplayString()` formats errors for display, appending `Received: <JSON>` when `error.received` is defined
+  - `rawMessage` stores the original unformatted message on PluginError
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [bb3222a5a]
+- Updated dependencies [8ec5f1be05]
+- Updated dependencies [af61715d5]
+- Updated dependencies [f673e3ab3]
+  - @lowdefy/errors@4.6.0
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/node-utils@4.6.0
+  - @lowdefy/operators@4.6.0
+  - @lowdefy/operators-js@4.6.0
+  - @lowdefy/nunjucks@4.6.0
+  - @lowdefy/ajv@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.2
+- @lowdefy/operators-js@4.5.2
+- @lowdefy/ajv@4.5.2
+- @lowdefy/helpers@4.5.2
+- @lowdefy/node-utils@4.5.2
+- @lowdefy/nunjucks@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.1
+- @lowdefy/operators-js@4.5.1
+- @lowdefy/ajv@4.5.1
+- @lowdefy/helpers@4.5.1
+- @lowdefy/node-utils@4.5.1
+- @lowdefy/nunjucks@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- Updated dependencies [09ae496d8]
+  - @lowdefy/operators@4.5.0
+  - @lowdefy/operators-js@4.5.0
+  - @lowdefy/ajv@4.5.0
+  - @lowdefy/helpers@4.5.0
+  - @lowdefy/node-utils@4.5.0
+  - @lowdefy/nunjucks@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

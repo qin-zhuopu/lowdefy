@@ -9,6 +9,29 @@ export default {
       additionalProperties: false,
       required: ['id', 'type'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         async: {
           type: 'boolean',
           errorMessage: {
@@ -39,10 +62,181 @@ export default {
         },
       },
     },
+    agent: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'type', 'connectionId'],
+      properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
+        id: {
+          type: 'string',
+          errorMessage: {
+            type: 'Agent "id" should be a string.',
+          },
+        },
+        type: {
+          type: 'string',
+          errorMessage: {
+            type: 'Agent "type" should be a string.',
+          },
+        },
+        connectionId: {
+          type: 'string',
+          errorMessage: {
+            type: 'Agent "connectionId" should be a string.',
+          },
+        },
+        properties: {
+          type: 'object',
+          errorMessage: {
+            type: 'Agent "properties" should be an object.',
+          },
+        },
+        tools: {
+          type: 'array',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                required: ['endpointId'],
+                properties: {
+                  endpointId: { type: 'string' },
+                  confirm: {
+                    const: true,
+                  },
+                },
+                additionalProperties: false,
+              },
+            ],
+          },
+          errorMessage: {
+            type: 'Agent "tools" should be an array.',
+          },
+        },
+        mcp: {
+          type: 'array',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                properties: {
+                  connectionId: { type: 'string' },
+                  url: { type: 'string' },
+                  transport: {
+                    type: 'string',
+                    enum: ['http', 'sse', 'stdio'],
+                    default: 'http',
+                  },
+                  headers: { type: 'object' },
+                  command: { type: 'string' },
+                  args: { type: 'array', items: { type: 'string' } },
+                  env: { type: 'object' },
+                  confirm: { const: true },
+                },
+                additionalProperties: false,
+              },
+            ],
+          },
+          errorMessage: {
+            type: 'Agent "mcp" should be an array.',
+          },
+        },
+        hooks: {
+          type: 'object',
+          properties: {
+            onStart: { type: 'array', items: { type: 'string' } },
+            onStepStart: { type: 'array', items: { type: 'string' } },
+            onToolCallStart: { type: 'array', items: { type: 'string' } },
+            onToolCallFinish: { type: 'array', items: { type: 'string' } },
+            onStepFinish: { type: 'array', items: { type: 'string' } },
+            onFinish: { type: 'array', items: { type: 'string' } },
+          },
+          errorMessage: {
+            type: 'Agent "hooks" should be an object.',
+          },
+        },
+        agents: {
+          type: 'array',
+          items: {
+            anyOf: [
+              { type: 'string' },
+              {
+                type: 'object',
+                required: ['agentId'],
+                properties: {
+                  agentId: { type: 'string' },
+                  description: { type: 'string' },
+                  inputSchema: { type: 'object' },
+                },
+                additionalProperties: false,
+              },
+            ],
+          },
+          errorMessage: {
+            type: 'Agent "agents" should be an array.',
+          },
+        },
+      },
+      errorMessage: {
+        type: 'Agent should be an object.',
+        required: {
+          id: 'Agent should have required property "id".',
+          type: 'Agent should have required property "type".',
+          connectionId: 'Agent should have required property "connectionId".',
+        },
+      },
+    },
     app: {
       type: 'object',
       additionalProperties: false,
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         html: {
           type: 'object',
           errorMessage: {
@@ -72,6 +266,29 @@ export default {
         type: 'App "auth" should be an object.',
       },
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         advanced: {
           type: 'object',
           properties: {
@@ -108,10 +325,110 @@ export default {
             },
           },
         },
+        api: {
+          type: 'object',
+          additionalProperties: false,
+          errorMessage: {
+            type: 'App "config.auth.api" should be an object.',
+          },
+          properties: {
+            '~ignoreBuildChecks': {
+              oneOf: [
+                { const: true },
+                {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: [
+                      'state-refs',
+                      'payload-refs',
+                      'step-refs',
+                      'link-refs',
+                      'request-refs',
+                      'connection-refs',
+                      'types',
+                      'schema',
+                    ],
+                  },
+                },
+              ],
+            },
+            '~r': {},
+            '~l': {},
+            protected: {
+              type: ['array', 'boolean'],
+              errorMessage: {
+                type: 'App "auth.api.protected.$" should be an array of strings.',
+              },
+              items: {
+                type: 'string',
+                description:
+                  'Page ids for which authentication is required. When specified, all unspecified api endpoints will be public.',
+                errorMessage: {
+                  type: 'App "auth.api.protected.$" should be an array of strings.',
+                },
+              },
+            },
+            public: {
+              type: ['array', 'boolean'],
+              errorMessage: {
+                type: 'App "auth.api.public.$" should be an array of strings.',
+              },
+              items: {
+                type: 'string',
+                description:
+                  'Page ids for which authentication is not required. When specified, all unspecified api endpoints will be protected.',
+                errorMessage: {
+                  type: 'App "auth.api.public.$" should be an array of strings.',
+                },
+              },
+            },
+            roles: {
+              type: 'object',
+              patternProperties: {
+                '^.*$': {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                  },
+                  errorMessage: {
+                    type: 'App "auth.api.roles.[role]" should be an array of strings.',
+                  },
+                },
+              },
+              errorMessage: {
+                type: 'App "auth.api.roles" should be an object.',
+              },
+            },
+          },
+        },
         authPages: {
           type: 'object',
           additionalProperties: false,
           properties: {
+            '~ignoreBuildChecks': {
+              oneOf: [
+                { const: true },
+                {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: [
+                      'state-refs',
+                      'payload-refs',
+                      'step-refs',
+                      'link-refs',
+                      'request-refs',
+                      'connection-refs',
+                      'types',
+                      'schema',
+                    ],
+                  },
+                },
+              ],
+            },
+            '~r': {},
+            '~l': {},
             signIn: {
               type: 'string',
               default: '/auth/signin',
@@ -213,6 +530,29 @@ export default {
             type: 'App "config.auth.pages" should be an object.',
           },
           properties: {
+            '~ignoreBuildChecks': {
+              oneOf: [
+                { const: true },
+                {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: [
+                      'state-refs',
+                      'payload-refs',
+                      'step-refs',
+                      'link-refs',
+                      'request-refs',
+                      'connection-refs',
+                      'types',
+                      'schema',
+                    ],
+                  },
+                },
+              ],
+            },
+            '~r': {},
+            '~l': {},
             protected: {
               type: ['array', 'boolean'],
               errorMessage: {
@@ -300,6 +640,20 @@ export default {
         userFields: {
           type: 'object',
         },
+        dev: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            '~ignoreBuildChecks': {},
+            '~r': {},
+            '~l': {},
+            mockUser: {
+              type: 'object',
+              description:
+                'Mock user object for e2e testing in dev server. Any JSON structure accepted.',
+            },
+          },
+        },
       },
     },
     block: {
@@ -307,6 +661,29 @@ export default {
       additionalProperties: false,
       required: ['id', 'type'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -344,6 +721,21 @@ export default {
           type: 'object',
           errorMessage: {
             type: 'Block "style" should be an object.',
+          },
+        },
+        class: {
+          oneOf: [
+            { type: 'string' },
+            { type: 'array', items: { type: 'string' } },
+            {
+              type: 'object',
+              additionalProperties: {
+                oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+              },
+            },
+          ],
+          errorMessage: {
+            type: 'Block "class" should be a string, array of strings, or object.',
           },
         },
         visible: {},
@@ -394,6 +786,29 @@ export default {
                   type: 'object',
                   additionalProperties: false,
                   properties: {
+                    '~ignoreBuildChecks': {
+                      oneOf: [
+                        { const: true },
+                        {
+                          type: 'array',
+                          items: {
+                            type: 'string',
+                            enum: [
+                              'state-refs',
+                              'payload-refs',
+                              'step-refs',
+                              'link-refs',
+                              'request-refs',
+                              'connection-refs',
+                              'types',
+                              'schema',
+                            ],
+                          },
+                        },
+                      ],
+                    },
+                    '~r': {},
+                    '~l': {},
                     try: {
                       type: 'array',
                       items: {
@@ -410,6 +825,29 @@ export default {
                       type: 'object',
                       additionalProperties: false,
                       properties: {
+                        '~ignoreBuildChecks': {
+                          oneOf: [
+                            { const: true },
+                            {
+                              type: 'array',
+                              items: {
+                                type: 'string',
+                                enum: [
+                                  'state-refs',
+                                  'payload-refs',
+                                  'step-refs',
+                                  'link-refs',
+                                  'request-refs',
+                                  'connection-refs',
+                                  'types',
+                                  'schema',
+                                ],
+                              },
+                            },
+                          ],
+                        },
+                        '~r': {},
+                        '~l': {},
                         immediate: {
                           type: 'boolean',
                           errorMessage: {
@@ -424,6 +862,23 @@ export default {
                         },
                       },
                     },
+                    shortcut: {
+                      anyOf: [
+                        {
+                          type: 'string',
+                          errorMessage: {
+                            type: 'Event "shortcut" should be a string.',
+                          },
+                        },
+                        {
+                          type: 'array',
+                          items: { type: 'string' },
+                          errorMessage: {
+                            type: 'Event "shortcut" should be a string or array of strings.',
+                          },
+                        },
+                      ],
+                    },
                   },
                 },
               ],
@@ -431,6 +886,31 @@ export default {
           },
           errorMessage: {
             type: 'Block "events" should be an object.',
+          },
+        },
+        slots: {
+          type: 'object',
+          patternProperties: {
+            '^.*$': {
+              type: 'object',
+              properties: {
+                blocks: {
+                  type: 'array',
+                  items: {
+                    $ref: '#/definitions/block',
+                  },
+                  errorMessage: {
+                    type: 'Block "slots.{slotKey}.blocks" should be an array.',
+                  },
+                },
+              },
+              errorMessage: {
+                type: 'Block "slots.{slotKey}" should be an object.',
+              },
+            },
+          },
+          errorMessage: {
+            type: 'Block "slots" should be an object.',
           },
         },
         areas: {
@@ -467,11 +947,104 @@ export default {
         },
       },
     },
+    endpoint: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'type'],
+      properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
+        id: {
+          type: 'string',
+          errorMessage: {
+            type: 'Api endpoint "id" should be a string.',
+          },
+        },
+        type: {
+          type: 'string',
+          errorMessage: {
+            type: 'Api endpoint "type" should be a string.',
+          },
+        },
+        description: {
+          type: 'string',
+          errorMessage: {
+            type: 'Api endpoint "description" should be a string.',
+          },
+        },
+        payloadSchema: {
+          type: 'object',
+          errorMessage: {
+            type: 'Api endpoint "payloadSchema" should be an object.',
+          },
+        },
+        routine: {
+          anyOf: [
+            {
+              type: 'array',
+              errorMessage: {
+                type: 'Api endpoint "routine" should be an array or object.',
+              },
+            },
+            {
+              type: 'object',
+              errorMessage: {
+                type: 'Api endpoint "routine" should be an array or object.',
+              },
+            },
+          ],
+        },
+      },
+    },
     connection: {
       type: 'object',
       additionalProperties: false,
       required: ['id', 'type'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -504,6 +1077,29 @@ export default {
       additionalProperties: false,
       required: ['id'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -538,6 +1134,29 @@ export default {
       additionalProperties: false,
       required: ['id', 'type'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -548,6 +1167,16 @@ export default {
           type: 'string',
           errorMessage: {
             type: 'MenuGroup "type" should be a string.',
+          },
+        },
+        style: {
+          errorMessage: {
+            type: 'MenuGroup "style" should be an object, string, or array.',
+          },
+        },
+        class: {
+          errorMessage: {
+            type: 'MenuGroup "class" should be a string, array, or object.',
           },
         },
         properties: {
@@ -574,8 +1203,76 @@ export default {
         },
       },
     },
+    menuDivider: {
+      type: 'object',
+      additionalProperties: false,
+      required: ['id', 'type'],
+      properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
+        id: {
+          type: 'string',
+          errorMessage: {
+            type: 'MenuDivider "id" should be a string.',
+          },
+        },
+        type: {
+          type: 'string',
+          errorMessage: {
+            type: 'MenuDivider "type" should be a string.',
+          },
+        },
+        style: {
+          errorMessage: {
+            type: 'MenuDivider "style" should be an object, string, or array.',
+          },
+        },
+        class: {
+          errorMessage: {
+            type: 'MenuDivider "class" should be a string, array, or object.',
+          },
+        },
+        properties: {
+          type: 'object',
+          errorMessage: {
+            type: 'MenuDivider "properties" should be an object.',
+          },
+        },
+      },
+      errorMessage: {
+        type: 'MenuDivider should be an object.',
+        required: {
+          id: 'MenuDivider should have required property "id".',
+          type: 'MenuDivider should have required property "type".',
+        },
+      },
+    },
     menuItem: {
       anyOf: [
+        {
+          $ref: '#/definitions/menuDivider',
+        },
         {
           $ref: '#/definitions/menuGroup',
         },
@@ -589,6 +1286,29 @@ export default {
       additionalProperties: false,
       required: ['id', 'type'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -625,6 +1345,16 @@ export default {
             type: 'MenuLink "input" should be an object.',
           },
         },
+        style: {
+          errorMessage: {
+            type: 'MenuLink "style" should be an object, string, or array.',
+          },
+        },
+        class: {
+          errorMessage: {
+            type: 'MenuLink "class" should be a string, array, or object.',
+          },
+        },
         properties: {
           type: 'object',
           errorMessage: {
@@ -645,6 +1375,29 @@ export default {
       additionalProperties: false,
       required: ['name', 'version'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         name: {
           type: 'string',
           errorMessage: {
@@ -677,6 +1430,29 @@ export default {
       additionalProperties: false,
       required: ['id', 'type', 'connectionId'],
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         id: {
           type: 'string',
           errorMessage: {
@@ -721,6 +1497,29 @@ export default {
   additionalProperties: false,
   required: ['lowdefy'],
   properties: {
+    '~ignoreBuildChecks': {
+      oneOf: [
+        { const: true },
+        {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: [
+              'state-refs',
+              'payload-refs',
+              'step-refs',
+              'link-refs',
+              'request-refs',
+              'connection-refs',
+              'types',
+              'schema',
+            ],
+          },
+        },
+      ],
+    },
+    '~r': {},
+    '~l': {},
     name: {
       type: 'string',
       errorMessage: {
@@ -745,6 +1544,21 @@ export default {
         type: 'App "version" should be a string.',
       },
     },
+    slug: {
+      type: 'string',
+      pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$',
+      errorMessage: {
+        type: 'App "slug" should be a string.',
+        pattern:
+          'App "slug" must be kebab-case: lowercase letters and digits, hyphen-separated, starting with a letter, no leading/trailing/consecutive hyphens, no underscores.',
+      },
+    },
+    description: {
+      type: 'string',
+      errorMessage: {
+        type: 'App "description" should be a string.',
+      },
+    },
     app: {
       $ref: '#/definitions/app',
     },
@@ -764,6 +1578,29 @@ export default {
       },
       additionalProperties: false,
       properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
         basePath: {
           type: 'string',
           description: 'App base path to apply to all routes. Base path must start with "/".',
@@ -779,6 +1616,81 @@ export default {
             type: 'App "config.homePageId" should be a string.',
           },
         },
+        i18n: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['defaultLocale', 'locales'],
+          properties: {
+            '~k': {},
+            '~r': {},
+            '~l': {},
+            defaultLocale: {
+              type: 'string',
+              description: 'BCP 47 locale code used when no user preference or browser match is available.',
+            },
+            locales: {
+              type: 'array',
+              minItems: 1,
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['code'],
+                properties: {
+                  '~k': {},
+                  '~r': {},
+                  '~l': {},
+                  code: {
+                    type: 'string',
+                    description: 'BCP 47 locale code (e.g. "en-US", "de-DE").',
+                  },
+                  label: {
+                    type: 'string',
+                    description: 'Human-readable label for language pickers.',
+                  },
+                  antd: {
+                    type: 'string',
+                    description: 'Ant Design locale module name (e.g. "en_US"). Loaded from antd/locale/{name}.',
+                  },
+                  dayjs: {
+                    type: 'string',
+                    description: 'Dayjs locale id (e.g. "en", "zh-cn").',
+                  },
+                },
+              },
+            },
+            messages: {
+              type: 'object',
+              description: 'Translation messages keyed by locale code. Each locale maps to an object of { key: ICU MessageFormat string }.',
+              additionalProperties: {
+                type: 'object',
+              },
+            },
+          },
+          errorMessage: {
+            type: 'App "config.i18n" should be an object.',
+            required: {
+              defaultLocale: 'App "config.i18n" requires "defaultLocale".',
+              locales: 'App "config.i18n" requires a "locales" array.',
+            },
+          },
+        },
+      },
+    },
+    theme: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        antd: { type: 'object' },
+        tailwind: { type: 'object' },
+        darkMode: {
+          type: 'string',
+          enum: ['system', 'light', 'dark'],
+          description:
+            'Dark mode behavior. "system" follows OS preference (default), "light" forces light mode, "dark" forces dark mode.',
+        },
+      },
+      errorMessage: {
+        type: 'App "theme" should be an object.',
       },
     },
     plugins: {
@@ -796,6 +1708,15 @@ export default {
         type: 'App "global" should be an object.',
       },
     },
+    agents: {
+      type: 'array',
+      items: {
+        $ref: '#/definitions/agent',
+      },
+      errorMessage: {
+        type: 'App "agents" should be an array.',
+      },
+    },
     connections: {
       type: 'array',
       items: {
@@ -803,6 +1724,15 @@ export default {
       },
       errorMessage: {
         type: 'App "connections" should be an array.',
+      },
+    },
+    api: {
+      type: 'array',
+      items: {
+        $ref: '#/definitions/endpoint',
+      },
+      errorMessage: {
+        type: 'App "api" should be an array.',
       },
     },
     menus: {
@@ -821,6 +1751,180 @@ export default {
       },
       errorMessage: {
         type: 'App "pages" should be an array.',
+      },
+    },
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'source'],
+        properties: {
+          '~r': {},
+          '~l': {},
+          id: {
+            type: 'string',
+            errorMessage: {
+              type: 'Module "id" should be a string.',
+            },
+          },
+          source: {
+            type: 'string',
+            errorMessage: {
+              type: 'Module "source" should be a string.',
+            },
+          },
+          vars: {
+            type: 'object',
+            errorMessage: {
+              type: 'Module "vars" should be an object.',
+            },
+          },
+          connections: {
+            type: 'object',
+            errorMessage: {
+              type: 'Module "connections" should be an object.',
+            },
+          },
+          dependencies: {
+            type: 'object',
+            additionalProperties: { type: 'string' },
+            errorMessage: {
+              type: 'Module "dependencies" should be an object with string values.',
+            },
+          },
+        },
+        additionalProperties: false,
+        errorMessage: {
+          type: 'Module should be an object.',
+          required: {
+            id: 'Module should have required property "id".',
+            source: 'Module should have required property "source".',
+          },
+        },
+      },
+      errorMessage: {
+        type: 'App "modules" should be an array.',
+      },
+    },
+    logger: {
+      type: 'object',
+      additionalProperties: false,
+      errorMessage: {
+        type: 'App "logger" should be an object.',
+      },
+      properties: {
+        '~ignoreBuildChecks': {
+          oneOf: [
+            { const: true },
+            {
+              type: 'array',
+              items: {
+                type: 'string',
+                enum: [
+                  'state-refs',
+                  'payload-refs',
+                  'step-refs',
+                  'link-refs',
+                  'request-refs',
+                  'connection-refs',
+                  'types',
+                  'schema',
+                ],
+              },
+            },
+          ],
+        },
+        '~r': {},
+        '~l': {},
+        sentry: {
+          type: 'object',
+          additionalProperties: false,
+          errorMessage: {
+            type: 'App "logger.sentry" should be an object.',
+          },
+          properties: {
+            '~ignoreBuildChecks': {
+              oneOf: [
+                { const: true },
+                {
+                  type: 'array',
+                  items: {
+                    type: 'string',
+                    enum: [
+                      'state-refs',
+                      'payload-refs',
+                      'step-refs',
+                      'link-refs',
+                      'request-refs',
+                      'connection-refs',
+                      'types',
+                      'schema',
+                    ],
+                  },
+                },
+              ],
+            },
+            '~r': {},
+            '~l': {},
+            client: {
+              type: 'boolean',
+              errorMessage: {
+                type: 'App "logger.sentry.client" should be a boolean.',
+              },
+            },
+            server: {
+              type: 'boolean',
+              errorMessage: {
+                type: 'App "logger.sentry.server" should be a boolean.',
+              },
+            },
+            tracesSampleRate: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              errorMessage: {
+                type: 'App "logger.sentry.tracesSampleRate" should be a number between 0 and 1.',
+              },
+            },
+            replaysSessionSampleRate: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              errorMessage: {
+                type: 'App "logger.sentry.replaysSessionSampleRate" should be a number between 0 and 1.',
+              },
+            },
+            replaysOnErrorSampleRate: {
+              type: 'number',
+              minimum: 0,
+              maximum: 1,
+              errorMessage: {
+                type: 'App "logger.sentry.replaysOnErrorSampleRate" should be a number between 0 and 1.',
+              },
+            },
+            feedback: {
+              type: 'boolean',
+              errorMessage: {
+                type: 'App "logger.sentry.feedback" should be a boolean.',
+              },
+            },
+            environment: {
+              type: 'string',
+              errorMessage: {
+                type: 'App "logger.sentry.environment" should be a string.',
+              },
+            },
+            userFields: {
+              type: 'array',
+              items: {
+                type: 'string',
+              },
+              errorMessage: {
+                type: 'App "logger.sentry.userFields" should be an array of strings.',
+              },
+            },
+          },
+        },
       },
     },
   },

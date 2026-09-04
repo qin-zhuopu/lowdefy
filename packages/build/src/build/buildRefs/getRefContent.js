@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,7 +14,11 @@
   limitations under the License.
 */
 
+import { type } from '@lowdefy/helpers';
+import { getFileExtension } from '@lowdefy/node-utils';
+
 import getConfigFile from './getConfigFile.js';
+import getUserJavascriptFunction from './getUserJavascriptFunction.js';
 import parseRefContent from './parseRefContent.js';
 import runRefResolver from './runRefResolver.js';
 
@@ -24,6 +28,8 @@ async function getRefContent({ context, refDef, referencedFrom }) {
     content = await getConfigFile({ context, refDef, referencedFrom });
   } else if (refDef.resolver || context.refResolver) {
     content = await runRefResolver({ context, refDef, referencedFrom });
+  } else if (type.isString(refDef.path) && getFileExtension(refDef.path) === 'js') {
+    return getUserJavascriptFunction({ context, filePath: refDef.path });
   } else {
     content = await getConfigFile({ context, refDef, referencedFrom });
   }

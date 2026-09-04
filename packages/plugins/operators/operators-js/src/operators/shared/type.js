@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,21 +14,27 @@
   limitations under the License.
 */
 
-import { get, type } from '@lowdefy/helpers';
+import { ReservedKeyError, get, type } from '@lowdefy/helpers';
 
 function _type({ location, params, state }) {
   const typeName = type.isObject(params) ? params.type : params;
   if (!type.isString(typeName)) {
-    throw new Error(
-      `Operator Error: _type.type must be a string. Received: ${JSON.stringify(
-        params
-      )} at ${location}.`
-    );
+    throw new Error(`_type.type must be a string.`);
   }
 
-  const on = Object.prototype.hasOwnProperty.call(params, 'on')
-    ? params.on
-    : get(state, get(params, 'key', { default: location }));
+  let on;
+  if (Object.prototype.hasOwnProperty.call(params, 'on')) {
+    on = params.on;
+  } else {
+    try {
+      on = get(state, get(params, 'key', { default: location }));
+    } catch (error) {
+      // A runtime read: the key comes from app data or an author keypath evaluated at render time,
+      // and there is no config location to attach in the browser. The reserved rule's job — refusing
+      // the read — is already done, so degrade to the miss value rather than crashing the page.
+      if (!(error instanceof ReservedKeyError)) throw error;
+    }
+  }
 
   switch (typeName) {
     case 'string':
@@ -54,12 +60,10 @@ function _type({ location, params, state }) {
     case 'primitive':
       return type.isPrimitive(on);
     default:
-      throw new Error(
-        `Operator Error: "${typeName}" is not a valid _type test. Received: ${JSON.stringify(
-          params
-        )} at ${location}.`
-      );
+      throw new Error(`"${typeName}" is not a valid _type test.`);
   }
 }
+
+_type.dynamic = true;
 
 export default _type;

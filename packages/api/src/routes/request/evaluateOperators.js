@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,36 +14,26 @@
   limitations under the License.
 */
 
-import { ServerParser } from '@lowdefy/operators';
-
-import { RequestError } from '../../context/errors.js';
-
 function evaluateOperators(
-  { jsMap, operators, secrets, session },
-  { connectionConfig, payload, requestConfig }
+  { evaluateOperators },
+  { connectionConfig, items, payload, requestConfig, state, steps }
 ) {
-  const operatorsParser = new ServerParser({
-    jsMap,
-    operators,
-    payload,
-    secrets,
-    user: session?.user,
-  });
-  const { output: connectionProperties, errors: connectionErrors } = operatorsParser.parse({
+  const connectionProperties = evaluateOperators({
     input: connectionConfig.properties || {},
     location: connectionConfig.connectionId,
+    payload,
+    state,
+    steps,
   });
-  if (connectionErrors.length > 0) {
-    throw new RequestError(connectionErrors[0]);
-  }
 
-  const { output: requestProperties, errors: requestErrors } = operatorsParser.parse({
+  const requestProperties = evaluateOperators({
     input: requestConfig.properties || {},
-    location: requestConfig.requestId,
+    items,
+    location: requestConfig.stepId ?? requestConfig.requestId,
+    payload,
+    state,
+    steps,
   });
-  if (requestErrors.length > 0) {
-    throw new RequestError(requestErrors[0]);
-  }
 
   return {
     connectionProperties,

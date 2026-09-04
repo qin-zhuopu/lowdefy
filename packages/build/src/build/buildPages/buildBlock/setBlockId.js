@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,8 +14,16 @@
   limitations under the License.
 */
 
+import { ConfigError } from '@lowdefy/errors';
+
 function setBlockId(block, { pageId, blockIdCounter }) {
   block.blockId = block.id;
+  if (block.blockId === pageId && blockIdCounter.getCount(block.blockId) > 0) {
+    throw new ConfigError(
+      `Block id "${block.blockId}" on page "${pageId}" collides with the page id. A block cannot have the same id as its page.`,
+      { configKey: block['~k'] }
+    );
+  }
   block.id = `block:${pageId}:${block.blockId}:${blockIdCounter.getCount(block.blockId)}`;
   blockIdCounter.increment(block.blockId);
 }

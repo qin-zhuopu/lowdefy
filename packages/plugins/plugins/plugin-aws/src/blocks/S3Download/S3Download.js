@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@
 
 import React, { useEffect } from 'react';
 import { Upload } from 'antd';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+
+import withTheme from '../withTheme.js';
 
 const downloadFile = async ({ file, methods }) => {
   const s3DownloadPolicy = await methods.triggerEvent({
@@ -26,7 +28,7 @@ const downloadFile = async ({ file, methods }) => {
   window.open(s3DownloadPolicy?.responses?.__getS3DownloadPolicy?.response?.[0]);
 };
 
-const S3Download = ({ blockId, methods, properties }) => {
+const S3Download = ({ blockId, classNames = {}, methods, properties, styles = {} }) => {
   useEffect(() => {
     methods.registerEvent({
       name: '__getS3DownloadPolicy',
@@ -39,23 +41,24 @@ const S3Download = ({ blockId, methods, properties }) => {
       ],
     });
   }, []);
+  const showRemoveIcon = properties.showRemoveIcon ?? false;
   return (
     <Upload
       id={blockId}
-      className={methods.makeCssClass([properties.style])}
+      className={classNames.element}
+      style={styles.element}
       fileList={properties.fileList ?? []}
       onPreview={async (file) => await downloadFile({ file, methods })}
-      showUploadList={{ showRemoveIcon: false, showDownloadIcon: true }}
       onDownload={async (file) => await downloadFile({ file, methods })}
+      onRemove={(file) => {
+        methods.triggerEvent({ name: 'onRemove', event: { file } });
+        // Controlled fileList: the YAML handler decides whether to update state.
+        // Return false so antd doesn't fire onChange with a removed-file list.
+        return false;
+      }}
+      showUploadList={{ showDownloadIcon: true, showRemoveIcon }}
     />
   );
 };
 
-S3Download.defaultProps = blockDefaultProps;
-S3Download.meta = {
-  category: 'display',
-  icons: [],
-  styles: ['blocks/S3Download/style.less'],
-};
-
-export default S3Download;
+export default withBlockDefaults(withTheme('Upload', S3Download));

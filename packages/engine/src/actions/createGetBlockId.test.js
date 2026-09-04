@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ test('getBlockId no params', async () => {
     lowdefy,
     pageConfig,
   });
-  const button = context._internal.RootBlocks.map['button'];
+  const button = context._internal.RootSlots.map['button'];
   const res = await button.triggerEvent({ name: 'onClick' });
   expect(res).toEqual({
     blockId: 'button',

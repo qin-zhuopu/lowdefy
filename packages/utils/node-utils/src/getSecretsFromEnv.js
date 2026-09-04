@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,12 +14,22 @@
   limitations under the License.
 */
 
+import { isReserved, setKey } from '@lowdefy/helpers';
+
 function getSecretsFromEnv() {
   const secrets = {};
 
   Object.keys(process.env).forEach((key) => {
     if (key.startsWith('LOWDEFY_SECRET_')) {
-      secrets[key.replace('LOWDEFY_SECRET_', '')] = process.env[key];
+      const name = key.replace('LOWDEFY_SECRET_', '');
+      // Fail at boot rather than at first _secret read: the reserved name is
+      // unreadable through get/getKey, so the secret would never resolve.
+      if (isReserved(name)) {
+        throw new Error(
+          `Environment variable "${key}" names a reserved secret "${name}". Rename the secret.`
+        );
+      }
+      setKey(secrets, name, process.env[key]);
     }
   });
   Object.freeze(secrets);

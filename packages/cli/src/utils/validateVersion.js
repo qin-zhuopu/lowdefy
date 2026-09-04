@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,10 +14,22 @@
   limitations under the License.
 */
 
+import fs from 'fs';
+import path from 'path';
 import axios from 'axios';
 import semver from 'semver';
 
-async function validateVersion({ cliVersion, lowdefyVersion, print, requiresLowdefyYaml }) {
+async function validateVersion({
+  cliVersion,
+  lowdefyVersion,
+  logger,
+  requiresLowdefyYaml,
+  configDirectory,
+}) {
+  const ui = logger?.ui ??
+    logger ?? {
+      warn: (message) => console.warn(message),
+    };
   if (!requiresLowdefyYaml) {
     return;
   }
@@ -42,7 +54,7 @@ async function validateVersion({ cliVersion, lowdefyVersion, print, requiresLowd
 ---------------------------------------------------`);
   }
   if (isExperimentalVersion(cliVersion) || isExperimentalVersion(lowdefyVersion)) {
-    print.warn(`
+    ui.warn(`
 ---------------------------------------------------
   You are using an experimental version of Lowdefy.
   Features may change at any time.
@@ -56,7 +68,7 @@ async function validateVersion({ cliVersion, lowdefyVersion, print, requiresLowd
     const latestVersion = packageInfo.data['dist-tags'].latest;
 
     if (cliVersion !== latestVersion) {
-      print.warn(`
+      ui.warn(`
 -------------------------------------------------------------
   You are not using the latest version of the Lowdefy CLI.
   Please update to version ${latestVersion}.
@@ -64,7 +76,7 @@ async function validateVersion({ cliVersion, lowdefyVersion, print, requiresLowd
 -------------------------------------------------------------`);
     }
     if (lowdefyVersion && lowdefyVersion !== latestVersion) {
-      print.warn(`
+      ui.warn(`
 -------------------------------------------------------------
   Your app is not using the latest Lowdefy version, ${lowdefyVersion}.
   Please update your app to version ${latestVersion}.
@@ -73,12 +85,39 @@ async function validateVersion({ cliVersion, lowdefyVersion, print, requiresLowd
 -------------------------------------------------------------`);
     }
   } catch (error) {
-    print.warn('Failed to check for latest Lowdefy version.');
+    ui.warn('Failed to check for latest Lowdefy version.');
+  }
+
+  // Check for pending codemods from an interrupted upgrade
+  if (configDirectory) {
+    try {
+      const upgradeStatePath = path.join(configDirectory, '.lowdefy', 'upgrade-state.json');
+      if (fs.existsSync(upgradeStatePath)) {
+        const state = JSON.parse(fs.readFileSync(upgradeStatePath, 'utf8'));
+        const skipped = state.phases
+          .flatMap((p) => p.codemods)
+          .filter((c) => c.status === 'skipped');
+        if (skipped.length > 0) {
+          ui.warn(`
+-------------------------------------------------------------
+  ${skipped.length} codemod(s) were skipped during upgrade.
+  Run "npx lowdefy upgrade --resume" to complete them.
+-------------------------------------------------------------`);
+        }
+      }
+    } catch {
+      // Ignore errors reading upgrade state
+    }
   }
 }
 
 function isExperimentalVersion(version) {
-  return version.includes('alpha') || version.includes('beta') || version.includes('rc');
+  return (
+    version.includes('alpha') ||
+    version.includes('beta') ||
+    version.includes('rc') ||
+    version.includes('experimental')
+  );
 }
 
 export default validateVersion;

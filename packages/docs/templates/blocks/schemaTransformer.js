@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,9 +15,10 @@
 */
 
 const reviver = (key, value) => {
-  if (key !== 'docs') {
-    return value;
+  if (key === 'docs' || key === '~k' || key === '~r' || key === '~l') {
+    return undefined;
   }
+  return value;
 };
 
 const transformer = (obj) => JSON.parse(JSON.stringify(obj), reviver);

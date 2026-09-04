@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -65,6 +65,15 @@ test('Return an empty object if no secrets', () => {
   };
   const secrets = getSecretsFromEnv();
   expect(secrets).toEqual({});
+});
+
+test('getSecretsFromEnv throws when an env var names a reserved secret', () => {
+  process.env = {
+    LOWDEFY_SECRET___proto__: 'supersecret',
+  };
+  expect(() => getSecretsFromEnv()).toThrow(
+    'Environment variable "LOWDEFY_SECRET___proto__" names a reserved secret "__proto__".'
+  );
 });
 
 test('Secrets are immutable', () => {

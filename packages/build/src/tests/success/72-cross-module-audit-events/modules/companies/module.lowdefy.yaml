@@ -1,0 +1,8 @@
+name: Companies
+
+dependencies:
+  - id: events
+    description: Event logging
+
+pages:
+  - _ref: pages/company-detail.yaml

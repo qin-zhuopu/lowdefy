@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,9 +14,9 @@
   limitations under the License.
 */
 
-import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
-import { get, mergeObjects, type } from '@lowdefy/helpers';
+import React, { useEffect } from 'react';
+import { mergeObjects, type } from '@lowdefy/helpers';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
 import Breadcrumb from '../Breadcrumb/Breadcrumb.js';
 import Content from '../Content/Content.js';
@@ -25,106 +25,58 @@ import Header from '../Header/Header.js';
 import Layout from '../Layout/Layout.js';
 import Menu from '../Menu/Menu.js';
 import MobileMenu from '../MobileMenu/MobileMenu.js';
+import {
+  getDarkMode,
+  renderHeaderActions,
+  registerDarkModeMethod,
+  registerLocaleMethod,
+} from '../headerActions.js';
 
 const PageHeaderMenu = ({
   basePath,
   blockId,
-  components: { Icon, Link },
+  classNames = {},
+  components: { Icon, Link, ShortcutBadge },
   content,
   events,
   menus,
   methods,
   pageId,
   properties,
+  styles = {},
 }) => {
-  const styles = {
-    layout: {
-      minHeight: '100vh',
-    },
-    header: {
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0 46px',
-      xs: { padding: '0 10px' },
-      sm: { padding: '0 15px' },
-      md: { padding: '0 30px' },
-      lg: { padding: '0 46px' },
-    },
-    headerContent: {
-      display: 'flex',
-      flex: '1 1 auto',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-    },
-    logo: {
-      margin: '0px 30px',
-      flex: '0 1 auto',
-      width: 130,
-      xs: { margin: '0 5px', width: 40 },
-      sm: { margin: '0 10px', width: 130 },
-      md: { margin: '0 15px' },
-    },
-    lgMenu: {
-      flex: '1 1 auto',
-      xs: { display: 'none' },
-      sm: { display: 'none' },
-      md: { display: 'none' },
-      lg: { display: 'flex' },
-    },
-    mdMenu: {
-      flex: '0 1 auto',
-      paddingLeft: '1rem',
-      xs: { display: 'flex' },
-      sm: { display: 'flex' },
-      md: { display: 'flex' },
-      lg: { display: 'none' },
-    },
-    desktop: {
-      display: 'none',
-      lg: { display: 'block' },
-    },
-    mobile: {
-      display: 'block',
-      lg: { display: 'none' },
-    },
-    body: {
-      padding: '0 40px 40px 40px',
-      xs: { padding: '0 5px 5px 5px' },
-      sm: { padding: '0 10px 10px 10px' },
-      md: { padding: '0 20px 20px 20px' },
-      lg: { padding: '0 40px 40px 40px' },
-    },
-    breadcrumb: {
-      margin: '16px 0',
-    },
-    noBreadcrumb: {
-      padding: '20px 0',
-      xs: { padding: '5px 0' },
-      sm: { padding: '5px 0' },
-      md: { padding: '10px 0' },
-    },
-  };
+  useEffect(() => {
+    registerDarkModeMethod(methods);
+    registerLocaleMethod(methods);
+  });
+
   return (
     <Layout
       blockId={blockId}
       events={events}
-      properties={{ style: mergeObjects([styles.layout, properties.style]) }}
-      components={{ Icon, Link }}
+      components={{ Icon, Link, ShortcutBadge }}
+      styles={{
+        element: mergeObjects([{ minHeight: '100vh' }, styles.element]),
+      }}
       content={{
         content: () => (
           <>
             <Header
               blockId={`${blockId}_header`}
               events={events}
-              components={{ Icon, Link }}
-              properties={mergeObjects([
-                {
-                  style: styles.header,
-                },
-                properties.header,
-              ])}
+              components={{ Icon, Link, ShortcutBadge }}
+              classNames={{ element: classNames.header }}
+              properties={{}}
+              styles={{
+                element: mergeObjects([
+                  {
+                    background: 'var(--ant-color-bg-container)',
+                    borderBottom: '1px solid var(--ant-color-border)',
+                  },
+                  styles.header,
+                ]),
+              }}
               content={{
-                // TODO: use next/image
                 content: () => (
                   <>
                     <Link home={true}>
@@ -133,28 +85,31 @@ const PageHeaderMenu = ({
                           media={`(min-width:${properties.logo?.breakpoint ?? 577}px)`}
                           srcSet={
                             properties.logo?.src ??
-                            `${basePath}/logo-${properties.header?.theme ?? 'dark'}-theme.png`
+                            `${basePath}/logo-${getDarkMode() ? 'dark' : 'light'}-theme.png`
                           }
                         />
                         <img
                           src={
                             properties.logo?.srcMobile ??
                             properties.logo?.src ??
-                            `${basePath}/logo-square-${
-                              properties.header?.theme ?? 'dark'
-                            }-theme.png`
+                            `${basePath}/logo-square-${getDarkMode() ? 'dark' : 'light'}-theme.png`
                           }
                           alt={properties.logo?.alt ?? 'Lowdefy'}
-                          className={methods.makeCssClass([styles.logo, properties.logo?.style])}
+                          className={
+                            classNames.logo ??
+                            'mx-1.5 sm:mx-2.5 md:mx-4 lg:mx-[30px] shrink w-10 sm:w-[130px]'
+                          }
+                          style={styles.logo}
                         />
                       </picture>
                     </Link>
-                    <div className={methods.makeCssClass(styles.headerContent)}>
-                      <div className={methods.makeCssClass([styles.desktop, styles.lgMenu])}>
+                    <div className="flex flex-auto items-center justify-end">
+                      <div className="hidden lg:flex flex-auto">
                         <Menu
                           blockId={`${blockId}_menu`}
                           basePath={basePath}
-                          components={{ Icon, Link }}
+                          components={{ Icon, Link, ShortcutBadge }}
+                          classNames={{ element: classNames.menu }}
                           events={events}
                           methods={methods}
                           menus={menus}
@@ -163,32 +118,80 @@ const PageHeaderMenu = ({
                             {
                               mode: 'horizontal',
                               collapsed: false,
-                              theme: get(properties, 'header.theme') ?? 'dark',
                             },
                             properties.menu,
                             properties.menuLg,
                           ])}
+                          styles={{
+                            // Size the menu's line box to the header height minus its 1px bottom
+                            // border, so the active item's underline lands exactly on that border
+                            // (antd offsets horizontal items down by 1px expecting the menu's own
+                            // border below them; reserving the border's 1px here makes the underline
+                            // and the header divider coincide as a single line). borderBottom is left
+                            // to the Header so the divider spans the full width, including the logo.
+                            element: mergeObjects([
+                              {
+                                borderBottom: 'none',
+                                lineHeight: 'calc(var(--ant-layout-header-height, 64px) - 1px)',
+                              },
+                              styles.menu,
+                            ]),
+                          }}
+                          rename={{
+                            events: {
+                              onClick: 'onMenuItemClick',
+                              onSelect: 'onMenuItemSelect',
+                              onToggleMenuGroup: 'onToggleMenuGroup',
+                            },
+                          }}
                         />
                       </div>
                       {content.header &&
                         content.header(
                           mergeObjects([
-                            { width: 'auto', flex: '0 1 auto' },
-                            properties.header?.contentStyle,
+                            {
+                              width: 'auto',
+                              flex: '0 1 auto',
+                              alignItems: 'center',
+                              flexWrap: 'nowrap',
+                            },
+                            styles.headerContent,
                           ])
                         )}
-                      <div className={methods.makeCssClass([styles.mobile, styles.mdMenu])}>
-                        <MobileMenu
-                          blockId={`${blockId}_mobile_menu`}
-                          basePath={basePath}
-                          components={{ Icon, Link }}
-                          events={events}
-                          methods={methods}
-                          menus={menus}
-                          pageId={pageId}
-                          properties={mergeObjects([properties.menu, properties.menuMd])}
-                        />
-                      </div>
+                      {renderHeaderActions({
+                        blockId,
+                        classNames,
+                        styles,
+                        properties,
+                        methods,
+                        events,
+                        components: { Icon, Link, ShortcutBadge },
+                        iconsColor: properties.iconsColor,
+                      })}
+                      <MobileMenu
+                        classNames={{
+                          element: classNames.mobileMenu ?? 'flex lg:hidden shrink pl-4',
+                        }}
+                        styles={{ element: styles.mobileMenu }}
+                        blockId={`${blockId}_mobile_menu`}
+                        basePath={basePath}
+                        components={{ Icon, Link, ShortcutBadge }}
+                        events={events}
+                        methods={methods}
+                        menus={menus}
+                        pageId={pageId}
+                        properties={mergeObjects([properties.menu, properties.menuMd])}
+                        rename={{
+                          methods: {
+                            toggleOpen: 'toggleMobileMenuOpen',
+                            setOpen: 'setMobileMenuOpen',
+                          },
+                          events: {
+                            onClose: 'onMobileMenuClose',
+                            onOpen: 'onMobileMenuOpen',
+                          },
+                        }}
+                      />
                     </div>
                   </>
                 ),
@@ -196,9 +199,19 @@ const PageHeaderMenu = ({
             />
             <Content
               blockId={`${blockId}_content`}
-              components={{ Icon, Link }}
+              components={{ Icon, Link, ShortcutBadge }}
+              classNames={{ element: classNames.content }}
               events={events}
-              properties={mergeObjects([{ style: styles.body }, properties.content])}
+              properties={properties.content ?? {}}
+              styles={{
+                element: mergeObjects([
+                  {
+                    padding: '0 40px 40px 40px',
+                    minWidth: 0,
+                  },
+                  styles.content,
+                ]),
+              }}
               content={{
                 content: () => (
                   <>
@@ -206,13 +219,14 @@ const PageHeaderMenu = ({
                       <Breadcrumb
                         blockId={`${blockId}_breadcrumb`}
                         basePath={basePath}
-                        components={{ Icon, Link }}
+                        components={{ Icon, Link, ShortcutBadge }}
+                        classNames={{ element: classNames.breadcrumb }}
                         events={events}
                         methods={methods}
-                        properties={mergeObjects([
-                          { style: styles.breadcrumb },
-                          properties.breadcrumb,
-                        ])}
+                        properties={properties.breadcrumb}
+                        styles={{
+                          element: mergeObjects([{ margin: '16px 0' }, styles.breadcrumb]),
+                        }}
                         rename={{
                           events: {
                             onClick: 'onBreadcrumbClick',
@@ -220,7 +234,7 @@ const PageHeaderMenu = ({
                         }}
                       />
                     ) : (
-                      <div className={methods.makeCssClass(styles.noBreadcrumb)} />
+                      <div className="py-1.5 sm:py-1.5 md:py-2.5 lg:py-5" />
                     )}
                     {content.content && content.content()}
                   </>
@@ -230,9 +244,13 @@ const PageHeaderMenu = ({
             {content.footer && (
               <Footer
                 blockId={`${blockId}_footer`}
-                components={{ Icon, Link }}
+                components={{ Icon, Link, ShortcutBadge }}
+                classNames={{ element: classNames.footer }}
                 events={events}
                 properties={properties.footer}
+                styles={{
+                  element: styles.footer,
+                }}
                 content={{
                   content: () => content.footer(),
                 }}
@@ -245,11 +263,4 @@ const PageHeaderMenu = ({
   );
 };
 
-PageHeaderMenu.defaultProps = blockDefaultProps;
-PageHeaderMenu.meta = {
-  category: 'container',
-  icons: [...MobileMenu.meta.icons],
-  styles: ['blocks/PageHeaderMenu/style.less'],
-};
-
-export default PageHeaderMenu;
+export default withBlockDefaults(PageHeaderMenu);

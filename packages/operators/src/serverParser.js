@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,23 +14,22 @@
   limitations under the License.
 */
 
+import { ConfigError, OperatorError } from '@lowdefy/errors';
 import { serializer, type } from '@lowdefy/helpers';
 
 class ServerParser {
-  constructor({ env, payload, secrets, user, operators, verbose, jsMap }) {
+  constructor({ env, i18n, jsMap, lowdefyApp, operators, secrets, user }) {
     this.env = env;
+    this.i18n = i18n;
     this.jsMap = jsMap;
+    this.lowdefyApp = lowdefyApp;
     this.operators = operators;
-    this.payload = payload;
+    this.parse = this.parse.bind(this);
     this.secrets = secrets;
     this.user = user;
-    this.parse = this.parse.bind(this);
-    this.verbose = verbose;
   }
 
-  // TODO: Look at logging here
-  // TODO: Remove console.error = () => {}; from tests
-  parse({ args, input, location, operatorPrefix = '_' }) {
+  parse({ args, input, items, location, operatorPrefix = '_', payload, state, steps }) {
     if (type.isUndefined(input)) {
       return { output: input, errors: [] };
     }
@@ -43,9 +42,6 @@ class ServerParser {
     const errors = [];
     const reviver = (_, value) => {
       if (!type.isObject(value)) return value;
-      // TODO: pass ~k in errors.
-      // const _k = value['~k'];
-      delete value['~k'];
       if (Object.keys(value).length !== 1) return value;
 
       const key = Object.keys(value)[0];
@@ -53,29 +49,48 @@ class ServerParser {
 
       const [op, methodName] = `_${key.substring(operatorPrefix.length)}`.split('.');
       if (type.isUndefined(this.operators[op])) return value;
+      const configKey = value['~k'];
+      const params = value[key];
       try {
         const res = this.operators[op]({
           args,
           arrayIndices: [],
           env: this.env,
+          i18n: this.i18n,
+          items,
           jsMap: this.jsMap,
           location,
+          lowdefyApp: this.lowdefyApp,
           methodName,
           operatorPrefix,
           operators: this.operators,
-          params: value[key],
+          params,
           parser: this,
-          payload: this.payload,
+          payload,
           runtime: 'node',
           secrets: this.secrets,
+          state,
+          steps,
           user: this.user,
         });
         return res;
       } catch (e) {
-        errors.push(e);
-        if (this.verbose) {
-          console.error(e);
+        if (e instanceof ConfigError) {
+          if (!e.configKey) {
+            e.configKey = configKey;
+          }
+          errors.push(e);
+          return null;
         }
+        const operatorError = new OperatorError(e.message, {
+          cause: e,
+          typeName: op,
+          methodName,
+          received: { [key]: params },
+          location,
+          configKey: e.configKey ?? configKey,
+        });
+        errors.push(operatorError);
         return null;
       }
     };

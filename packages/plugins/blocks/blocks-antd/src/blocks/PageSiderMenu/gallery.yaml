@@ -1,0 +1,516 @@
+# Copyright 2020-2026 Lowdefy, Inc
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- title: Basic PageSiderMenu
+  fullWidth: true
+  blocks:
+    - id: psm_basic
+      type: PageSiderMenu
+      properties:
+        sider:
+          width: 220
+          hideToggleButton: true
+        menu:
+          links:
+            - id: psm_basic_dash
+              type: MenuLink
+              properties:
+                title: Dashboard
+                icon: AiOutlineDashboard
+            - id: psm_basic_orders
+              type: MenuLink
+              properties:
+                title: Orders
+                icon: AiOutlineShoppingCart
+            - id: psm_basic_products
+              type: MenuLink
+              properties:
+                title: Products
+                icon: AiOutlineAppstore
+            - id: psm_basic_settings
+              type: MenuLink
+              properties:
+                title: Settings
+                icon: AiOutlineSetting
+      blocks:
+        - id: psm_basic_title
+          type: Title
+          properties:
+            content: Dashboard
+            level: 3
+        - id: psm_basic_stats
+          type: Box
+          layout:
+            gap: 16
+          blocks:
+            - id: psm_basic_stat_1
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_basic_stat_1_val
+                  type: Statistic
+                  properties:
+                    title: Orders Today
+                    value: 128
+            - id: psm_basic_stat_2
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_basic_stat_2_val
+                  type: Statistic
+                  properties:
+                    title: Revenue
+                    value: 4820
+                    prefix: $
+
+- title: Breadcrumb with Dark Mode Toggle
+  fullWidth: true
+  blocks:
+    - id: psm_light
+      type: PageSiderMenu
+      properties:
+        darkModeToggle: true
+        sider:
+          width: 230
+          hideToggleButton: true
+        breadcrumb:
+          list:
+            - label: Home
+              icon: AiOutlineHome
+            - label: Projects
+            - label: Website Redesign
+        menu:
+          links:
+            - id: psm_light_overview
+              type: MenuLink
+              properties:
+                title: Overview
+                icon: AiOutlineProject
+            - id: psm_light_tasks
+              type: MenuLink
+              properties:
+                title: Tasks
+                icon: AiOutlineCheckSquare
+            - id: psm_light_files
+              type: MenuLink
+              properties:
+                title: Files
+                icon: AiOutlineFile
+            - id: psm_light_team
+              type: MenuLink
+              properties:
+                title: Team
+                icon: AiOutlineTeam
+      blocks:
+        - id: psm_light_title
+          type: Title
+          properties:
+            content: Website Redesign
+            level: 3
+        - id: psm_light_desc
+          type: Paragraph
+          properties:
+            content: Breadcrumb items support both simple strings and objects with label, icon, pageId, and url properties. Toggle dark mode to see the layout adapt automatically.
+        - id: psm_light_alert
+          type: Alert
+          properties:
+            message: 3 tasks due this week
+            type: warning
+            showIcon: true
+
+- title: Menu Groups & Sider Toggle
+  fullWidth: true
+  blocks:
+    - id: psm_groups
+      type: PageSiderMenu
+      properties:
+        sider:
+          width: 240
+          hideToggleButton: false
+        menu:
+          links:
+            - id: psm_grp_dash
+              type: MenuLink
+              properties:
+                title: Dashboard
+                icon: AiOutlineDashboard
+            - id: psm_grp_users_group
+              type: MenuGroup
+              properties:
+                title: User Management
+                icon: AiOutlineTeam
+              links:
+                - id: psm_grp_all_users
+                  type: MenuLink
+                  properties:
+                    title: All Users
+                - id: psm_grp_roles
+                  type: MenuLink
+                  properties:
+                    title: Roles & Permissions
+            - id: psm_grp_content_group
+              type: MenuGroup
+              properties:
+                title: Content
+                icon: AiOutlineEdit
+              links:
+                - id: psm_grp_articles
+                  type: MenuLink
+                  properties:
+                    title: Articles
+                - id: psm_grp_categories
+                  type: MenuLink
+                  properties:
+                    title: Categories
+            - id: psm_grp_settings
+              type: MenuLink
+              properties:
+                title: Settings
+                icon: AiOutlineSetting
+      blocks:
+        - id: psm_grp_title
+          type: Title
+          properties:
+            content: All Users
+            level: 3
+        - id: psm_grp_card
+          type: Card
+          properties:
+            title: User List
+          blocks:
+            - id: psm_grp_user_1
+              type: Box
+              layout:
+                gap: 8
+                align: center
+              style:
+                padding: 8px 0
+                borderBottom: 1px solid var(--ant-color-border)
+              blocks:
+                - id: psm_grp_avatar_1
+                  type: Avatar
+                  layout:
+                    flex: 0 0 auto
+                  properties:
+                    size: small
+                    color: '#fff'
+                    backgroundColor: '#1677ff'
+                    icon: AiOutlineUser
+                - id: psm_grp_name_1
+                  type: Paragraph
+                  layout:
+                    flex: 1 1 0
+                  properties:
+                    content: Jane Cooper
+                    style:
+                      margin: 0
+                - id: psm_grp_tag_1
+                  type: Tag
+                  layout:
+                    flex: 0 0 auto
+                  properties:
+                    title: Admin
+                    color: blue
+            - id: psm_grp_user_2
+              type: Box
+              layout:
+                gap: 8
+                align: center
+              style:
+                padding: 8px 0
+              blocks:
+                - id: psm_grp_avatar_2
+                  type: Avatar
+                  layout:
+                    flex: 0 0 auto
+                  properties:
+                    size: small
+                    color: '#fff'
+                    backgroundColor: '#52c41a'
+                    icon: AiOutlineUser
+                - id: psm_grp_name_2
+                  type: Paragraph
+                  layout:
+                    flex: 1 1 0
+                  properties:
+                    content: Tom Wilson
+                    style:
+                      margin: 0
+                - id: psm_grp_tag_2
+                  type: Tag
+                  layout:
+                    flex: 0 0 auto
+                  properties:
+                    title: Editor
+                    color: green
+
+- title: Profile & Notifications
+  fullWidth: true
+  blocks:
+    - id: psm_profile
+      type: PageSiderMenu
+      properties:
+        darkModeToggle: true
+        sider:
+          width: 220
+          hideToggleButton: true
+        notifications:
+          count: 5
+        profile:
+          avatar:
+            content: JC
+            color: '#1677ff'
+          links:
+            - id: psm_prof_my_profile
+              type: MenuLink
+              properties:
+                title: My Profile
+                icon: AiOutlineUser
+            - id: psm_prof_settings
+              type: MenuLink
+              properties:
+                title: Account Settings
+                icon: AiOutlineSetting
+            - id: psm_prof_divider
+              type: MenuDivider
+            - id: psm_prof_logout
+              type: MenuLink
+              properties:
+                title: Sign Out
+                icon: AiOutlineLogout
+                danger: true
+        menu:
+          links:
+            - id: psm_prof_dash
+              type: MenuLink
+              properties:
+                title: Dashboard
+                icon: AiOutlineDashboard
+            - id: psm_prof_users
+              type: MenuLink
+              properties:
+                title: Users
+                icon: AiOutlineTeam
+            - id: psm_prof_reports
+              type: MenuLink
+              properties:
+                title: Reports
+                icon: AiOutlineBarChart
+      blocks:
+        - id: psm_prof_title
+          type: Title
+          properties:
+            content: Admin Dashboard
+            level: 3
+        - id: psm_prof_stats
+          type: Box
+          layout:
+            gap: 16
+          blocks:
+            - id: psm_prof_stat_1
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_prof_stat_1_val
+                  type: Statistic
+                  properties:
+                    title: Active Users
+                    value: 1284
+            - id: psm_prof_stat_2
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_prof_stat_2_val
+                  type: Statistic
+                  properties:
+                    title: Pending Requests
+                    value: 23
+
+- title: Full Layout with All Slots
+  fullWidth: true
+  blocks:
+    - id: psm_full
+      type: PageSiderMenu
+      properties:
+        darkModeToggle: true
+        sider:
+          width: 240
+          hideToggleButton: true
+        notifications:
+          dot: true
+        profile:
+          avatar:
+            icon: AiOutlineUser
+            color: '#1677ff'
+        breadcrumb:
+          separator: /
+          list:
+            - Admin
+            - Dashboard
+        menu:
+          links:
+            - id: psm_full_dash
+              type: MenuLink
+              properties:
+                title: Dashboard
+                icon: AiOutlineDashboard
+            - id: psm_full_analytics
+              type: MenuLink
+              properties:
+                title: Analytics
+                icon: AiOutlineBarChart
+            - id: psm_full_settings
+              type: MenuLink
+              properties:
+                title: Settings
+                icon: AiOutlineSetting
+      slots:
+        sider:
+          blocks:
+            - id: psm_full_sider_box
+              type: Box
+              style:
+                padding: 12px
+              blocks:
+                - id: psm_full_progress_label
+                  type: Paragraph
+                  properties:
+                    content: Sprint Progress
+                    style:
+                      margin: 0 0 8px 0
+                      fontSize: 12
+                      color: '#999'
+                - id: psm_full_progress
+                  type: Progress
+                  properties:
+                    percent: 68
+                    size: small
+        footer:
+          blocks:
+            - id: psm_full_footer_text
+              type: Paragraph
+              properties:
+                content: Admin Panel v2.4.1
+                style:
+                  textAlign: center
+                  margin: 0
+                  color: '#999'
+                  fontSize: 12
+      blocks:
+        - id: psm_full_title
+          type: Title
+          properties:
+            content: Dashboard Overview
+            level: 3
+        - id: psm_full_stats_row
+          type: Box
+          layout:
+            gap: 16
+          blocks:
+            - id: psm_full_stat_users
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_full_stat_users_val
+                  type: Statistic
+                  properties:
+                    title: Total Users
+                    value: 2847
+                    prefixIcon: AiOutlineUser
+            - id: psm_full_stat_revenue
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_full_stat_revenue_val
+                  type: Statistic
+                  properties:
+                    title: Revenue
+                    value: 58420
+                    prefix: $
+            - id: psm_full_stat_orders
+              type: Card
+              layout:
+                flex: 1 1 0
+              properties:
+                size: small
+              blocks:
+                - id: psm_full_stat_orders_val
+                  type: Statistic
+                  properties:
+                    title: Orders
+                    value: 384
+
+- title: Profile Links from _menu Operator
+  description: Use the _menu operator to populate profile dropdown links from a menu defined in lowdefy.yaml. This keeps profile menus consistent with navigation menus and supports access-controlled filtering.
+  fullWidth: true
+  blocks:
+    - id: psm_menu_op
+      type: PageSiderMenu
+      properties:
+        darkModeToggle: true
+        sider:
+          width: 220
+          hideToggleButton: true
+        notifications:
+          count: 4
+          link:
+            pageId: home
+        profile:
+          avatar:
+            content: JC
+            color: '#6366f1'
+          links:
+            _menu: default
+        menu:
+          links:
+            - id: psm_mo_dash
+              type: MenuLink
+              properties:
+                title: Dashboard
+                icon: AiOutlineDashboard
+            - id: psm_mo_users
+              type: MenuLink
+              properties:
+                title: Users
+                icon: AiOutlineTeam
+      blocks:
+        - id: psm_mo_title
+          type: Title
+          properties:
+            content: Profile from _menu
+            level: 3
+        - id: psm_mo_info
+          type: Alert
+          properties:
+            message: The profile dropdown links are populated using _menu operator, pulling from the menus defined in lowdefy.yaml. Click the avatar to see the dropdown.
+            type: info
+            showIcon: true

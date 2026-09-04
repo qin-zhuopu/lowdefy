@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 */
 
 import buildAuth from './buildAuth.js';
-import testContext from '../../test/testContext.js';
+import testContext from '../../test-utils/testContext.js';
 
 const context = testContext();
 
@@ -30,6 +30,9 @@ test('buildAuth default', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: false,
@@ -54,6 +57,9 @@ test('buildAuth no pages', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: false,
@@ -85,6 +91,9 @@ test('buildAuth all protected, some public', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -122,6 +131,9 @@ test('buildAuth all public, some protected', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -159,6 +171,9 @@ test('buildAuth all public', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -196,6 +211,9 @@ test('buildAuth all protected', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       events: [],
@@ -214,6 +232,48 @@ test('buildAuth all protected', async () => {
       { id: 'c', type: 'Context', auth: { public: false } },
     ],
   });
+});
+
+test('buildAuth 404 page is always public even when all pages are protected', async () => {
+  const components = {
+    auth: {
+      pages: {
+        protected: true,
+        roles: {},
+      },
+    },
+    pages: [
+      { id: 'a', type: 'Context' },
+      { id: '404', type: 'Result' },
+    ],
+  };
+  const res = buildAuth({ components, context });
+  expect(res.pages).toEqual([
+    { id: 'a', type: 'Context', auth: { public: false } },
+    { id: '404', type: 'Result', auth: { public: true } },
+  ]);
+});
+
+test('buildAuth 404 page is always public with explicit public list', async () => {
+  const components = {
+    auth: {
+      pages: {
+        public: ['a'],
+        roles: {},
+      },
+    },
+    pages: [
+      { id: 'a', type: 'Context' },
+      { id: 'b', type: 'Context' },
+      { id: '404', type: 'Result' },
+    ],
+  };
+  const res = buildAuth({ components, context });
+  expect(res.pages).toEqual([
+    { id: 'a', type: 'Context', auth: { public: true } },
+    { id: 'b', type: 'Context', auth: { public: false } },
+    { id: '404', type: 'Result', auth: { public: true } },
+  ]);
 });
 
 test('buildAuth roles', async () => {
@@ -235,6 +295,9 @@ test('buildAuth roles', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -270,7 +333,7 @@ test('buildAuth roles and public pages inconsistency', async () => {
     pages: [{ id: 'page1', type: 'Context' }],
   };
   expect(() => buildAuth({ components, context })).toThrow(
-    'Page "page1" is both protected by roles ["role1"] and public.'
+    'Page "page1" is both protected by roles and public.'
   );
 });
 
@@ -289,6 +352,9 @@ test('buildAuth roles and protected pages array', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -322,6 +388,9 @@ test('buildAuth roles and protected true', async () => {
   const res = buildAuth({ components, context });
   expect(res).toEqual({
     auth: {
+      api: {
+        roles: {},
+      },
       authPages: {},
       callbacks: [],
       configured: true,
@@ -341,92 +410,102 @@ test('buildAuth roles and protected true', async () => {
 });
 
 test('Auth plugins are counted', () => {
-  const components = {
-    auth: {
-      adapter: {
-        id: 'adapter',
-        type: 'Adapter',
-        properties: {
-          x: 1,
+  // NEXTAUTH_SECRET is required when auth.providers is configured (validateAuthConfig.js)
+  const originalSecret = process.env.NEXTAUTH_SECRET;
+  process.env.NEXTAUTH_SECRET = 'test-secret';
+  try {
+    const components = {
+      auth: {
+        adapter: {
+          id: 'adapter',
+          type: 'Adapter',
+          properties: {
+            x: 1,
+          },
         },
+        providers: [
+          {
+            id: 'provider',
+            type: 'Provider',
+            properties: {
+              x: 1,
+            },
+          },
+        ],
+        callbacks: [
+          {
+            id: 'callback',
+            type: 'Callback',
+            properties: {
+              x: 1,
+            },
+          },
+        ],
+        events: [
+          {
+            id: 'event',
+            type: 'Event',
+            properties: {
+              x: 1,
+            },
+          },
+        ],
       },
-      providers: [
-        {
-          id: 'provider',
-          type: 'Provider',
+    };
+    const res = buildAuth({ components, context });
+    expect(res).toEqual({
+      auth: {
+        api: {
+          roles: {},
+        },
+        authPages: {},
+        adapter: {
+          id: 'adapter',
           properties: {
             x: 1,
           },
+          type: 'Adapter',
         },
-      ],
-      callbacks: [
-        {
-          id: 'callback',
-          type: 'Callback',
-          properties: {
-            x: 1,
+        callbacks: [
+          {
+            id: 'callback',
+            properties: {
+              x: 1,
+            },
+            type: 'Callback',
           },
-        },
-      ],
-      events: [
-        {
-          id: 'event',
-          type: 'Event',
-          properties: {
-            x: 1,
+        ],
+        configured: true,
+        events: [
+          {
+            id: 'event',
+            properties: {
+              x: 1,
+            },
+            type: 'Event',
           },
+        ],
+        pages: {
+          roles: {},
         },
-      ],
-    },
-  };
-  const res = buildAuth({ components, context });
-  expect(res).toEqual({
-    auth: {
-      authPages: {},
-      adapter: {
-        id: 'adapter',
-        properties: {
-          x: 1,
-        },
-        type: 'Adapter',
+        providers: [
+          {
+            id: 'provider',
+            properties: {
+              x: 1,
+            },
+            type: 'Provider',
+          },
+        ],
+        session: {},
+        theme: {},
       },
-      callbacks: [
-        {
-          id: 'callback',
-          properties: {
-            x: 1,
-          },
-          type: 'Callback',
-        },
-      ],
-      configured: true,
-      events: [
-        {
-          id: 'event',
-          properties: {
-            x: 1,
-          },
-          type: 'Event',
-        },
-      ],
-      pages: {
-        roles: {},
-      },
-      providers: [
-        {
-          id: 'provider',
-          properties: {
-            x: 1,
-          },
-          type: 'Provider',
-        },
-      ],
-      session: {},
-      theme: {},
-    },
-  });
-  expect(context.typeCounters.auth.adapters.getCounts()).toEqual({ Adapter: 1 });
-  expect(context.typeCounters.auth.providers.getCounts()).toEqual({ Provider: 1 });
-  expect(context.typeCounters.auth.callbacks.getCounts()).toEqual({ Callback: 1 });
-  expect(context.typeCounters.auth.events.getCounts()).toEqual({ Event: 1 });
+    });
+    expect(context.typeCounters.auth.adapters.getCounts()).toEqual({ Adapter: 1 });
+    expect(context.typeCounters.auth.providers.getCounts()).toEqual({ Provider: 1 });
+    expect(context.typeCounters.auth.callbacks.getCounts()).toEqual({ Callback: 1 });
+    expect(context.typeCounters.auth.events.getCounts()).toEqual({ Event: 1 });
+  } finally {
+    process.env.NEXTAUTH_SECRET = originalSecret;
+  }
 });

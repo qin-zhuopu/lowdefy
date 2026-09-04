@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "mode": "prod",
+      "errors": [
+        "lowdefy.auth is not an object"
+      ],
+      "errorContains": [
+        "lowdefy.auth is not an object.",
+        "lowdefy.yaml:11"
+      ]
+    }
+  ]
+}

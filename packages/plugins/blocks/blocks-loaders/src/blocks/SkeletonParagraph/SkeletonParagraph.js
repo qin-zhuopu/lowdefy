@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,25 +15,29 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
 import Skeleton from '../Skeleton/Skeleton.js';
 
-const SkeletonParagraph = ({ properties, methods }) => {
+const SkeletonParagraph = ({ classNames, properties, styles }) => {
   const lines = [...Array(properties.lines ?? 4).keys()];
   return (
-    <div style={{ width: properties.width ?? '100%' }}>
+    <div
+      className={classNames?.element}
+      style={{
+        width: properties.width ?? '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '0.75rem',
+        ...styles?.element,
+      }}
+    >
       {lines.map((key) => (
         <Skeleton
           key={key}
-          methods={methods}
           properties={{
-            ...{
-              height: '1.25rem',
-              width: key === lines.length - 1 && key !== 0 ? '40%' : '100%',
-              style: { marginBottom: '1rem' },
-            },
-            ...(properties.style || {}),
+            height: '0.875rem',
+            width: key === lines.length - 1 && key !== 0 ? '60%' : '100%',
           }}
         />
       ))}
@@ -41,11 +45,4 @@ const SkeletonParagraph = ({ properties, methods }) => {
   );
 };
 
-SkeletonParagraph.defaultProps = blockDefaultProps;
-SkeletonParagraph.meta = {
-  category: 'display',
-  icons: [],
-  styles: ['blocks/SkeletonParagraph/style.less'],
-};
-
-export default SkeletonParagraph;
+export default withBlockDefaults(SkeletonParagraph);

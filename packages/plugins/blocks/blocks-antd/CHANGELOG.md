@@ -1,5 +1,974 @@
 # Change Log
 
+## 5.6.0
+
+### Minor Changes
+
+- 9399e4e: feat(blocks-antd): Add `columns` and `gutter` to `CheckboxSelector` and `RadioSelector`.
+
+  A long list of options flowed across the row and wrapped wherever the labels happened to run out of room, so it could not be read down a column. The only even alternative was `direction: vertical` — one option per line — which does not scale past a handful of options.
+
+  Set `columns` to lay the options out in an even grid instead: `columns: 2` gives two equal-width columns. Use a count that divides 24 evenly (1, 2, 3, 4, 6, 8 or 12), or a responsive breakpoint object such as `{ xs: 1, md: 3 }`. `gutter` sets the spacing between options, as a number or a `[horizontal, vertical]` pair, and defaults to matching the spacing the flowed layout produced.
+
+  `align`, `direction` and `wrap` describe the flowed layout and are ignored while `columns` is set. With `columns` unset, both blocks render exactly as before.
+
+  The `theme.marginXS` description on `CheckboxSelector` is also corrected — it claimed to be the horizontal gap between checkboxes, which was never what that token affected.
+
+### Patch Changes
+
+- 508708d: fix(blocks-antd): Honour `label.hasFeedback: false`.
+
+  The Label rendered the validation status icon (and message) regardless of `hasFeedback`, so an input configured with `label.hasFeedback: false` still showed a detached grey icon after `Validate`. Both the icon and the feedback message are now gated on `hasFeedback`; validation itself and the input's error/warning styling are unchanged.
+
+- 3ead269: fix(helpers): Deep merges replace arrays instead of merging them index-by-index.
+
+  Wherever Lowdefy deep-merges configuration — block property defaults, `AxiosHttp` connection
+  and request config, theme tokens, i18n message catalogs — an array value is now treated as a
+  single value. A later array replaces an earlier one; it no longer merges element-by-element
+  at matching indices.
+
+  This is what most overrides already assumed, and it matches a plain object spread. Two
+  places where the old behaviour was visible:
+
+  - `RatingSlider`'s `CheckboxInput.options` — overriding it previously inherited the default
+    element's `label: 'N/A'`. It no longer does; specify the full option object.
+  - The layout blocks (`PageHeaderMenu`, `PageSiderMenu`, `PageSidebarLayout`, `MobileMenu`) —
+    if you set the same array (`selectedKeys`, `defaultOpenKeys`, `links`) on both `menu` and a
+    breakpoint variant such as `menuLg` or `menuMd`, the breakpoint value now replaces the base
+    value outright rather than overlaying it index-by-index.
+
+  Two smaller semantic changes come with this. A later `undefined` now replaces an earlier value
+  instead of being skipped — `mergeObjects([{ a: 1 }, { a: undefined }])` was `{ a: 1 }` and is now
+  `{ a: undefined }`, so a caller that means "no override" must omit the key rather than set it to
+  `undefined`. And a single-object merge no longer passes its input through: `mergeObjects([x]) === x`
+  was `true` and is now `false`, so memoise at the call site if a stable reference is needed across
+  renders. Both are reachable only from code that calls `mergeObjects` — plugin and connection authors
+  — not from YAML, which has no `undefined`; a config `null` merges as it always did.
+
+  Also fixed: merging no longer mutates its inputs. `AxiosHttp` previously wrote merged request
+  config back into the shared connection config, leaking values such as the HTTP agent between
+  requests.
+
+  `lodash.merge`, the last remaining lodash dependency in Lowdefy, has been removed.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [6785e0e]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/nunjucks@5.6.0
+  - @lowdefy/block-utils@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- 59cae71: fix: Keep long sidebar menus fully reachable.
+
+  Two related sidebar scrolling issues are fixed:
+
+  - When the sidebar is collapsed, hovering a menu group with a long nested list opened a
+    flyout whose top was pushed above the screen, so the first items were cut off and
+    unreachable — most noticeable for groups low down the menu on shorter screens. Flyout
+    menus now stay within the viewport and scroll, so every item is reachable.
+  - When the sidebar is expanded with a menu taller than the screen, the last item could be
+    hidden behind the logo/profile footer with no way to scroll it into view. The menu now
+    scrolls between a fixed toggle and footer, so the last item is always reachable.
+  - @lowdefy/block-utils@5.5.1
+  - @lowdefy/helpers@5.5.1
+  - @lowdefy/nunjucks@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.5.0
+- @lowdefy/helpers@5.5.0
+- @lowdefy/nunjucks@5.5.0
+
+## 5.4.0
+
+### Minor Changes
+
+- c2c3a7f: feat(blocks-antd): Add a data-driven way to populate selectors, with `valueKey` and `primaryKey`.
+
+  Every selector — `Selector`, `MultipleSelector`, `ButtonSelector`, `RadioSelector`,
+  `CheckboxSelector`, `SegmentedSelector` and `ListSelector` — can now be driven two ways:
+
+  - **`options`** (the original way): an array of primitives or `{ label, value }` pairs. Unchanged
+    and fully backward compatible.
+  - **`data` + `html`**: pass raw rows and render each option label with a Nunjucks template, instead
+    of building label/value pairs in your query.
+
+  New properties:
+
+  - `data` — raw rows, an alternative to `options`.
+  - `html` — Nunjucks template for each option label (context: `item`, `index`).
+  - `valueKey` — field stored as the value. With `options` it names the value field (defaults to
+    `value`, so existing apps are unaffected); with `data` it names the field stored on select (omit to
+    store the whole row).
+  - `primaryKey` — field used to match the current value (e.g. set with `SetState`) back to an option
+    for highlighting. Defaults to `valueKey`.
+
+  Selecting an option stores `valueKey`'s value, and setting that value (or array of values for the
+  multi-value selectors) via `SetState` highlights the matching option(s). Object options no longer
+  require a `value` field (relaxed to support `valueKey`). Adds the shared `getSelectorOptions` and
+  `getSelectedIndex` helpers; `getUniqueValues`/`getValueIndex` remain for `PhoneNumberInput`.
+
+  Every selector also gains a **`setData`** method (call it with `CallMethod` from the block's
+  `onMount` event, after a request loads the rows) to supply `data` imperatively. The dataset is held
+  in the block instead of `properties`, so the engine no longer re-parses and re-serializes every row
+  on each update cycle — keeping pages with very large selectors responsive. The selector still falls
+  back to `properties.data`/`properties.options` until `setData` is called.
+
+- 25225ab: feat(blocks-antd): Add `ListSelector` input block.
+
+  Data-driven vertical list that doubles as a single-select input. Each item is rendered into a headerless antd `Card` whose body comes from a Nunjucks template against the row. Clicking a card sets the block value (the whole item, or the `valueKey` field when set) and highlights the selected card with a `colorPrimary` ring that follows the app theme. Clicking the selected card again clears the value (`allowDeselect`, on by default). Set `selectable: false` to turn selection off and render a read-only card list. Use `valueKey` to store a single field (e.g. `id`) as the value, and `primaryKey` (defaults to `valueKey`) to match a `SetState`-controlled value back to a card for highlighting.
+
+  Backed by `react-virtuoso` so thousands of variable-height cards render smoothly with only the visible window in the DOM, and rows are `React.memo`'d via a stable `methodsRef` so unrelated parent re-renders don't bust the cache. Selection state lives in the block value, so the selected card stays correct as rows scroll in and out of the virtual window.
+
+  Properties: `data`, `html` (Nunjucks), `valueKey`, `primaryKey`, `selectable`, `allowDeselect`, `bordered`, `hoverable`, `size`, `gap`, `height`, `overscan`, `noData`, `theme`, and an optional `search` object (`placeholder`, `fields`, `caseSensitive`, `debounce`, `sticky`, `allowClear`, `minLength`, `noResultsText`). Search defaults to matching every field path via `JSON.stringify`; supply `fields: ['user.name', 'email']` to restrict. Filtering preserves the original `index` in the template context and event payloads. Built-in loading skeleton renders when `loading` is truthy. A text-only no-results placeholder appears when the filter matches zero items, and a `noData` placeholder renders in place of the list when the `data` array is empty.
+
+  Events: `onChange` (`{ value, index, item }`, fires on selection change when `selectable` is true), `onClick` (`{ index, item }`), and `onSearch` (`{ value, resultCount }`, fires on debounced query change when `search` is set).
+
+  `@lowdefy/helpers`: renames the built-in i18n message keys `blocks.cardList.search.placeholder` / `blocks.cardList.search.noResults` to `blocks.listSelector.search.*` to match the block, and adds `blocks.listSelector.noData` ("No data").
+
+- 2aaf365: feat(blocks-antd): Rename `TreeSelector` → `TreeInput`, add `TreeSelector` and
+  `TreeMultipleSelector` dropdown blocks, and give all three the data-driven selector model.
+
+  The inline tree block (antd `Tree`) is renamed **`TreeSelector` → `TreeInput`**. **Migration:**
+  update `type: TreeSelector` → `type: TreeInput` in your YAML. `TreeInput` is now driven by the same
+  flat model as the other selectors — `data` + `html` + `valueKey` + `primaryKey` + `parentKey` (or
+  `options`) — and stores a **single** `valueKey` value (previously a root-to-node path array), matched
+  back to a node by value. It also gains a `setData` method. (Nested `children` options are no longer
+  used; build the hierarchy from a flat array via `primaryKey`/`parentKey`.)
+
+  New **`TreeSelector`** (single, `valueType: any`) and **`TreeMultipleSelector`** (multiple,
+  `valueType: array`) wrap antd `TreeSelect` as searchable dropdowns, sharing the same model. Build a
+  flat `data`/`options` array where each row's `parentKey` references the parent row's `primaryKey`;
+  the tree is assembled with `treeDataSimpleMode`. Selecting stores the `valueKey` value; a
+  `SetState`-controlled value highlights the matching node(s). `showSearch`, `treeDefaultExpandAll`;
+  the multiple variant adds `checkable`, `showCheckedStrategy`, `maxTagCount`. Both register a
+  `setData` method (call it from the block's `onMount`) for large trees.
+
+  All three blocks support antd design-token `theme` overrides, and the dropdowns localise their
+  `placeholder` / not-found text via the `blocks.treeSelector.*` / `blocks.treeMultipleSelector.*`
+  i18n message keys.
+
+- 0108f38: feat: First-class i18n / locale support for Lowdefy apps.
+
+  Apps can now declare supported locales and message catalogs under
+  `config.i18n`, switch language at runtime, and translate their own
+  strings with ICU MessageFormat. Ant Design's component strings (date
+  pickers, modal Ok/Cancel, pagination, form validation messages),
+  dayjs date formatting, and the engine's built-in framework strings
+  (loading toasts, validation summaries, popup blocker warnings, error
+  page) all localize automatically once `config.i18n` is set.
+
+  ```yaml
+  config:
+    i18n:
+      defaultLocale: en-US
+      locales:
+        - { code: en-US, label: English, antd: en_US, dayjs: en }
+        - { code: de-DE, label: Deutsch, antd: de_DE, dayjs: de }
+      messages:
+        en-US: { greeting: 'Hello, {name}!' }
+        de-DE: { greeting: 'Hallo, {name}!' }
+  ```
+
+  **New schema** — `config.i18n` with `defaultLocale`, `locales[]`, and
+  `messages`. Validated at build time; only declared locales are bundled
+  (antd and dayjs locale imports are codegen'd, no ~150KB unused). The
+  missing-key fallback is always `en-US`, so plugin and module authors
+  should ship `en-US` translations as a baseline.
+
+  **New operators**
+
+  - [`_t`](/_t) — translate operator with ICU MessageFormat. Resolution
+    order: active locale → fallback locale → built-in framework message
+    → key.
+
+    ```yaml
+    _t:
+      key: cart.items
+      values: { count: { _state: itemCount } }
+    ```
+
+  - [`_locale`](/_locale) — read `active` / `default` / `fallback`
+    (always `'en-US'`) / `supported` locale state. Use with `Selector`
+    to build a language picker.
+
+  **New action** — [`SetLocale`](/SetLocale) sets the user's preferred
+  locale (persisted to `localStorage`). Pass `'auto'` to clear the
+  preference and fall back to the browser language or default.
+
+  **Built-in framework strings.** Engine and client strings (`'Loading'`,
+  `'Success'`, `'This field is required'`, validation summaries, popup
+  blocker, error page) live in a built-in catalog and surface as English
+  by default. Authors override per-locale by adding the same key to
+  `config.i18n.messages`:
+
+  ```yaml
+  messages:
+    de-DE:
+      engine.action.loading: 'Laden'
+      engine.validation.fieldRequired: 'Pflichtfeld'
+  ```
+
+  See the [Internationalization concept page](/i18n) for the full list
+  of overridable keys.
+
+  **Ant Design block cleanup.** `Modal`/`ConfirmModal` `okText`/`cancelText`
+  and date picker placeholders (`DateSelector`, `DateRangeSelector`,
+  `DateTimeSelector`, `MonthSelector`, `WeekSelector`) no longer hardcode
+  English defaults — they fall through to antd's `ConfigProvider locale`,
+  so a German app gets `'OK'` / `'Abbrechen'` / `'Datum auswählen'`
+  without per-block configuration. The antd `ConfigProvider` block
+  itself now accepts a `locale` prop for subtree overrides.
+
+  **Server-side translation.** API requests resolve the user's active
+  locale from the `Accept-Language` header and thread it into the server
+  operator parser, so `_t` works the same in server-side actions and
+  requests as on the client.
+
+  **Translation engine.** A new `translate()` helper in `@lowdefy/helpers`
+  backs both the `_t` operator and the engine/client adapter (installed
+  on `lowdefy._internal.translate`). One source of truth for the lookup
+  chain; no duplication. Adds `intl-messageformat` as a foundational dep.
+
+  **Plugin-author surface.** Action and block plugins receive
+  `methods.translate(key, values)` and `methods.getLocale()` for runtime
+  translation in their JS code. Plugin packages can ship default
+  messages via a `./messages` export — the build merges them into the
+  app's i18n catalog (user app messages > plugin messages > framework
+  builtins > key).
+
+  **DatePicker and NumberInput auto-localization.** Date selector blocks
+  (`DateSelector`, `DateRangeSelector`, `DateTimeSelector`,
+  `MonthSelector`) and `NumberInput` derive their default `format` /
+  `decimalSeparator` from the active locale via `Intl.DateTimeFormat` /
+  `Intl.NumberFormat`. A German user sees `DD.MM.YYYY` and `1234,56`
+  automatically; an en-US user sees `MM/DD/YYYY` and `1234.56`.
+
+- 5f00be7: feat(blocks-antd): Per-item styling and new props for menu items.
+
+  Menu items in `Menu` and `DropdownMenu` now support the same `class` and slot-keyed `style` ergonomics as other Lowdefy blocks, plus the missing antd MenuItem props.
+
+  - **Per-item `class`** (Tailwind / arbitrary CSS) on `MenuLink`, `MenuGroup`, and `MenuDivider`. Flat string/array applies to the item wrapper; objects with dot-prefixed slot keys (`.element`, `.icon`, `.label`, and `.popup` on `MenuGroup` for the floating SubMenu popup) target specific parts.
+  - **Slot-keyed `style`** on the same item types using `.element` / `.icon` / `.label`. Flat objects continue to work as a shorthand for `.element`.
+  - **New item properties:** `properties.disabled` (greys out the item and blocks clicks), `properties.tooltip` (text shown when the menu is collapsed — maps to antd's `title`), and `properties.extra` (free-form right-aligned label on a `MenuLink`, e.g. `beta`, `soon`).
+  - **`shortcut` badge moved to the far right.** The existing `properties.shortcut` already auto-rendered a kbd badge and wired the key handler — the badge is now floated to the far right of the item to match common menu conventions (previously inline next to the title). When `extra` and `shortcut` are both set on the same item, `extra` sits to the left of the shortcut badge.
+  - **`extra` rendering note:** rendered inside the `<Link>` via `float: right` rather than antd's `extra` prop. The antd `extra` prop triggers a `display: inline-flex; width: 100%` layout on `.ant-menu-title-content-with-extra` that collapses Lowdefy-wrapped labels, so we bypass it.
+  - **Unified internals:** `Menu` and `DropdownMenu` now share one item builder, eliminating the prior divergence in icon CSS keys and which props were plumbed.
+
+  Block-level `properties.theme` on `Menu` is unchanged; pair it with `properties.danger: true` on a `MenuLink` to theme danger items via `dangerItem*` tokens. See the updated theming docs.
+
+- 27659ef: feat: per-option `color` on selector options.
+
+  Object options now accept a `color`, applied when that option is selected. It falls back to the block-level color when not set, and overrides it for that option when set.
+
+  - **ButtonSelector** — the selected option uses its own color: `solid` fills the button (with auto-contrast text), `outline` colors the border/text plus a low-opacity tint.
+  - **CheckboxSelector** / **RadioSelector** — each selected box tick / radio dot and its label render in the option's color (multiple checked boxes can each show a different color).
+  - **Selector** — the whole input is colored with the selected option's color. A `variant` of `solid` fills the input (with auto-contrast text); `outlined` colors the border/text. Dropdown options are tinted.
+  - **MultipleSelector** — each selected value's tag/pill renders in the option's color, controlled by `variant`: `solid` → filled tags, `outlined` → outlined tags (hex colors use auto-contrast text, dark-mode safe). An explicit `tag.color` still takes precedence, and per-option tag colors no longer require `renderTags`.
+
+  `Selector` and `MultipleSelector` gain `solid` as a `variant` option (alongside the antd input variants). `CheckboxSelector`/`RadioSelector` have no variant — they only apply the per-option color.
+
+  ```yaml
+  - id: priority
+    type: ButtonSelector
+    properties:
+      variant: outlined
+      options:
+        - { label: Low, value: low, color: '#16a34a' }
+        - { label: Medium, value: medium, color: '#d97706' }
+        - { label: High, value: high, color: '#dc2626' }
+  ```
+
+- 4e189a0: feat: Tabs block now supports per-tab dynamic events.
+
+  Each entry in the Tabs `tabs[]` array can declare an `eventName`. When that tab becomes active, the named event is triggered (with `{ key }` of the now-active tab) in addition to the generic `onChange`. This mirrors the per-button `eventName` pattern used by the AgGrid blocks and lets each tab run its own actions without branching inside `onChange`.
+
+  The Tabs event surface is `onChange` (fires on any tab change → `{ activeKey }`) plus these per-tab events.
+
+  ```yaml
+  - id: settings_tabs
+    type: Tabs
+    properties:
+      tabs:
+        - key: profile
+          title: Profile
+          eventName: onProfileTab
+        - key: billing
+          title: Billing
+          eventName: onBillingTab
+    events:
+      onChange: # fires on any tab change → { activeKey }
+        - id: log_change
+          type: SetState
+          params:
+            activeTab:
+              _event: true
+      onProfileTab: # fires only when the Profile tab is selected → { key }
+        - id: load_profile
+          type: Request
+          params: get_profile
+      onBillingTab:
+        - id: load_billing
+          type: Request
+          params: get_billing
+  ```
+
+- 27659ef: feat: ButtonSelector gains a `variant` (`solid` | `outlined`) property matching the Button block, and `color` now applies consistently across both styles.
+
+  The `buttonStyle` (`solid` | `outline`) property is deprecated in favor of `variant`; it still works as an alias. `color` fixes:
+
+  Previously `color` was applied as a Radio component-level token, so antd did not re-derive the dependent tokens — the selected solid background, hover/active states, and outline border/text kept using the default primary color, and the selected solid button could render low-contrast text on the colored background.
+
+  - `color` is now applied as a global `colorPrimary` token, so the full palette (solid background, hover/active, outline border/text) is re-derived from it. This also means it works correctly under `darkModeToggle` / `darkAlgorithm` — the nested `ConfigProvider` inherits the parent algorithm.
+  - The selected button's text now auto-contrasts (black or white, chosen by the background color's luminance) so it stays readable on any `color`, including light/pastel values.
+  - In `outline` mode the selected item now gets a low-opacity tint of the active color as its background, giving it visual emphasis. The tint also applies with the default primary color when no `color` is set.
+
+- e324c72: Label and input blocks no longer show an unwanted browser tooltip duplicating the label, which previously leaked raw HTML markup on hover when the label title contained HTML.
+
+  Tooltips are now opt-in via a new `tooltip` label property, which shows an icon beside the label with an accessible Ant Design tooltip. It accepts either a string (the tooltip text, supports HTML) or an object to also customize the icon and color:
+
+  ```yaml
+  label:
+    tooltip:
+      title: More information # supports HTML
+      icon: AiOutlineInfoCircle # defaults to AiOutlineQuestionCircle
+      color: '#1677ff'
+  ```
+
+  A new `onTooltipClick` event fires when the tooltip icon is clicked. This applies to the `Label` block and all label-based inputs (ButtonSelector, Selector, CheckboxSelector, RadioSelector, TextInput, etc.).
+
+### Patch Changes
+
+- 0027a41: fix(blocks-antd): Display object-valued selector options correctly.
+
+  Selectors whose value is an object (an option `value`, or a `data` row, that is an object rather than a scalar) now render the selected value again — both when an option is picked and when the value is pre-populated via `SetState` (e.g. an edit form), including when matched by `primaryKey`. Previously the value was stored correctly but no tag/value rendered.
+
+  Selection matching and option de-duplication now compare values by identity — projecting `primaryKey` when set, otherwise the whole value — and ignore build-time location markers, so an object value defined in config matches the same value arriving from state or a request. Scalar-valued selectors are unaffected.
+
+- f8a5d80: fix(blocks-antd): Correct nested `links` placement in Menu meta schemas.
+
+  The Menu and MobileMenu meta schemas declared the third-level `links` array inside the user-facing `properties` field instead of as a sibling of it. The schema shape now matches the runtime, so block-property validation and editor autocomplete report the correct structure for three-level menu configs.
+
+- 60c193c: fix: PageHeaderMenu active menu item underline now sits exactly on the header's bottom border.
+
+  The horizontal menu was vertically centered in the header, so the active item's underline floated half a pixel above the header's bottom divider — two disconnected lines under the selected tab. The menu now reserves the header's 1px bottom border when sizing its line box, so the active underline lands precisely on the divider, forming a single continuous line across the full page width (including the logo) and matching the single-border look of Sider / PageSiderMenu.
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/block-utils@5.4.0
+  - @lowdefy/nunjucks@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- 54d30f7: fix(blocks-antd): Add default header border to PageHeaderMenu.
+
+  PageHeaderMenu now has a default `borderBottom` matching the existing default borders on PageSiderMenu and PageSidebarLayout, for visual consistency across the page menu blocks. The default can still be overridden via `styles.header`.
+
+  - @lowdefy/block-utils@5.3.0
+  - @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 01e249b: feat(blocks-antd): `ControlledList` now fires `onAdd` / `onRemove` events and defaults the remove icon to the antd error color at a standard size.
+
+  **Events.** Both events fire **after** the list mutation completes. The event payload is `{ index, item }`:
+
+  - `onAdd` — `index` is where the new row was inserted (`0` for `addToFront: true`, else `list.length`). `item` is the newly added value (typically `undefined` for an empty row).
+  - `onRemove` — `index` is the removed row's position. `item` is the row value captured before removal, so handlers can reference the deleted data (e.g., `_event: item._id` to delete from a backend).
+
+  ```yaml
+  - id: tags
+    type: ControlledList
+    events:
+      onRemove:
+        - id: notify
+          type: DisplayMessage
+          params:
+            content:
+              _string.concat: ['Removed at index ', { _event: index }]
+    blocks:
+      - id: tags.$.label
+        type: TextInput
+  ```
+
+  **Remove icon styling.** The remove icon now defaults to `var(--ant-color-error)` at `var(--ant-font-size-lg)`, with `--ant-color-error-hover` / `--ant-color-error-active` on hover/press — no more hardcoded hex colors, and the size no longer swings with `properties.size`. Override via `class.removeIcon` / `style.removeIcon` (both slots target the icon wrapper). Existing configs that hardcoded `color: '#ff4d4f'` on `removeItemIcon` can drop it — the default is already danger.
+
+  **`@lowdefy/client`** also now passes the list's current state value to list-type block components via a `value` prop, so any list block can read its own array data.
+
+### Patch Changes
+
+- 6ec2cd9: fix(PageSidebarLayout): Pin the sider to the viewport so the bottom actions stay visible.
+
+  The sider is now `position: sticky` with `height: 100vh`, so the menu, notifications, profile avatar, dark-mode toggle, and logo remain on screen as the page content scrolls. The sticky footer container fades from transparent to the container background so content passing behind it doesn't cut off abruptly.
+
+- fd1604f: feat(blocks-antd): `DropdownButton` now supports the standard Lowdefy event-shortcut schema (`events.<eventName>.shortcut`) for item shortcuts, alongside the existing item-level `shortcut` property.
+
+  When a shortcut is configured via the event, the framework-level shortcut manager binds and fires it — consistent with `Button`. The shortcut badge renders next to the item label in both cases. If both are set on the same item, the event-level shortcut wins. The split-button's main action now also renders a badge when `events.onClick.shortcut` is configured.
+
+  **Event-level (preferred, matches `Button`):**
+
+  ```yaml
+  - id: actions
+    type: DropdownButton
+    properties:
+      items:
+        - title: Undo
+          eventName: onUndo
+    events:
+      onUndo:
+        shortcut: mod+z
+        try:
+          - id: undo
+            type: ...
+  ```
+
+  **Item-level (still supported):**
+
+  ```yaml
+  - id: actions
+    type: DropdownButton
+    properties:
+      items:
+        - title: Undo
+          eventName: onUndo
+          shortcut: mod+z
+    events:
+      onUndo:
+        - id: undo
+          type: ...
+  ```
+
+- cea34ac: fix(PageSidebarLayout): Render notifications, profile, and dark-mode toggle as labeled, left-aligned rows when the sider is expanded.
+
+  When the sider is open, the bottom actions now render as `[icon] [label]` rows that match the visual style of the menu items above (e.g. "Notifications", "Profile", "Light mode"). When the sider is collapsed, the actions remain as a centered icon stack. Two new optional schema fields — `notifications.title` (default `Notifications`) and `profile.title` (default `Profile`) — let consumers customise the expanded labels; consumers can also bind `_user: name` to `profile.title` to show the authenticated user's name.
+
+  The profile dropdown's default `trigger` now depends on whether the sider is expanded: `click` when expanded (the labeled row invites click), `hover` when collapsed (original small-avatar behavior). Consumers passing `profile.trigger` explicitly are unaffected.
+
+  No change to `PageSiderMenu` or `PageHeaderMenu` — their header-bar rendering still uses the icon-only layout and `hover` trigger.
+
+  - @lowdefy/block-utils@5.2.0
+  - @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Minor Changes
+
+- 95388a581: feat(blocks-antd): DataDiff gains `sideBySide`, `timeline`, and `gitDiff` modes, plus depth-aware nested rendering.
+
+  - `mode: sideBySide` — two aligned antd `Descriptions` panels (Before / After) that respond to breakpoints.
+  - `mode: timeline` — antd `Timeline` with one item per change, colour-coded and breadcrumb-labelled for context.
+  - `mode: gitDiff` — unified-diff YAML patch rendering with +/− line markers; for technical users who want to see every line of change. Ignores the structured-rendering props (`labels`, `format`, `maxDepth`) but still honours `hide` / `show`.
+  - list mode now sub-groups array-of-objects changes into per-item sections with their own summary chips, and breadcrumbs deeply-nested row labels (`Order 1 › Customer › Name` instead of just `Name`).
+  - New `maxDepth` property (default `4`) collapses changes deeper than the cap into a single JSON-rendered row at the cap, keeping deep payloads legible.
+
+- 573b90369: feat(blocks-antd): Add `DataDiff` block for rendering user-friendly diffs.
+
+  `DataDiff` compares two objects (`before` / `after`) and renders the differences using antd primitives (`Descriptions`, `Collapse`, `Tag`, `Empty`). v1 ships a polished `list` mode: grouped by top-level key, with `+N` / `−N` / `~N` summary chips per group, icon- and color-coded change rows, and a collapsed-JSON fallback for entirely-new nested objects. All colors come from antd semantic tokens (`colorSuccess`, `colorError`, `colorWarning`) so the block respects dark mode and `theme` overrides automatically.
+
+  Per-path value formatters — `date`, `datetime`, `boolean` (Yes/No tag), `currency` (Intl.NumberFormat), `json` (pretty inside a subtle collapse), `code`, and `enum` (value → `{ label, color }` map) — turn raw field values into something end-users can read. `labels` maps dotted paths to display names; `hide` / `show` accept exact paths, `prefix.*`, or `*.leaf` patterns. Built on `microdiff` (~1 kB, zero deps).
+
+  ```yaml
+  - id: order_audit
+    type: DataDiff
+    properties:
+      before: _state.original
+      after: _state.current
+      labels:
+        status: Order status
+        total: Total
+      format:
+        total: { type: currency, currency: USD }
+        status:
+          type: enum
+          map:
+            pending: { label: Pending, color: warning }
+            paid: { label: Paid, color: success }
+      hide:
+        - 'internal.*'
+  ```
+
+- be367bebd: feat(blocks-antd): Expose `selector` cssKey on Select-based blocks.
+
+  `Selector`, `MultipleSelector`, and `AutoComplete` now expose a `selector` cssKey that targets the inner tag/value container (antd v6's `content` semantic slot, rendered as `.ant-select-content` in the DOM). Use it to cap the tag container height and enable internal scroll on multi-select blocks:
+
+  ```yaml
+  style:
+    .selector:
+      maxHeight: 96px
+      overflowY: auto
+  ```
+
+  Before this change, users had to reach for Tailwind arbitrary variants or global CSS (e.g. `[&_.ant-select-selector]:max-h-24`) to style the inner container, which leaked antd internals into app YAML and was brittle across antd upgrades.
+
+- b1e0c9944: feat(blocks-diff): New package. DataDiff extracted from blocks-antd and split
+  into `DiffList`, `DiffSideBySide`, `DiffTimeline`, and `DiffGit` blocks.
+
+  BREAKING: The `DataDiff` block has been removed from `@lowdefy/blocks-antd`.
+  Migrate to the per-mode blocks in `@lowdefy/blocks-diff`:
+
+  - `mode: list` → `Diff.DiffList`
+  - `mode: sideBySide` → `Diff.DiffSideBySide`
+  - `mode: timeline` → `Diff.DiffTimeline`
+  - `mode: gitDiff` → `Diff.DiffGit`
+
+  The `diff`, `yaml`, `pluralize`, and `microdiff` dependencies have been moved
+  from `@lowdefy/blocks-antd` to `@lowdefy/blocks-diff` along with the block.
+
+- 447f8ce57: feat: Add PageSidebarLayout block
+
+  New full-page layout block with a full-height sidebar, no top-level header, and mobile drawer navigation. The sider spans the entire viewport height with the logo pinned at the bottom.
+
+  **PageSidebarLayout**
+
+  - Full-height collapsible sider with inline menu
+  - Sider collapse state persists in localStorage (configurable key via `siderStorageKey`)
+  - Dark mode via app-level ConfigProvider — all components adapt automatically via CSS variables
+  - `darkModeToggle`, `notifications`, and `profile` properties shown in the sider on desktop and the mobile header on small screens, matching PageHeaderMenu and PageSiderMenu
+  - `theme` property accepts an Ant Design design token object for fine-grained color customization via ConfigProvider
+  - Responsive logo: full logo when sider is expanded, square logo when collapsed, auto-swaps between light and dark variants based on dark mode
+  - 8 content slots: content, footer, header, siderOpen, siderClosed, mobileExtra, mobileDrawerContent, mobileDrawerFooter
+
+  **Drawer**
+
+  - Added `footer` content slot and `styles.footer` passthrough
+
+  **MobileMenu**
+
+  - Added `logo` property for drawer header branding with dark mode-aware logo switching
+  - Added `drawerContent` and `drawerFooter` content slots
+  - Changed category from `display` to `container` to support slot resolution
+
+- 36a2d1bca: feat: Persist PageSiderMenu sider open state to localStorage
+
+  PageSiderMenu now persists its sider collapsed/expanded state across page navigations and reloads, matching PageSidebarLayout behavior.
+
+  - Sider open state reads from and writes to `lf-{siderStorageKey}-open` in localStorage
+  - New `siderStorageKey` property (default `'sider'`) — shares the same key as PageSidebarLayout by default, so the user's preference survives swapping between layouts
+  - New `sider.initialCollapsed` property used as the fallback when no persisted value exists
+  - Gracefully handles SSR and privacy-mode localStorage unavailability
+
+### Patch Changes
+
+- 6c6aab961: fix(blocks-antd): PageSiderMenu state sync, setSiderOpen bug, and menu auto-popup.
+
+  Three related fixes so the sider persists correctly and the inline menu doesn't pop open flyouts on page load.
+
+  - **Persistence on hard-refresh / new tab**: PageSiderMenu now feeds its computed `openSiderState` (read from `localStorage['lf-{siderStorageKey}-open']`) into the inner Sider block as `initialCollapsed`. Previously the Sider re-read the media-query-computed `initialCollapsed` independently and ignored the persisted value, so the sider always started collapsed on desktop regardless of the user's preference.
+  - **`setSiderOpen({ open })` bug**: the action called the Sider's `_toggleSiderOpen` (a no-arg toggle) with an `{ open }` argument that was silently ignored. Fixed to call `_setSiderOpen({ open })` so the sider lands in the requested state. `toggleSiderOpen` now also uses the explicit setter with the computed next value for symmetry.
+  - **Menu auto-popup when sider is collapsed**: the Menu block's `defaultOpenKeys` guard checked `properties.collapsed !== true`, but PageSiderMenu never passes `collapsed` as a prop — antd derives the collapsed state from `SiderContext`. As a result the current page's parent group was added to `defaultOpenKeys`, and antd's Menu auto-popped the flyout for that group on mount. Menu now reads `siderCollapsed` from `Layout._InternalSiderContext` (the same channel antd's own Menu uses) so the group auto-expansion only applies when the sider is expanded.
+  - @lowdefy/block-utils@5.1.0
+  - @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Rename and remove several block properties to match antd v6 API.
+
+  | Block        | Old property            | New property                                 |
+  | ------------ | ----------------------- | -------------------------------------------- |
+  | Modal        | `visible`               | `open`                                       |
+  | Tooltip      | `defaultVisible`        | `defaultOpen`                                |
+  | Tooltip      | event `onVisibleChange` | event `onOpenChange`                         |
+  | Progress     | `gapPosition`           | `gapPlacement`                               |
+  | Carousel     | `dotPosition`           | `dotPlacement`                               |
+  | Collapse     | `expandIconPosition`    | `expandIconPlacement`                        |
+  | Notification | `message`               | `title`                                      |
+  | Progress     | `success` (number)      | `success: { percent, strokeColor }` (object) |
+  | Breadcrumb   | children API            | `items` array API                            |
+
+- 29eb199c7f: Restructure block metadata from component static properties to dedicated `meta.js` files.
+
+  ### Breaking Changes
+
+  - **`schema.js` renamed to `meta.js`**: Block definitions moved from `schema.js` to `meta.js`. The `meta.js` files export `category`, `icons`, `valueType`, `cssKeys`, `events`, and `properties` (JSON Schema).
+  - **`schemas.js` barrel renamed to `metas.js`**: Block packages export `./metas` instead of `./schemas`.
+  - **`.meta` removed from components**: Block components no longer have a `.meta` static property. Metadata is loaded from the `blockMetas.json` build artifact at runtime.
+  - **`blockMetas.json` build artifact**: The build pipeline writes `plugins/blockMetas.json` containing category, valueType, and initValue for each block type.
+  - **`buildBlockSchema(meta)`**: New function in `@lowdefy/block-utils` generates complete JSON Schema from meta objects with operator support and CSS slot key validation.
+
+- f430f02dde: Replace boolean `bordered` property with enum `variant` on 16 input and display blocks.
+
+  **Migration:**
+
+  - `bordered: true` (default) -> `variant: outlined`
+  - `bordered: false` -> `variant: borderless`
+  - New option: `variant: filled`
+
+  Affected blocks: AutoComplete, Card, Collapse, Descriptions, DateSelector, DateRangeSelector, DateTimeSelector, MonthSelector, WeekSelector, MultipleSelector, NumberInput, PasswordInput, PhoneNumberInput, Selector, TextArea, TextInput.
+
+- f430f02dde: Replace Button `type`/`danger` properties with `color`/`variant` to match antd v6 API.
+
+  **Migration:**
+
+  | Old             | New                                |
+  | --------------- | ---------------------------------- |
+  | `type: primary` | `color: primary`, `variant: solid` |
+  | `type: dashed`  | `variant: dashed`                  |
+  | `type: text`    | `variant: text`                    |
+  | `type: link`    | `variant: link`                    |
+  | `danger: true`  | `color: danger`                    |
+
+- f430f02dde: Replace `ColorPicker` with `ColorSelector` using antd's native ColorPicker component. The separate `@lowdefy/blocks-color-selectors` package has been removed — `ColorSelector` is now in `@lowdefy/blocks-antd`.
+- f430f02dde: Remove the Comment block (dropped upstream in Ant Design v6). Use a Card + Flex + Avatar composition instead.
+- 155c0b9724: Replace moment.js with day.js across the monorepo.
+
+  ### Breaking Changes
+
+  - **`_moment` operator removed**: Use `_dayjs` instead. The new `@lowdefy/operators-dayjs` package provides the `_dayjs` operator with the same API patterns.
+  - **`@lowdefy/operators-moment` package removed**: Apps using `_moment` must migrate to `_dayjs`.
+  - **Nunjucks `date` filter**: Now uses day.js internally. Format strings are day.js compatible (mostly identical to moment).
+  - **Date picker blocks**: All date/time picker blocks use day.js instead of moment for value parsing and formatting.
+  - **Google Sheets connection**: Date serialization uses day.js internally.
+  - **`humanizeDuration` thresholds**: The `thresholds` parameter on `_dayjs.humanizeDuration` is silently ignored (day.js does not support it).
+  - **AgGrid cell renderers**: Update `__moment` to `__dayjs` in custom AG Grid cell renderer references.
+  - **Date selector UTC handling**: Antd v6 bundles its own dayjs without the UTC plugin. Date selector blocks wrap antd's dayjs instances with the extended dayjs before calling `.utc()` — this is handled internally and requires no user action.
+
+- f430f02dde: Remove Divider `type` property and align with antd v6 API. `orientation` now controls divider direction (`horizontal`/`vertical`). New `titlePlacement` property (`start`/`center`/`end`) controls where title text sits within the divider.
+
+  **Migration:**
+
+  - `type: vertical` -> `orientation: vertical`
+  - `orientation: left` -> `titlePlacement: start`
+  - `orientation: right` -> `titlePlacement: end`
+  - `orientation: center` -> `titlePlacement: center` (or remove, `center` is the default)
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+- f430f02dde: Migrate all blocks from `defaultProps` to `withBlockDefaults` wrapper for React 19 compatibility.
+
+  ### Breaking Changes
+
+  - **`defaultProps` removed**: React 19 silently ignores `defaultProps` on function components. All ~101 block components now use a `withBlockDefaults` wrapper from `@lowdefy/block-utils`.
+  - **`withBlockDefaults` API**: New export from `@lowdefy/block-utils` that wraps block components with default property injection. Antd blocks use `withTheme` which absorbs defaults; non-antd blocks use the generic wrapper.
+
+- c570982e0f: Remove per-component `header.theme`, `sider.theme`, and `menu.theme` string properties from PageSiderMenu, PageHeaderMenu, Header, and Sider blocks. Dark mode now works automatically via CSS variables from the root ConfigProvider — no manual theme switching needed.
+
+  **Removed properties:**
+
+  | Block          | Removed Property          |
+  | -------------- | ------------------------- |
+  | PageSiderMenu  | `properties.header.theme` |
+  | PageSiderMenu  | `properties.sider.theme`  |
+  | PageSiderMenu  | `properties.menu.theme`   |
+  | PageHeaderMenu | `properties.header.theme` |
+  | PageHeaderMenu | `properties.menu.theme`   |
+  | Header         | `properties.theme`        |
+  | Sider          | `properties.theme`        |
+
+  **Migration:** Simply remove these properties. Dark mode is handled automatically by the global ConfigProvider. Use `darkModeToggle: true` on page blocks or `SetDarkMode` action for user-facing toggle. Use `properties.theme` (design token object) for fine-grained color customization.
+
+  **Also removed:**
+
+  | Block          | Removed Property                 | Replacement                 |
+  | -------------- | -------------------------------- | --------------------------- |
+  | PageSiderMenu  | `properties.header.style`        | `style: { .header }`        |
+  | PageSiderMenu  | `properties.header.contentStyle` | `style: { .headerContent }` |
+  | PageSiderMenu  | `properties.sider.style`         | `style: { .sider }`         |
+  | PageSiderMenu  | `properties.footer.style`        | `style: { .footer }`        |
+  | PageSiderMenu  | `properties.content.style`       | `style: { .content }`       |
+  | PageSiderMenu  | `properties.logo.style`          | `style: { .logo }`          |
+  | PageHeaderMenu | `properties.header.style`        | `style: { .header }`        |
+  | PageHeaderMenu | `properties.header.contentStyle` | `style: { .headerContent }` |
+  | PageHeaderMenu | `properties.footer.style`        | `style: { .footer }`        |
+  | PageHeaderMenu | `properties.content.style`       | `style: { .content }`       |
+  | PageHeaderMenu | `properties.logo.style`          | `style: { .logo }`          |
+
+  **Events removed:**
+
+  | Block          | Removed Event         | Replacement                               |
+  | -------------- | --------------------- | ----------------------------------------- |
+  | PageSiderMenu  | `onNotificationClick` | Use `notifications.link` property instead |
+  | PageSiderMenu  | `onProfileClick`      | Removed                                   |
+  | PageHeaderMenu | `onNotificationClick` | Use `notifications.link` property instead |
+  | PageHeaderMenu | `onProfileClick`      | Removed                                   |
+
+  **Other removals:**
+
+  - `collapsible` and `initialCollapsed` properties removed from PageSiderMenu sider
+  - Horizontal menu border removed from PageHeaderMenu header
+
+  **Added:**
+
+  - `notifications.link` property for notification item navigation
+
+- f430f02dde: Rename `Segmented` block to `SegmentedSelector` to follow the selector naming convention. Now uses the standard selector value flow, supporting complex option values and HTML option labels.
+
+  **Migration:** Replace `type: Segmented` with `type: SegmentedSelector` in your config.
+
+- f430f02dde: Replace the Less/Emotion styling system with unified `style` and `class` properties using `.` prefixed CSS slot keys.
+
+  ### Breaking Changes
+
+  - **Less removed**: `.less` files are no longer supported. All styling uses CSS, CSS Modules, or Tailwind utilities.
+  - **`makeCssClass` removed**: Blocks no longer call `methods.makeCssClass()`. They receive `classNames` and `styles` objects as props, keyed by CSS slot names (`element`, `icon`, `header`, `body`, etc.).
+  - **`mediaToCssObject` removed** from `@lowdefy/block-utils`.
+  - **`style` replaces `styles`**: The `style` (singular) property handles all styling. Using `styles` (plural) throws a `ConfigError`.
+  - **`class` property added**: New `class` property for CSS classes (Tailwind utilities, custom classes). Supports string, array, or object with `.` slot keys.
+  - **`properties.style` moved**: Block-specific `properties.style` maps to `style: { .element }` at build time.
+  - **Inline style props removed**: `headerStyle`, `bodyStyle`, `maskStyle`, `contentWrapperStyle`, `contentStyle`, `labelStyle`, `valueStyle`, `tabBarStyle`, `overlayStyle` are replaced by CSS slot keys (e.g., `style: { .header }`, `style: { .body }`).
+
+  ### CSS Slot Keys
+
+  `.` prefixed keys target specific parts of a block:
+
+  | Key                                | Target                                                  |
+  | ---------------------------------- | ------------------------------------------------------- |
+  | `.block`                           | Layout wrapper (grid column)                            |
+  | `.element`                         | Component root element                                  |
+  | `.header`, `.body`, `.cover`, etc. | Antd semantic sub-elements (declared in `meta.cssKeys`) |
+
+  Flat shorthand (no `.` keys) maps to `.block`:
+
+  ```yaml
+  # These are equivalent:
+  style: { marginTop: 20 }
+  style:
+    .block: { marginTop: 20 }
+  ```
+
+- f430f02dde: Rename Tabs `tabPosition` property to `tabPlacement` to match antd v6 API.
+
+  **Migration:** Replace `tabPosition` with `tabPlacement`. Values `left` and `right` are renamed to `start` and `end` to match antd v6 logical placement (`top`, `start`, `bottom`, `end`).
+
+### Minor Changes
+
+- f430f02dde: Add Avatar.Group support with data-driven avatars and a `+N` overflow indicator via `properties.group` with `maxCount` and `avatars` array.
+- 0fe1bc38dd: Add `darkModeToggle` property to PageHeaderMenu and PageSiderMenu. Set `darkModeToggle: true` to render a built-in sun/moon toggle button in the header that switches between light and dark Ant Design themes. The preference is persisted to localStorage and respects the OS dark mode setting as default. A `toggleDarkMode` method is also registered for programmatic control.
+- 130a569d36: Add keyboard shortcut support for block events.
+
+  Blocks can now define keyboard shortcuts on events using the `shortcut` property in the event long-form object. Shortcuts are platform-aware (`mod+K` maps to Cmd+K on Mac, Ctrl+K on Windows), support sequences (`g i`), and can be arrays for multiple bindings.
+
+  - **Build validation** warns on duplicate shortcuts within a page and conflicts with browser defaults (e.g. `mod+N`)
+  - **ShortcutManager** registers a single global keydown listener via tinykeys with visibility gating and input field suppression
+  - **ShortcutBadge** component renders platform-appropriate key symbols (e.g. `⌘ K`) and is available to all blocks via `components.ShortcutBadge`
+  - **ShortcutBadge in blocks**: Button, Anchor, Tag, and Search blocks display a platform-aware keyboard shortcut badge (e.g. `⌘S` / `Ctrl+S`) next to the title when the event has a `shortcut` defined
+
+- c3b5b45ec5: feat(blocks-antd): Add Search command palette block with MiniSearch.
+
+  New `Search` display block provides a full-text search command palette (Cmd+K / Ctrl+K) using MiniSearch (~6KB) and antd Modal.
+
+  - **Pre-built index support**: Load a static JSON index via `indexUrl` for zero-config search on static sites
+  - **Runtime indexing**: Pass `documents` array with `fields` and `storeFields` for client-side indexing
+  - **Grouped results**: Results auto-grouped by configurable field with section headers
+  - **Keyboard navigation**: Arrow keys, Enter to select, Escape to close
+  - **Term highlighting**: Matched search terms highlighted in results
+  - **Recent searches**: localStorage-backed search history with configurable count
+  - **14 CSS slots**: Full style customization via `styles`/`classNames` (trigger, modal, input, results, groups, highlights)
+  - **Analytics-friendly events**: `onSelect` passes the result item, search `query`, and `resultCount` for click-through tracking; `onSearch` passes the search term and result count on each query change
+
+  ### Docs app integration
+
+  - New search index transformer (`generateSiteAssets.js`) builds a MiniSearch index at build time from page content
+  - Replaces Algolia DocSearch with the self-hosted Search block — removes external CDN dependency
+
+  ### Removed
+
+  - `@lowdefy/blocks-algolia` package has been removed. Use the `Search` block in `@lowdefy/blocks-antd` instead.
+
+- c8f4a41063: Add `theme.darkMode` config with system preference support.
+
+  **System Dark Mode (`theme.darkMode`)**
+
+  - New `theme.darkMode` config key accepts `'system'` (default), `'light'`, or `'dark'`
+  - When set to `'system'`, the app follows the OS dark mode preference and updates live when it changes
+  - When set to `'light'` or `'dark'`, the developer locks the mode — user preferences are stored but not applied
+
+  **SetDarkMode Action**
+
+  - Now accepts string params: `darkMode: 'system' | 'light' | 'dark'`
+  - Without params, cycles through light, dark, and system preferences
+
+  **`_media` Operator**
+
+  - New `_media: darkModePreference` returns the user's preference (`'system'`, `'light'`, or `'dark'`)
+  - `_media: darkMode` continues to return the effective boolean state
+
+  **Dark Mode Rendering**
+
+  - Notification, Message, and ConfirmModal render with correct dark mode colors via `App.useApp()` hooks
+  - Loader blocks (Skeleton, Spinner) use antd design tokens instead of hardcoded colors
+  - 404 page and loading states use theme-aware backgrounds
+  - Mobile menu drawer background matches the active theme
+
+- f430f02dde: Add 13 new blocks leveraging Ant Design v6 components: Calendar, FloatButton, Tour, QRCode, Watermark, ColorSelector, Flex, Splitter, ConfigProvider, Masonry, MasonryList, DropdownMenu, and DropdownButton.
+
+  **Calendar** — Full-size and compact date calendar with selection events (onChange, onSelect, onPanelChange), disabled dates, valid range, and date cell badge data.
+
+  **DropdownMenu** — Container block that wraps any content with a dropdown menu triggered by click, hover, or right-click (context menu). Supports MenuLink, MenuGroup, and MenuDivider item types with icons, keyboard shortcuts, danger/disabled states, and nested groups.
+
+  **DropdownButton** — Display block rendering a button with an attached dropdown menu. Supports split button mode (separate click and dropdown actions), all antd button variants/colors, and custom color theming via ConfigProvider.
+
+### Patch Changes
+
+- 43528a8b9: fix(blocks-antd): Format PhoneNumberInput phone_number value.
+
+  PhoneNumberInput now strips leading zeros and non-digit characters from user input when building the `phone_number` value. Typing `0821234567` with +27 selected now produces `+27821234567` instead of `+270821234567`. Empty input produces an empty string instead of just the dial code.
+
+- c1b5ddb33a: Add `color` and `iconsColor` properties to Header block.
+
+  Set `color` to change the header background color (defaults to `--ant-color-bg-container`). Set `iconsColor` to control the color of notification, profile, and dark mode toggle icons — useful when using a dark background color. The `iconsColor` property is also available on PageHeaderMenu and PageSiderMenu.
+
+- f430f02dde: Add ErrorBoundary to portal-based blocks (Message, Notification, ConfirmModal, Modal, Drawer, Tour) to prevent uncaught errors in portals from crashing the entire app.
+- f430f02dde: Add validation error borders to input blocks. TextArea and AutoComplete now pass `status` for antd validation styling. Group-based inputs (Radio, Checkbox, ButtonSelector, SegmentedSelector) show CSS-based error/warning borders via the Label wrapper.
+- Updated dependencies [29eb199c7f]
+- Updated dependencies [130a569d36]
+- Updated dependencies [905d5d406]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/block-utils@5.0.0
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.3
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- 18d1c3bfa: feat(blocks-antd): Add do.select() and do.fill() to date picker e2e helpers.
+
+  All five date picker e2e helpers (DateSelector, DateTimeSelector,
+  DateRangeSelector, MonthSelector, WeekSelector) now support
+  `do.select()` for calendar UI interaction and `do.fill()` for
+  typing dates directly. DateTimeSelector also supports time
+  selection via the time panel.
+
+  - @lowdefy/block-utils@4.7.1
+  - @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- 811f80760: fix(e2e-utils): Escape dotted block IDs in e2e CSS selectors.
+
+  Block IDs containing dots (e.g., `form.field.name`) now work correctly in e2e test locators. Added `escapeId()` utility to `@lowdefy/e2e-utils` that escapes CSS special characters, and updated all block e2e helpers and test specs to use it.
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/block-utils@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- fb7910f62: test(blocks): Add comprehensive Playwright e2e tests for blocks-antd and blocks-basic
+
+  **@lowdefy/block-dev-e2e** (new package)
+
+  - Shared test utilities for block e2e testing in the monorepo
+  - `createPlaywrightConfig` for consistent Playwright setup
+  - `getBlock` helper using framework wrapper ID pattern (`#bl-{blockId}`)
+  - `navigateToTestPage` for test page navigation
+
+  **@lowdefy/blocks-antd**
+
+  - ~700 e2e tests covering all 63 blocks
+  - Test coverage for input, display, layout, navigation, and overlay blocks
+  - Block-specific e2e helpers (Button, TextInput, Selector)
+
+  **@lowdefy/blocks-basic**
+
+  - ~40 e2e tests covering core blocks (Box, Span, Anchor, Html, etc.)
+
+- 5e03091ee: Add e2e testing package for Lowdefy apps
+
+  **@lowdefy/e2e-utils** (new package)
+
+  - Locator-first API via `ldf` Playwright fixture: `ldf.block('id').do.*`, `ldf.block('id').expect.*`
+  - Request mocking with static YAML files (`mocks.yaml`) and inline per-test overrides
+  - Request assertion API: `ldf.request('id').expect.toFinish()`, `.toHaveResponse()`, `.toHavePayload()`
+  - State and URL assertions: `ldf.state('key').expect.toBe()`, `ldf.url().expect.toBe()`
+  - Manifest generation from build artifacts for block type resolution and helper loading
+  - `createConfig()` and `createMultiAppConfig()` for Playwright config with automatic build/server management
+  - Scaffold command (`npx @lowdefy/e2e-utils`) for project setup with templates and dependency management
+  - Block helper factory with auto-provided expect methods (visible, hidden, disabled, validation)
+
+  **@lowdefy/cli**
+
+  - Add `--server` option to `lowdefy build` for server variant selection (e.g., `--server e2e`)
+
+  **@lowdefy/client**
+
+  - Expose `window.lowdefy` when `stage="e2e"` for e2e state/validation access
+
+  **@lowdefy/blocks-antd**
+
+  - Flatten e2e helper APIs for polymorphic proxy compatibility
+  - Add TextArea e2e helper
+
+  **@lowdefy/block-dev-e2e**
+
+  - Remove unused srcDir variable
+
+### Patch Changes
+
+- c62468b98: Pass value of inputs to onChange event.
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/block-utils@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.2
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.1
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- d6c58fe97: Add minItems property to ControlledList block.
+- b3a2e6662: Drawer block enhancements. Add afterOpenChange and afterClose methods.
+  - @lowdefy/block-utils@4.5.0
+  - @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Minor Changes

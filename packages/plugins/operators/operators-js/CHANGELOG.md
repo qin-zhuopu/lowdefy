@@ -1,5 +1,542 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 824f4be: fix(helpers): Dot paths resolve own properties only, and prefer a nested match to a literal dotted key.
+
+  A key that contains dots still resolves without escaping, at every depth. `_url_query:
+my_object.subfield` against `?my_object.subfield=x` reads as before, and a JWT `claimMapping` of
+  `resource_access.com.example.api.roles` against `{ resource_access: { 'com.example.api': { roles:
+['admin'] } } }` still returns `['admin']`. **No path needs a `\.` added unless a plain key or a
+  shorter dotted key overlaps the dotted key it resolves through; where one does, escaping is now the
+  way — see below.**
+  What changed is how ties and misses resolve: `get`, `set` and `unset` now walk the path in a single
+  forward pass, look only at own properties, and no longer try the whole path as one key ahead of the
+  walk. The accepted breaks:
+
+  **A nested match now wins over a literal dotted key.** With both present,
+  `get({ a: { b: 2 }, 'a.b': 1 }, 'a.b')` was `1` and is now `2`, and `unset` deletes the nested `b`
+  rather than the literal `'a.b'` key. A present segment also blocks the join even when it cannot be
+  descended: `get({ a: 1, 'a.b': 2 }, 'a.b')` was `2` and is now the default. Where two dotted keys
+  overlap the shorter one wins: `get({ 'a.b': {}, 'a.b.c': 1 }, 'a.b.c')` was `1` and is now the
+  default. Escaping (`a\.b`) is the way to address a literal dotted key past a nested match.
+
+  **Reads and writes see own properties only, never anything inherited from a prototype.** A data
+  operator whose key was `toString`, `valueOf` or `hasOwnProperty` used to reach the built-in
+  `Object.prototype` function and then fail while copying it, raising `SyntaxError: "undefined" is not
+valid JSON`; `_state: toString` now returns the operator default instead. Writes were worse off:
+  `SetState: { 'toString.x': 1 }` wrote `x` onto `Object.prototype.toString` — making `x` readable on
+  every object in the process — and left state untouched. It now writes `{ toString: { x: 1 } }` into
+  state, as asked. Own-only applies to every prototype, not just `Object.prototype`, so any value
+  reached through an inherited accessor is now unreachable — the realistic case being a class getter.
+  Given a `Thing` class whose `derived` getter returns `'g'`, `get({ t: new Thing() }, 't.derived')` was
+  `'g'` and is now the default. YAML config holds no class instances, so that shape reaches a path only
+  from a custom plugin or connection.
+
+  **A path no longer steps _through_ a function value.** Given an `f` carrying an `f.z` of `3`,
+  `get({ f }, 'f.z')` was `3` and is now the default. Config data holds no functions, so this is
+  reachable only from a custom plugin.
+
+  **`get` no longer accepts `separator`, `split`, `join` or `isValid`, and paths must be strings.**
+  `get({ a: { b: 1 } }, 'a/b', { separator: '/' })` was `1` and is now the default, and `isValid` is
+  ignored rather than consulted. Array paths are gone from all three helpers:
+  `get({ a: { b: 1 } }, ['a', 'b'])` was `1` and is now the default, `set({}, ['a', 'b'], 1)` wrote
+  `{ a: { b: 1 } }` and is now a no-op, and `unset(obj, ['a', 'b'])` threw a `TypeError` and is now a
+  no-op. Nothing in Lowdefy passed any of these, so this too is a custom-plugin concern. (`set`'s
+  `options` parameter is removed outright — see its own entry.)
+
+  **`unset` no longer skips a delete because the value looks empty, and no longer throws on a dotted
+  key at depth.** Hiding a block clears its state field, so both are reachable from config. A hidden
+  _nested_ block whose value was an empty string or `undefined` used to keep its field —
+  `unset({ parent: { child: '' } }, 'parent.child')` left `child` in place and now removes it — so a
+  cleared, hidden input no longer leaves a stale key behind in `_state`. The same applied to an empty
+  `Map` or `Set`, an empty-source `RegExp`, and a blank-message `Error`. And a block id written with an
+  escaped dot used to crash the delete: `unset({ 'a.b': { c: 1 } }, 'a\.b.c')` threw
+  `TypeError: Cannot read properties of undefined` and now deletes `c`.
+
+  **The dot-path escape grammar now covers the backslash itself.** `\.` remains a literal dot and `\\`
+  is now a literal backslash, so `joinPath` can escape a segment that ends in a backslash — before, it
+  only escaped dots, and `joinPath(['a\\', 'b'])` produced a path `splitPath` read back as the single
+  key `a.b`. Any other backslash is still an ordinary character, so a key such as `a\b` needs no
+  escaping. The one observable change is a doubled backslash directly before a dot:
+  `splitPath('a\\\\.b')` used to yield `['a\\.b']` and now yields `['a\\', 'b']`.
+
+- 3ead269: fix(operators): Read fields inside an error value by dot path.
+
+  Dot-path reads stopped at an error, so a field on it silently returned the operator default even
+  though the value was there. Mapping a sign-in failure to a friendly message with `_actions:
+login.error.cause.code` always fell through to the default branch; it now reads the code.
+  `_actions: login.error.message` was the default and now returns the message.
+
+  Errors are the only kind of value this opens up. `Date`, `URL`, `Map`, `Set`, `RegExp`, `Promise`,
+  `Buffer` and typed arrays are still not traversable — a path into one returns the default, exactly
+  as before — and a class instance's own fields were already readable, so nothing changed there.
+
+  A lookup on an error reads the error's serializable form, which brings that form's limits with it:
+
+  - An own field holding a class instance or a function arrives as a marker string —
+    `'[Object: Socket]'`, `'[Function: handler]'` — not as a live object.
+  - The `cause` chain resolves three levels. `_actions: x.error.cause.cause.cause.message` reads; a
+    fourth `cause` is the literal string `'[Truncated]'`. Lowdefy's own wrap (`ActionError` →
+    `RequestError` → `ServiceError` → driver error) fits inside that.
+  - A non-enumerable own property is not readable. `AggregateError`'s `errors` array is
+    non-enumerable, so `_actions: x.error.errors` returns the default.
+
+  An error that is the _end_ of the path is unchanged — `_actions: x.error` still hands over the error
+  itself, not its extracted form. This entry only adds readable values; for the reads that this
+  release does change, see the dot-path resolution entry.
+
+  Also in this release, `@lowdefy/helpers`' `type` utility identifies `Date` and `Error` with
+  `instanceof` rather than duck-typing, so a `Date` or `Error` constructed in another JavaScript realm
+  (a `vm` context, iframe, or worker) is no longer detected as one; `type.isRegExp` is unchanged and
+  still detects a foreign `RegExp`. Lowdefy itself never constructs a value in another realm, so this
+  is reachable only from a custom plugin that introduces one. No `type` predicate was removed.
+  `type.typeOf` returns coarser answers for four kinds of value: a generator function is now
+  `'function'` (was `'generatorfunction'`), a generator object and an `arguments` object are now
+  `'object'` (were `'generator'` and `'arguments'`), and the map, set, array and string iterators are
+  all now `'iterator'` (were `'mapiterator'`, `'setiterator'`, `'arrayiterator'` and
+  `'stringiterator'`). `typeOf(Buffer.from('x'))` still returns `'buffer'`.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/operators@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/operators@5.5.1
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/operators@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Minor Changes
+
+- 60401aa: feat: Add `_app` operator and structured app metadata.
+
+  A new runtime operator `_app` reads the app's declared metadata —
+  `slug`, `name`, `version`, `description`, `license`, `lowdefyVersion`,
+  `gitSha`. It works on both client and server, including inside
+  `modules-mongodb` request filters, and inside `_js` functions via a
+  bound `lowdefyApp(p)` callable.
+
+  The root `lowdefy.yaml` schema gains two new optional fields:
+
+  - `slug` — a kebab-case identifier (`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`),
+    validated at build time. Build fails with a clear error if invalid.
+  - `description` — a free-form string.
+
+  `gitSha` resolves through a fallback chain: `LOWDEFY_GIT_SHA` env var
+  when set non-empty → `git rev-parse HEAD` → `null`. This lets apps
+  deployed without `.git` (Docker, Vercel, Netlify, Render, hermetic
+  PaaS sandboxes) pin the SHA explicitly by mapping their platform's
+  commit env var via shell expansion in the build command.
+
+  Build emits a new `appMeta.json` artifact alongside `app.json`. The
+  existing `app.git_sha` field is removed; consumers (internal telemetry)
+  read `gitSha` from `appMeta` instead.
+
+  See the `_app` operator reference for the full key set and examples.
+
+- ba1d3bd: feat: Add `_boolean` operator.
+
+  A new operator `_boolean` coerces any value to its boolean truthiness,
+  equivalent to the `_not` of `_not` pattern or the JavaScript `!!value`
+  expression. It works on the client, server, and at build time, and
+  joins the existing type-cast operator family (`_number`, `_string`,
+  `_array`, `_object`).
+
+  See the `_boolean` operator reference for examples.
+
+- 0108f38: feat: First-class i18n / locale support for Lowdefy apps.
+
+  Apps can now declare supported locales and message catalogs under
+  `config.i18n`, switch language at runtime, and translate their own
+  strings with ICU MessageFormat. Ant Design's component strings (date
+  pickers, modal Ok/Cancel, pagination, form validation messages),
+  dayjs date formatting, and the engine's built-in framework strings
+  (loading toasts, validation summaries, popup blocker warnings, error
+  page) all localize automatically once `config.i18n` is set.
+
+  ```yaml
+  config:
+    i18n:
+      defaultLocale: en-US
+      locales:
+        - { code: en-US, label: English, antd: en_US, dayjs: en }
+        - { code: de-DE, label: Deutsch, antd: de_DE, dayjs: de }
+      messages:
+        en-US: { greeting: 'Hello, {name}!' }
+        de-DE: { greeting: 'Hallo, {name}!' }
+  ```
+
+  **New schema** — `config.i18n` with `defaultLocale`, `locales[]`, and
+  `messages`. Validated at build time; only declared locales are bundled
+  (antd and dayjs locale imports are codegen'd, no ~150KB unused). The
+  missing-key fallback is always `en-US`, so plugin and module authors
+  should ship `en-US` translations as a baseline.
+
+  **New operators**
+
+  - [`_t`](/_t) — translate operator with ICU MessageFormat. Resolution
+    order: active locale → fallback locale → built-in framework message
+    → key.
+
+    ```yaml
+    _t:
+      key: cart.items
+      values: { count: { _state: itemCount } }
+    ```
+
+  - [`_locale`](/_locale) — read `active` / `default` / `fallback`
+    (always `'en-US'`) / `supported` locale state. Use with `Selector`
+    to build a language picker.
+
+  **New action** — [`SetLocale`](/SetLocale) sets the user's preferred
+  locale (persisted to `localStorage`). Pass `'auto'` to clear the
+  preference and fall back to the browser language or default.
+
+  **Built-in framework strings.** Engine and client strings (`'Loading'`,
+  `'Success'`, `'This field is required'`, validation summaries, popup
+  blocker, error page) live in a built-in catalog and surface as English
+  by default. Authors override per-locale by adding the same key to
+  `config.i18n.messages`:
+
+  ```yaml
+  messages:
+    de-DE:
+      engine.action.loading: 'Laden'
+      engine.validation.fieldRequired: 'Pflichtfeld'
+  ```
+
+  See the [Internationalization concept page](/i18n) for the full list
+  of overridable keys.
+
+  **Ant Design block cleanup.** `Modal`/`ConfirmModal` `okText`/`cancelText`
+  and date picker placeholders (`DateSelector`, `DateRangeSelector`,
+  `DateTimeSelector`, `MonthSelector`, `WeekSelector`) no longer hardcode
+  English defaults — they fall through to antd's `ConfigProvider locale`,
+  so a German app gets `'OK'` / `'Abbrechen'` / `'Datum auswählen'`
+  without per-block configuration. The antd `ConfigProvider` block
+  itself now accepts a `locale` prop for subtree overrides.
+
+  **Server-side translation.** API requests resolve the user's active
+  locale from the `Accept-Language` header and thread it into the server
+  operator parser, so `_t` works the same in server-side actions and
+  requests as on the client.
+
+  **Translation engine.** A new `translate()` helper in `@lowdefy/helpers`
+  backs both the `_t` operator and the engine/client adapter (installed
+  on `lowdefy._internal.translate`). One source of truth for the lookup
+  chain; no duplication. Adds `intl-messageformat` as a foundational dep.
+
+  **Plugin-author surface.** Action and block plugins receive
+  `methods.translate(key, values)` and `methods.getLocale()` for runtime
+  translation in their JS code. Plugin packages can ship default
+  messages via a `./messages` export — the build merges them into the
+  app's i18n catalog (user app messages > plugin messages > framework
+  builtins > key).
+
+  **DatePicker and NumberInput auto-localization.** Date selector blocks
+  (`DateSelector`, `DateRangeSelector`, `DateTimeSelector`,
+  `MonthSelector`) and `NumberInput` derive their default `format` /
+  `decimalSeparator` from the active locale via `Intl.DateTimeFormat` /
+  `Intl.NumberFormat`. A German user sees `DD.MM.YYYY` and `1234,56`
+  automatically; an en-US user sees `MM/DD/YYYY` and `1234.56`.
+
+### Patch Changes
+
+- Updated dependencies [60401aa]
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+- Updated dependencies [302e330]
+  - @lowdefy/operators@5.4.0
+  - @lowdefy/helpers@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/operators@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Minor Changes
+
+- 69a59c0: feat(\_js): Pass pre-computed values into `_js` via an `args` object.
+
+  The `_js` operator now accepts an object form `{ fn, args }` alongside the existing string form. Values in `args` are resolved by the parser — using any Lowdefy operator (`_state`, `_request`, `_user`, nested `_js`, etc.) — before the JavaScript function runs, and are injected as the `args` object inside the function body.
+
+  ```yaml
+  _js:
+    fn: |
+      const { products, target } = args;
+      return products
+        .filter((p) => p.category === target)
+        .reduce((a, p) => a + p.price, 0);
+    args:
+      products:
+        _request: get_products.data.products
+      target: smartphones
+  ```
+
+  This lets you precompute or normalize values in YAML and keep the JavaScript body focused on computation, rather than mixing operator lookups into the function. The string form continues to work unchanged, and identical `fn` bodies still share a single compiled function at build time — only `args` varies per call.
+
+- 0d44433: feat(\_string): Add `_string.format` for template-style string interpolation.
+
+  `_string.format` substitutes placeholders in a template string with values, accepting either a positional array form or a named object form. `null`/`undefined` values render as empty strings, which often makes `_if_none` unnecessary.
+
+  ```yaml
+  # Positional placeholders
+  _string.format:
+    - 'Updates ({0})'
+    - _request: get_counts.0.update
+
+  # Named placeholders
+  _string.format:
+    template: 'Updates ({count}) since {date}'
+    on:
+      count:
+        _request: get_counts.0.update
+      date:
+        _date.format:
+          - YYYY-MM-DD
+          - _state: lastSync
+  ```
+
+  Use `{{` / `}}` to include literal braces. Prefer `_string.format` over `_string.concat` for label-style interpolation, and use [`_nunjucks`](/_nunjucks) when you need conditionals, loops, or filters.
+
+### Patch Changes
+
+- 1d18a13: feat(actions): `holdValue` flag on `Request` and `CallAPI` actions.
+
+  `Request` and `CallAPI` actions now accept a `holdValue: true` flag that retains the previous response value while a new call is loading. UI bound to `_request: <id>` or `_api: <endpointId>` keeps showing the previous response instead of flashing to `null` during a refetch. The previous response is also retained if the new call errors — the error is still observable via `_request_details` / `_api`.
+
+  ```yaml
+  - id: refresh_table
+    type: Request
+    params:
+      requestId: my_table_request
+      holdValue: true
+  ```
+
+  The `Request` action's object-form params now also support `{ requestId, holdValue }` and `{ requestIds, holdValue }` shapes alongside the existing `{ all }` shape.
+
+- Updated dependencies [73fa2b9]
+- Updated dependencies [1e964c4]
+  - @lowdefy/operators@5.2.0
+  - @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- af8ef77cb: feat(operators-js): Add `_user.hasRole`, `_user.hasSomeRoles`, and `_user.hasAllRoles` methods to check user roles against the `user.roles` array. `hasRole` takes a single role string; `hasSomeRoles` and `hasAllRoles` take an array of role strings. All return a boolean.
+  - @lowdefy/operators@5.1.0
+  - @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+### Minor Changes
+
+- c8f4a41063: Add `theme.darkMode` config with system preference support.
+
+  **System Dark Mode (`theme.darkMode`)**
+
+  - New `theme.darkMode` config key accepts `'system'` (default), `'light'`, or `'dark'`
+  - When set to `'system'`, the app follows the OS dark mode preference and updates live when it changes
+  - When set to `'light'` or `'dark'`, the developer locks the mode — user preferences are stored but not applied
+
+  **SetDarkMode Action**
+
+  - Now accepts string params: `darkMode: 'system' | 'light' | 'dark'`
+  - Without params, cycles through light, dark, and system preferences
+
+  **`_media` Operator**
+
+  - New `_media: darkModePreference` returns the user's preference (`'system'`, `'light'`, or `'dark'`)
+  - `_media: darkMode` continues to return the effective boolean state
+
+  **Dark Mode Rendering**
+
+  - Notification, Message, and ConfirmModal render with correct dark mode colors via `App.useApp()` hooks
+  - Loader blocks (Skeleton, Spinner) use antd design tokens instead of hardcoded colors
+  - 404 page and loading states use theme-aware backgrounds
+  - Mobile menu drawer background matches the active theme
+
+- 8b9f926d1: `_menu` operator now returns the `links` array directly instead of the full menu object. Supports dot-path access: `_menu: profile_menu.0.pageId`. `_menu: true` and `{ all: true }` still return the full menus array.
+- f430f02dde: Add theme token system. Use `_theme` operator to access Ant Design v6 design tokens (colors, spacing, typography) at runtime. Theme is configured via `theme.antd.token` and `theme.antd.algorithm` in `lowdefy.yaml`. The `_theme` operator resolves the full computed token set including antd defaults.
+
+### Patch Changes
+
+- e3e922538: feat(operators-js): Add `_math.mod` modulo operator.
+
+  Added `_math.mod` operator for modulo (remainder) calculations. Supports both array and named argument forms: `_math.mod: [10, 3]` or `_math.mod: { dividend: 10, divisor: 3 }`.
+
+- fd8225b7a1: fix(operators-js): The `_date` operator now accepts Date objects as input, in addition to numbers and strings.
+- Updated dependencies [905d5d406]
+  - @lowdefy/helpers@5.0.0
+  - @lowdefy/operators@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- c5ce5b972: fix: Prevent \_date, \_intl, and \_number.toLocaleString operators from being evaluated at build time.
+
+  These operators depend on runtime context (current date/time, locale) and were incorrectly marked as static, causing them to be evaluated during the build and freezing their values.
+
+  - @lowdefy/operators@4.7.3
+  - @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/operators@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- fac48c10a: Fix `_function` callback template being mutated in-place by `evaluateOperators`, causing `_build.array.map` and similar operators to produce duplicate results from repeated callback invocations.
+  - @lowdefy/operators@4.7.1
+  - @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/operators@4.7.0
+  - @lowdefy/helpers@4.7.0
+
+## 4.6.0
+
+### Minor Changes
+
+- aa0d6d363e: feat: Config-aware error tracing and Sentry integration
+
+  **Config-Aware Error Tracing (#1940)**
+
+  - Errors now trace back to exact YAML config locations with file:line
+  - Clickable VSCode links in terminal and browser
+  - Build-time validation catches typos with "Did you mean?" suggestions
+  - Service vs Config error classification
+
+  **Plugin Error Refactoring**
+
+  - Operators throw simple error messages without formatting
+  - Parsers (WebParser, ServerParser, BuildParser) format errors with received value and location
+  - Removed redundant "Operator Error:" prefix from error messages
+  - Consistent error format: "{message} Received: {params} at {location}."
+  - Actions and connections also simplified: removed inline `received` from error messages (interface layer adds it)
+  - Connection plugins (axios-http, knex, redis, sendgrid) no longer expose raw response data in errors
+
+  **Error Class Hierarchy**
+
+  - Unified error system in `@lowdefy/errors` with all error classes
+    - `@lowdefy/errors/build` - Build-time classes with sync location resolution
+  - Error classes: `LowdefyError`, `ConfigError`, `ConfigWarning`, `PluginError`, `ServiceError`
+  - `ConfigWarning` supports `prodError` flag to throw in production builds
+  - `ServiceError.isServiceError()` detects network/timeout/5xx errors
+  - `~ignoreBuildChecks` cascades through descendants to suppress warnings/errors
+
+  **Build Error Collection**
+
+  - Errors collected in `context.errors[]` instead of throwing immediately
+  - `tryBuildStep()` wrapper catches and collects errors from build steps
+  - All errors logged together before summary message for proper ordering
+
+  **Sentry Integration (#1945)**
+
+  - Zero-config Sentry support - just set SENTRY_DSN
+  - Client and server error capture with Lowdefy context (pageId, blockId, config location)
+  - Configurable sampling rates, session replay, user feedback
+  - Graceful no-op when DSN not set
+
+### Patch Changes
+
+- bb3222a5a: fix(errors): Preserve error cause chains in catch-and-rethrow blocks across plugins and CLI
+- af61715d5: feat: JIT page building for dev server
+
+  **Shallow Refs and JIT Build (`@lowdefy/build`)**
+
+  - Shallow `_ref` resolution stops at configured JSON paths, leaving `~shallow` markers for on-demand resolution
+  - `shallowBuild` produces a page registry with dependency tracking instead of fully built pages
+  - `buildPageJit` fully resolves a single page on demand using the shallow build output
+  - File dependency map tracks which config files affect which pages for targeted rebuilds
+  - Build package reorganized: `jit/` folder for dev-server-only files, `full/` folder for production-only files
+
+  **JIT Page Building (`@lowdefy/server-dev`)**
+
+  - Pages are built on-demand when requested instead of all at once during initial build
+  - Page cache with file-watcher invalidation for fast rebuilds
+  - `/api/page/[pageId]` endpoint triggers JIT build if page not cached
+  - `/api/js/[env]` endpoint serves operator JS maps
+  - Build error page component displays errors inline in the browser
+
+  **Operator JS Hash Check (`@lowdefy/operators-js`)**
+
+  - Added hash validation for jsMap to detect stale operator definitions
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/operators@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.2
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/operators@4.5.1
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- Updated dependencies [09ae496d8]
+  - @lowdefy/operators@4.5.0
+  - @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

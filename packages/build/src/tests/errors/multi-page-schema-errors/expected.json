@@ -1,0 +1,16 @@
+{
+  "tests": [
+    {
+      "mode": "prod",
+      "description": "Multiple block id missing errors across pages should ALL be collected",
+      "errorContains": [
+        "Block id missing at page",
+        "lowdefy.yaml:17",
+        "lowdefy.yaml:25",
+        "lowdefy.yaml:33"
+      ],
+      "errorCount": 3,
+      "expectThrow": true
+    }
+  ]
+}

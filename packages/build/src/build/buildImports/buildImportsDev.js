@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 */
 
 import buildIconImports from './buildIconImports.js';
-import buildStyleImports from './buildStyleImports.js';
 import defaultIconsDev from './defaultIconsDev.js';
 
 function getPluginPackages({ components }) {
@@ -27,6 +26,7 @@ function getPluginPackages({ components }) {
     });
   }
   getPackages(components.types.actions);
+  getPackages(components.types.agents);
   getPackages(components.types.auth.adapters);
   getPackages(components.types.auth.callbacks);
   getPackages(components.types.auth.events);
@@ -54,6 +54,7 @@ function buildImportsDev({ components, context }) {
   const blocks = buildImportClassDev({ pluginPackages, map: context.typesMap.blocks });
   return {
     actions: buildImportClassDev({ pluginPackages, map: context.typesMap.actions }),
+    agents: buildImportClassDev({ pluginPackages, map: context.typesMap.agents }),
     auth: {
       adapters: buildImportClassDev({ pluginPackages, map: context.typesMap.auth.adapters }),
       callbacks: buildImportClassDev({ pluginPackages, map: context.typesMap.auth.callbacks }),
@@ -68,7 +69,6 @@ function buildImportsDev({ components, context }) {
       client: buildImportClassDev({ pluginPackages, map: context.typesMap.operators.client }),
       server: buildImportClassDev({ pluginPackages, map: context.typesMap.operators.server }),
     },
-    styles: buildStyleImports({ blocks, context }),
   };
 }
 

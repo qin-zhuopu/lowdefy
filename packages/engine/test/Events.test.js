@@ -1,7 +1,7 @@
 /* eslint-disable prefer-promise-reject-errors */
 
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 */
 
 import { jest } from '@jest/globals';
+import { ConfigError } from '@lowdefy/errors';
 
 import testContext from './testContext.js';
 
@@ -98,12 +99,13 @@ test('init Events', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
       catchActions: [],
       debounce: undefined,
+      shortcut: null,
       history: [],
       loading: false,
     },
@@ -125,7 +127,7 @@ test('triggerEvent no event defined', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   const promise = button.triggerEvent({ name: 'onClick' });
   expect(button.Events.events).toEqual({});
   const res = await promise;
@@ -159,13 +161,14 @@ test('triggerEvent x1', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   const promise = button.triggerEvent({ name: 'onClick', event: { x: 1 } });
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
       catchActions: [],
       debounce: undefined,
+      shortcut: null,
       history: [],
       loading: true,
     },
@@ -215,7 +218,7 @@ test('triggerEvent, 2 actions', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   await button.triggerEvent({ name: 'onClick', event: { x: 1 } });
   expect(button.Events.events.onClick.history[0].event).toEqual({ x: 1 });
   expect(Object.keys(button.Events.events.onClick.history[0].responses).length).toEqual(2);
@@ -246,7 +249,7 @@ test('triggerEvent error', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   await button.triggerEvent({ name: 'onClick', event: { x: 1 } });
   expect(button.Events.events.onClick.history[0]).toEqual({
     blockId: 'button',
@@ -263,17 +266,20 @@ test('triggerEvent error', async () => {
         },
         type: 'Error',
       },
-      error: {
-        error: new Error('Invalid action type "Error" at "button".'),
-        index: 0,
-        type: 'Error',
-      },
+      error: expect.any(ConfigError),
+      index: 0,
     },
     responses: {
       e: {
-        type: 'Error',
+        action: {
+          id: 'e',
+          params: {
+            a: 'a',
+          },
+          type: 'Error',
+        },
+        error: expect.any(ConfigError),
         index: 0,
-        error: new Error('Invalid action type "Error" at "button".'),
       },
     },
     success: false,
@@ -297,7 +303,7 @@ test('registerEvent then triggerEvent x1', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   button.Events.registerEvent({
     name: 'onClick',
     actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
@@ -307,6 +313,7 @@ test('registerEvent then triggerEvent x1', async () => {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
       catchActions: [],
       debounce: null,
+      shortcut: null,
       history: [],
       loading: false,
     },
@@ -359,7 +366,7 @@ test('triggerEvent skip', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   await button.triggerEvent({ name: 'onClick', event: { x: 1 } });
   expect(button.Events.events).toMatchInlineSnapshot(`
     Object {
@@ -401,6 +408,7 @@ test('triggerEvent skip', async () => {
           },
         ],
         "loading": false,
+        "shortcut": null,
       },
     }
   `);
@@ -479,7 +487,7 @@ test('triggerEvent skip tests === true', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   await button.triggerEvent({ name: 'onClick', event: { x: 1 } });
   expect(button.Events.events).toMatchInlineSnapshot(`
     Object {
@@ -521,6 +529,7 @@ test('triggerEvent skip tests === true', async () => {
           },
         ],
         "loading": false,
+        "shortcut": null,
       },
     }
   `);
@@ -591,7 +600,7 @@ test('triggerEvent skip tests === true', async () => {
 //     lowdefy,
 //     pageConfig,
 //   });
-//   const { button } = context._internal.RootBlocks.map;
+//   const { button } = context._internal.RootSlots.map;
 //   button.Events.registerEvent({
 //     name: 'registered',
 //     actions: null,
@@ -624,7 +633,7 @@ test('triggerEvent skip tests === true', async () => {
 //     lowdefy,
 //     pageConfig,
 //   });
-//   const { button } = context._internal.RootBlocks.map;
+//   const { button } = context._internal.RootSlots.map;
 //   expect(button.Events.events).toEqual({
 //     onClick: { actions: [], history: [], loading: false, catchActions: [], debounce: undefined },
 //   });
@@ -651,13 +660,15 @@ test('Actions try catch arrays', async () => {
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
+      catchActions: [{ id: 'b', type: 'SetState', params: { b: 'b' } }],
+      debounce: undefined,
+      shortcut: null,
       history: [],
       loading: false,
-      catchActions: [{ id: 'b', type: 'SetState', params: { b: 'b' } }],
     },
   });
 });
@@ -687,17 +698,18 @@ test('Actions try catch arrays and debounce.immediate == true (leading edge)', a
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
-      history: [],
-      loading: false,
       catchActions: [],
       debounce: {
         immediate: true,
         ms: 100,
       },
+      shortcut: null,
+      history: [],
+      loading: false,
     },
   });
   const firstClick = button.triggerEvent({ name: 'onClick', event: { x: 1 } });
@@ -800,16 +812,17 @@ test('Actions try catch arrays and debounce.immediate == undefined (trailing edg
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
-      history: [],
-      loading: false,
       catchActions: [],
       debounce: {
         ms: 100,
       },
+      shortcut: null,
+      history: [],
+      loading: false,
     },
   });
   const firstClick = button.triggerEvent({ name: 'onClick', event: { x: 1 } });
@@ -909,16 +922,17 @@ test('Actions try catch arrays and debounce.immediate == false default ms (trail
     lowdefy,
     pageConfig,
   });
-  const { button } = context._internal.RootBlocks.map;
+  const { button } = context._internal.RootSlots.map;
   expect(button.Events.events).toEqual({
     onClick: {
       actions: [{ id: 'a', type: 'SetState', params: { a: 'a' } }],
-      history: [],
-      loading: false,
       catchActions: [],
       debounce: {
         immediate: false,
       },
+      shortcut: null,
+      history: [],
+      loading: false,
     },
   });
   const firstClick = button.triggerEvent({ name: 'onClick', event: { x: 1 } });

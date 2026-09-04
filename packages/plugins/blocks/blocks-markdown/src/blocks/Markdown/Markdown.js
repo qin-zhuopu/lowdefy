@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,15 +15,18 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import ReactMarkdown from 'react-markdown';
 
 import gfm from 'remark-gfm';
 
-const Markdown = ({ blockId, properties, methods }) => (
-  <div id={blockId} className={methods.makeCssClass(properties.style)}>
+import markdownStyles from '../../style.module.css';
+import codeblockStyles from '../../codeblock.module.css';
+
+const Markdown = ({ blockId, classNames, properties, styles }) => (
+  <div id={blockId} className={classNames?.element} style={styles?.element}>
     <ReactMarkdown
-      className="markdown-body markdown-default-code"
+      className={`${markdownStyles['markdown-body']} ${codeblockStyles['markdown-default-code']}`}
       skipHtml={properties.skipHtml}
       remarkPlugins={[gfm]}
     >
@@ -32,11 +35,4 @@ const Markdown = ({ blockId, properties, methods }) => (
   </div>
 );
 
-Markdown.defaultProps = blockDefaultProps;
-Markdown.meta = {
-  category: 'container',
-  icons: [],
-  styles: ['codeblock.less'],
-};
-
-export default Markdown;
+export default withBlockDefaults(Markdown);

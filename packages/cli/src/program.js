@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import init from './commands/init/init.js';
 import initDocker from './commands/init-docker/initDocker.js';
 import initVercel from './commands/init-vercel/initVercel.js';
 import start from './commands/start/start.js';
+import upgrade from './commands/upgrade/upgrade.js';
 import runCommand from './utils/runCommand.js';
 
 const require = createRequire(import.meta.url);
@@ -35,10 +36,6 @@ const program = new Command();
 program.name('lowdefy').description(description).version(cliVersion, '-v, --version');
 
 const options = {
-  communityEdition: new Option(
-    '--community-edition',
-    'Use the Apache 2.0 licensed community edition server.'
-  ).env('LOWDEFY_COMMUNITY_EDITION'),
   configDirectory: new Option(
     '--config-directory <config-directory>',
     'Change config directory. Default is the current working directory.'
@@ -83,12 +80,17 @@ program
   .command('build')
   .description('Build a Lowdefy production app.')
   .usage('[options]')
-  .addOption(options.communityEdition)
   .addOption(options.configDirectory)
   .addOption(options.disableTelemetry)
   .addOption(options.logLevel)
   .option('--no-next-build', 'Do not build the Next.js server.')
   .addOption(options.refResolver)
+  .addOption(
+    new Option(
+      '--server <server>',
+      'Server package variant. Use "e2e" for @lowdefy/server-e2e.'
+    ).choices(['e2e'])
+  )
   .addOption(options.serverDirectory)
   .action(runCommand({ cliVersion, handler: build }));
 
@@ -143,5 +145,17 @@ program
   .addOption(options.port)
   .addOption(options.serverDirectory)
   .action(runCommand({ cliVersion, handler: start }));
+
+program
+  .command('upgrade')
+  .description('Upgrade a Lowdefy app to a newer version, applying codemods.')
+  .usage('[options]')
+  .addOption(options.configDirectory)
+  .addOption(options.disableTelemetry)
+  .addOption(options.logLevel)
+  .addOption(new Option('--to <version>', 'Target version. Default: latest stable.'))
+  .addOption(new Option('--plan', 'Show upgrade plan without executing.'))
+  .addOption(new Option('--resume', 'Resume a previously interrupted upgrade.'))
+  .action(runCommand({ cliVersion, handler: upgrade }));
 
 export default program;

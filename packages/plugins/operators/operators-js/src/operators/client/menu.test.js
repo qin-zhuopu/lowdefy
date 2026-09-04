@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -29,12 +29,15 @@ const context = {
       menus: [
         {
           menuId: 'default',
+          links: [{ id: 'home', type: 'MenuLink', properties: { title: 'Home' } }],
         },
         {
           menuId: 'm_1',
+          links: [{ id: 'page1', type: 'MenuLink', properties: { title: 'Page 1' } }],
         },
         {
           menuId: 'm_2',
+          links: [{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }],
         },
       ],
       urlQuery: { urlQuery: true },
@@ -72,56 +75,34 @@ const operators = {
 
 console.error = () => {};
 
-test('_menu using string menuId', () => {
+test('_menu using string menuId returns links array', () => {
   const input = { a: { _menu: 'default' } };
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual({
-    a: {
-      menuId: 'default',
-    },
+    a: [{ id: 'home', type: 'MenuLink', properties: { title: 'Home' } }],
   });
   expect(res.errors).toEqual([]);
 });
 
-test('_menu using index', () => {
+test('_menu using index returns links array', () => {
   const input = { a: { _menu: 1 } };
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual({
-    a: {
-      menuId: 'm_1',
-    },
+    a: [{ id: 'page1', type: 'MenuLink', properties: { title: 'Page 1' } }],
   });
   expect(res.errors).toEqual([]);
 });
 
-test('_menu in object', () => {
-  const input = { a: { _menu: 'default' } };
-  const parser = new WebParser({ context, operators });
-  const res = parser.parse({ input, location: 'locationId', arrayIndices });
-  expect(res.output).toEqual({
-    a: {
-      menuId: 'default',
-    },
-  });
-  expect(res.errors).toEqual([]);
-});
-
-test('_menu full menus', () => {
+test('_menu true returns full menus array', () => {
   const input = { _menu: true };
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual([
-    {
-      menuId: 'default',
-    },
-    {
-      menuId: 'm_1',
-    },
-    {
-      menuId: 'm_2',
-    },
+    { menuId: 'default', links: [{ id: 'home', type: 'MenuLink', properties: { title: 'Home' } }] },
+    { menuId: 'm_1', links: [{ id: 'page1', type: 'MenuLink', properties: { title: 'Page 1' } }] },
+    { menuId: 'm_2', links: [{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }] },
   ]);
   expect(res.errors).toEqual([]);
 });
@@ -131,14 +112,14 @@ test('_menu null', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toBe(null);
-  expect(res.errors).toMatchInlineSnapshot(`
-    Array [
-      [Error: Operator Error: _menu must be of type string, number or object. Received: null at locationId.],
-    ]
-  `);
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0]._message).toBe('_menu must be of type string, number or object.');
+  expect(res.errors[0].message).toBe(
+    '_menu must be of type string, number or object. at locationId.'
+  );
 });
 
-test('_menu param object value', () => {
+test('_menu param object value returns links array', () => {
   const input = {
     _menu: {
       value: 'm_2',
@@ -146,11 +127,11 @@ test('_menu param object value', () => {
   };
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
-  expect(res.output).toEqual({ menuId: 'm_2' });
+  expect(res.output).toEqual([{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }]);
   expect(res.errors).toEqual([]);
 });
 
-test('_menu param object index', () => {
+test('_menu param object index returns links array', () => {
   const input = {
     _menu: {
       index: 2,
@@ -158,7 +139,7 @@ test('_menu param object index', () => {
   };
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
-  expect(res.output).toEqual({ menuId: 'm_2' });
+  expect(res.output).toEqual([{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }]);
   expect(res.errors).toEqual([]);
 });
 
@@ -171,11 +152,9 @@ test('_menu params object value not string', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toBe(null);
-  expect(res.errors).toMatchInlineSnapshot(`
-    Array [
-      [Error: Operator Error: _menu.value must be of type string. Received: {"value":1} at locationId.],
-    ]
-  `);
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0]._message).toBe('_menu.value must be of type string.');
+  expect(res.errors[0].message).toBe('_menu.value must be of type string. at locationId.');
 });
 
 test('_menu params object index not number', () => {
@@ -187,14 +166,12 @@ test('_menu params object index not number', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toBe(null);
-  expect(res.errors).toMatchInlineSnapshot(`
-    Array [
-      [Error: Operator Error: _menu.index must be of type number. Received: {"index":"a"} at locationId.],
-    ]
-  `);
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0]._message).toBe('_menu.index must be of type number.');
+  expect(res.errors[0].message).toBe('_menu.index must be of type number. at locationId.');
 });
 
-test('_menu param object all', () => {
+test('_menu param object all returns full menus array', () => {
   const input = {
     _menu: {
       all: true,
@@ -203,20 +180,14 @@ test('_menu param object all', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual([
-    {
-      menuId: 'default',
-    },
-    {
-      menuId: 'm_1',
-    },
-    {
-      menuId: 'm_2',
-    },
+    { menuId: 'default', links: [{ id: 'home', type: 'MenuLink', properties: { title: 'Home' } }] },
+    { menuId: 'm_1', links: [{ id: 'page1', type: 'MenuLink', properties: { title: 'Page 1' } }] },
+    { menuId: 'm_2', links: [{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }] },
   ]);
   expect(res.errors).toEqual([]);
 });
 
-test('_menu param object all and value', () => {
+test('_menu param object all and value returns full menus array', () => {
   const input = {
     _menu: {
       all: true,
@@ -226,15 +197,9 @@ test('_menu param object all and value', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual([
-    {
-      menuId: 'default',
-    },
-    {
-      menuId: 'm_1',
-    },
-    {
-      menuId: 'm_2',
-    },
+    { menuId: 'default', links: [{ id: 'home', type: 'MenuLink', properties: { title: 'Home' } }] },
+    { menuId: 'm_1', links: [{ id: 'page1', type: 'MenuLink', properties: { title: 'Page 1' } }] },
+    { menuId: 'm_2', links: [{ id: 'page2', type: 'MenuLink', properties: { title: 'Page 2' } }] },
   ]);
   expect(res.errors).toEqual([]);
 });
@@ -248,9 +213,33 @@ test('_menu param object invalid', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ input, location: 'locationId', arrayIndices });
   expect(res.output).toEqual(null);
-  expect(res.errors).toMatchInlineSnapshot(`
-    Array [
-      [Error: Operator Error: _menu must be of type string, number or object. Received: {"other":true} at locationId.],
-    ]
-  `);
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0]._message).toBe('_menu must be of type string, number or object.');
+  expect(res.errors[0].message).toBe(
+    '_menu must be of type string, number or object. at locationId.'
+  );
+});
+
+test('_menu dot-path access into links', () => {
+  const input = { a: { _menu: 'default.0.id' } };
+  const parser = new WebParser({ context, operators });
+  const res = parser.parse({ input, location: 'locationId', arrayIndices });
+  expect(res.output).toEqual({ a: 'home' });
+  expect(res.errors).toEqual([]);
+});
+
+test('_menu dot-path access nested property', () => {
+  const input = { a: { _menu: 'default.0.properties.title' } };
+  const parser = new WebParser({ context, operators });
+  const res = parser.parse({ input, location: 'locationId', arrayIndices });
+  expect(res.output).toEqual({ a: 'Home' });
+  expect(res.errors).toEqual([]);
+});
+
+test('_menu dot-path with nonexistent menu returns undefined', () => {
+  const input = { a: { _menu: 'nonexistent.0.id' } };
+  const parser = new WebParser({ context, operators });
+  const res = parser.parse({ input, location: 'locationId', arrayIndices });
+  expect(res.output).toEqual({ a: undefined });
+  expect(res.errors).toEqual([]);
 });

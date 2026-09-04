@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ _ref:
       - _ref:
           path: templates/navigation_buttons.yaml
           vars:
-            previous_page_title: Requests
-            previous_page_id: tutorial-requests
+            previous_page_title: SQL Requests
+            previous_page_id: tutorial-requests-sql
             next_page_title: Next steps
             next_page_id: next-steps

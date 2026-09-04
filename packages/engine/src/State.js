@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
   limitations under the License.
 */
 
-import { unset, get, serializer, set, swap, type } from '@lowdefy/helpers';
+import { unset, get, joinPath, serializer, set, splitPath, swap, type } from '@lowdefy/helpers';
 
 class State {
   constructor(context) {
@@ -54,9 +54,9 @@ class State {
   del(field) {
     unset(this.context.state, field);
     // remove all empty objects from state as an effect of deleted values
-    const fields = field.split('.');
+    const fields = splitPath(field);
     if (fields.length > 1) {
-      const parent = fields.slice(0, fields.length - 1).join('.');
+      const parent = joinPath(fields.slice(0, -1));
       const parentValue = get(this.context.state, parent);
       if (type.isObject(parentValue) && Object.keys(parentValue).length === 0) {
         this.del(parent);

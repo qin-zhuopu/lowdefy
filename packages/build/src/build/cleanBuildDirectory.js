@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,10 +14,12 @@
   limitations under the License.
 */
 
+import path from 'path';
 import { cleanDirectory } from '@lowdefy/node-utils';
 
 async function cleanBuildDirectory({ context }) {
   await cleanDirectory(context.directories.build);
+  await cleanDirectory(path.join(context.directories.server, 'lowdefy-build', 'tailwind'));
 }
 
 export default cleanBuildDirectory;

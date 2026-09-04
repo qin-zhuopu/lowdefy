@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import React from 'react';
 import { serializer } from '@lowdefy/helpers';
 
 import Block from './block/Block.js';
-import BrandTag from './BrandTag.js';
 import Context from './Context.js';
 import DisplayMessage from './DisplayMessage.js';
 import Head from './Head.js';
@@ -61,6 +60,7 @@ const Client = ({
         id="lowdefy-display-message"
         key={`${config.pageConfig.id}-display-message`}
         Component={lowdefy._internal.blockComponents.Message}
+        components={lowdefy._internal.components}
         methods={{
           registerMethod: (_, method) => {
             lowdefy._internal.displayMessage = method;
@@ -81,12 +81,12 @@ const Client = ({
               <Head
                 Component={Components.Head}
                 properties={
-                  context._internal.RootBlocks.map[config.pageConfig.blockId].eval.properties
+                  context._internal.RootSlots.map[config.pageConfig.blockId].eval.properties
                 }
               />
               <Block
-                block={context._internal.RootBlocks.map[config.pageConfig.blockId]}
-                Blocks={context._internal.RootBlocks}
+                block={context._internal.RootSlots.map[config.pageConfig.blockId]}
+                Blocks={context._internal.RootSlots}
                 context={context}
                 lowdefy={lowdefy}
                 parentLoading={false}
@@ -95,7 +95,6 @@ const Client = ({
           );
         }}
       </Context>
-      <BrandTag />
     </>
   );
 };

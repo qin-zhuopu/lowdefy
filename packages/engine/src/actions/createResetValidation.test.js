@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
   limitations under the License.
 */
 import { jest } from '@jest/globals';
+import { UserError } from '@lowdefy/errors';
 
 import testContext from '../../test/testContext.js';
 
@@ -30,10 +31,21 @@ const lowdefy = {
       },
     },
     blockComponents: {
-      Button: { meta: { category: 'display' } },
-      TextInput: { meta: { category: 'input', valueType: 'string' } },
+      Button: {},
+      TextInput: {},
+    },
+    blockMetas: {
+      Button: { category: 'display' },
+      TextInput: { category: 'input', valueType: 'string' },
     },
     displayMessage,
+    translate: (key, values) => {
+      if (key === 'engine.validation.summary') {
+        return `Your input has ${values.count} validation error${values.count === 1 ? '' : 's'}.`;
+      }
+      if (key === 'engine.validation.fieldRequired') return 'This field is required';
+      return key;
+    },
   },
 };
 
@@ -100,9 +112,9 @@ test('RestValidation after required field', async () => {
     pageConfig,
     operators: lowdefy._internal.operators,
   });
-  const button = context._internal.RootBlocks.map['button'];
-  const reset = context._internal.RootBlocks.map['reset'];
-  const text1 = context._internal.RootBlocks.map['text1'];
+  const button = context._internal.RootSlots.map['button'];
+  const reset = context._internal.RootSlots.map['reset'];
+  const text1 = context._internal.RootSlots.map['text1'];
   expect(text1.eval.validation).toEqual({
     errors: ['This field is required'],
     status: null,
@@ -119,23 +131,26 @@ test('RestValidation after required field', async () => {
         id: 'validate',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     responses: {
       validate: {
-        type: 'Validate',
+        action: {
+          id: 'validate',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        error: new Error('Your input has 1 validation error.'),
       },
     },
     success: false,
     startTimestamp: { date: 0 },
     endTimestamp: { date: 0 },
   });
+  expect(button.Events.events.onClick.history[0].error.error.message).toContain(
+    'Your input has 1 validation error'
+  );
   expect(text1.eval.validation).toEqual({
     errors: ['This field is required'],
     status: 'error',
@@ -164,19 +179,19 @@ test('RestValidation after required field', async () => {
         id: 'validate',
         type: 'Validate',
       },
-      error: {
-        error: new Error('Your input has 1 validation error.'),
-        index: 0,
-        type: 'Validate',
-      },
+      error: expect.any(UserError),
+      index: 0,
     },
     event: undefined,
     eventName: 'onClick',
     responses: {
       validate: {
-        error: new Error('Your input has 1 validation error.'),
+        action: {
+          id: 'validate',
+          type: 'Validate',
+        },
+        error: expect.any(UserError),
         index: 0,
-        type: 'Validate',
       },
     },
     startTimestamp: {

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -65,18 +65,14 @@ test('_regex with null key', () => {
       location,
       state: { string: 'Some String' },
     })
-  ).toThrow(
-    'Operator Error: _regex.key must be a string. Received: {"key":null,"pattern":"^a$"} at location.'
-  );
+  ).toThrow('_regex.key must be a string.');
 });
 test('_regex null', () => {
-  expect(() => _regex({ params: null, location })).toThrow(
-    'Operator Error: _regex.pattern must be a string. Received: null at location.'
-  );
+  expect(() => _regex({ params: null, location })).toThrow('_regex.pattern must be a string.');
 });
 test('_regex with non-string on', () => {
   expect(() => _regex({ params: { pattern: '^a$', on: 5 }, location })).toThrow(
-    'Operator Error: _regex.on must be a string. Received: {"pattern":"^a$","on":5} at location.'
+    '_regex.on must be a string.'
   );
 });
 test('_regex flags', () => {
@@ -84,6 +80,48 @@ test('_regex flags', () => {
 });
 test('_regex invalid flags', () => {
   expect(() => _regex({ params: { pattern: '^a$', on: 'A', flags: 1 }, location })).toThrow(
-    'Operator Error: _regex failed to execute RegExp.test. Received: {"pattern":"^a$","on":"A","flags":1} at location.'
+    '_regex failed to execute RegExp.test.'
+  );
+});
+test('_regex with a reserved key returns false and does not throw', () => {
+  expect(
+    _regex({
+      params: { key: 'a.__proto__.b', pattern: 'x' },
+      location,
+      state: { a: { b: 'Some String' } },
+    })
+  ).toEqual(false);
+});
+test('_regex with a reserved location returns false and does not throw', () => {
+  expect(
+    _regex({
+      params: { pattern: 'x' },
+      location: 'a.__proto__.b',
+      state: { a: { b: 'Some String' } },
+    })
+  ).toEqual(false);
+});
+test('_regex with a reserved key ignores a non-reserved on value', () => {
+  expect(
+    _regex({
+      params: { key: '__proto__', on: 'Some String', pattern: '^Some String$' },
+      location,
+      state: { string: 'Some String' },
+    })
+  ).toEqual(false);
+});
+test('_regex propagates an error that is not a ReservedKeyError', () => {
+  const state = {};
+  Object.defineProperty(state, 'boom', {
+    enumerable: true,
+    get: () => {
+      throw new Error('read failed');
+    },
+  });
+  expect(() => _regex({ params: { key: 'boom', pattern: 'x' }, location, state })).toThrow(
+    'read failed'
+  );
+  expect(() => _regex({ params: { pattern: 'x' }, location: 'boom', state })).toThrow(
+    'read failed'
   );
 });

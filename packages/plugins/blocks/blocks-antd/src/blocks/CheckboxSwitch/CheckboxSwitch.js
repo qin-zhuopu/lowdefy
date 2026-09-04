@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,67 +15,68 @@
 */
 
 import React from 'react';
-import { Checkbox, Space } from 'antd';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import { Checkbox, ConfigProvider, Space } from 'antd';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
 
 import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
 
 const CheckboxSwitch = ({
   blockId,
+  classNames = {},
   components,
   events,
   loading,
   properties,
   required,
+  styles = {},
   validation,
   value,
   methods,
 }) => {
+  const checkbox = (
+    <Checkbox
+      id={`${blockId}_input`}
+      checked={value}
+      className={classNames.element}
+      disabled={properties.disabled || loading}
+      style={{
+        marginRight: properties.description ? '30px' : undefined,
+        ...styles.element,
+      }}
+      onChange={(e) => {
+        methods.setValue(e.target.checked);
+        methods.triggerEvent({ name: 'onChange', event: { value: e.target.checked } });
+      }}
+    >
+      <Space wrap={true}>{renderHtml({ html: properties.description, methods })}</Space>
+    </Checkbox>
+  );
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={components}
       events={events}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       validation={validation}
       required={required}
+      styles={styles}
       content={{
-        content: () => (
-          <Checkbox
-            id={`${blockId}_input`}
-            checked={value}
-            disabled={properties.disabled || loading}
-            className={methods.makeCssClass([
-              properties.color && {
-                '& > span.ant-checkbox-checked:not(.ant-checkbox-disabled) > span': {
-                  backgroundColor: `${properties.color} !important`,
-                  borderColor: `${properties.color} !important`,
-                },
-              },
-              properties.description && {
-                marginRight: '30px', // stops the checkbox description from overlapping with the validation symbol
-              },
-              properties.inputStyle,
-            ])}
-            onChange={(e) => {
-              methods.setValue(e.target.checked);
-              methods.triggerEvent({ name: 'onChange' });
-            }}
-          >
-            <Space wrap={true}>{renderHtml({ html: properties.description, methods })}</Space>
-          </Checkbox>
-        ),
+        content: () =>
+          properties.color ? (
+            <ConfigProvider
+              theme={{ components: { Checkbox: { colorPrimary: properties.color } } }}
+            >
+              {checkbox}
+            </ConfigProvider>
+          ) : (
+            checkbox
+          ),
       }}
     />
   );
 };
 
-CheckboxSwitch.defaultProps = blockDefaultProps;
-CheckboxSwitch.meta = {
-  valueType: 'boolean',
-  category: 'input',
-  icons: [...Label.meta.icons],
-  styles: ['blocks/CheckboxSwitch/style.less'],
-};
-
-export default CheckboxSwitch;
+export default withTheme('Checkbox', withBlockDefaults(CheckboxSwitch));

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,8 +16,8 @@
 
 import { jest } from '@jest/globals';
 
-import buildPages from './buildPages.js';
-import testContext from '../../test/testContext.js';
+import buildPages from '../full/buildPages.js';
+import testContext from '../../test-utils/testContext.js';
 
 const mockLogWarn = jest.fn();
 const mockLog = jest.fn();
@@ -50,7 +50,7 @@ test('requests not an array', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Requests is not an array at "page_1" on page "page_1". Received "requests"'
+    'Requests is not an array at "page_1" on page "page_1".'
   );
 });
 
@@ -80,7 +80,7 @@ test('request id not a string', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Request id is not a string at page "page_1". Received true.'
+    'Request id is not a string at page "page_1".'
   );
 });
 
@@ -132,7 +132,7 @@ test('Throw on duplicate request ids', () => {
   );
 });
 
-test('request id contains a "."', () => {
+test('request id contains invalid characters', () => {
   const components = {
     pages: [
       {
@@ -144,7 +144,23 @@ test('request id contains a "."', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Request id "my.request" at page "page_1" should not include a period (".").'
+    'Request id "my.request" at page "page_1" contains invalid characters.'
+  );
+});
+
+test('request id is a reserved name', () => {
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        auth,
+        type: 'Container',
+        requests: [{ id: 'constructor', type: 'Request' }],
+      },
+    ],
+  };
+  expect(() => buildPages({ components, context })).toThrow(
+    'Request id "constructor" at page "page_1" is a reserved name and cannot be used as an id.'
   );
 });
 
@@ -160,7 +176,7 @@ test('request type is not a string', () => {
     ],
   };
   expect(() => buildPages({ components, context })).toThrow(
-    'Request type is not a string at at request at "request" at page "page_1". Received undefined.'
+    'Request type is not a string at request "request" at page "page_1".'
   );
 });
 
@@ -261,7 +277,7 @@ test('request on a sub-block', () => {
             payload: {},
           },
         ],
-        areas: {
+        slots: {
           content: {
             blocks: [
               {
@@ -395,4 +411,59 @@ test('set auth to request', () => {
       },
     ],
   });
+});
+
+test('request connectionId is not a string', () => {
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        auth,
+        type: 'Container',
+        requests: [{ id: 'my_request', type: 'Request', connectionId: 123 }],
+      },
+    ],
+  };
+  expect(() => buildPages({ components, context })).toThrow(
+    'Request "my_request" at page "page_1" connectionId is not a string.'
+  );
+});
+
+test('request references non-existent connection', () => {
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        auth,
+        type: 'Container',
+        requests: [{ id: 'my_request', type: 'Request', connectionId: 'nonExistentConnection' }],
+      },
+    ],
+  };
+  expect(() => buildPages({ components, context })).toThrow(
+    'Request "my_request" at page "page_1" references non-existent connection "nonExistentConnection".'
+  );
+});
+
+test('request with valid connectionId', () => {
+  const contextWithConnection = testContext({ logger });
+  contextWithConnection.connectionIds.add('validConnection');
+  const components = {
+    pages: [
+      {
+        id: 'page_1',
+        type: 'Container',
+        auth,
+        requests: [
+          {
+            id: 'request_1',
+            type: 'Request',
+            connectionId: 'validConnection',
+          },
+        ],
+      },
+    ],
+  };
+  const res = buildPages({ components, context: contextWithConnection });
+  expect(res.pages[0].requests[0].connectionId).toBe('validConnection');
 });

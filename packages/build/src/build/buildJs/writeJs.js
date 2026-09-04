@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -21,14 +21,14 @@ async function writeJs({ context }) {
     'plugins/operators/clientJsMap.js',
     generateJsFile({
       map: context.jsMap.client,
-      functionPrototype: `{ actions, event, input, location, lowdefyGlobal, request, state, urlQuery, user }`,
+      functionPrototype: `{ actions, args, event, input, location, lowdefyApp, lowdefyGlobal, request, state, urlQuery, user }`,
     })
   );
   await context.writeBuildArtifact(
     'plugins/operators/serverJsMap.js',
     generateJsFile({
       map: context.jsMap.server,
-      functionPrototype: `{ payload, secrets, user }`,
+      functionPrototype: `{ args, item, lowdefyApp, payload, secret, state, step, user }`,
     })
   );
 }

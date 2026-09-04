@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,18 +14,54 @@
   limitations under the License.
 */
 
-import recursiveBuild from './recursiveBuild.js';
-import makeRefDefinition from './makeRefDefinition.js';
-import evaluateBuildOperators from './evaluateBuildOperators.js';
+import operators from '@lowdefy/operators-js/operators/build';
 
-async function buildRefs({ context }) {
+import { resolve, WalkContext } from './walker.js';
+import getRefContent from './getRefContent.js';
+import makeRefDefinition from './makeRefDefinition.js';
+import evaluateStaticOperators from './evaluateStaticOperators.js';
+import collectDynamicIdentifiers from '../collectDynamicIdentifiers.js';
+import validateOperatorsDynamic from '../validateOperatorsDynamic.js';
+import isPageContentPath from '../jit/isPageContentPath.js';
+
+// Validate and collect dynamic identifiers once at module load
+validateOperatorsDynamic({ operators });
+const dynamicIdentifiers = collectDynamicIdentifiers({ operators });
+
+async function buildRefs({ context, shallowOptions }) {
+  context.unresolvedRefVars = context.unresolvedRefVars ?? {};
   const refDef = makeRefDefinition('lowdefy.yaml', null, context.refMap);
-  let components = await recursiveBuild({
+
+  const ctx = new WalkContext({
+    buildContext: context,
+    refId: refDef.id,
+    sourceRefId: null,
+    vars: {},
+    path: '',
+    currentFile: refDef.path,
+    refChain: new Set(refDef.path ? [refDef.path] : []),
+    operators,
+    env: process.env,
+    dynamicIdentifiers,
+    shouldStop: shallowOptions
+      ? // Strip page content (blocks, events, etc.) from ref-backed pages so
+        // JIT can re-resolve them from source files. Inline pages (defined
+        // directly in lowdefy.yaml) live in the root ref and have no separate
+        // source file — their content must be preserved for buildShallowPages.
+        (path, refId) => isPageContentPath(path) && refId !== refDef.id
+      : null,
+  });
+
+  const content = await getRefContent({
     context,
     refDef,
-    count: 0,
+    referencedFrom: null,
   });
-  components = await evaluateBuildOperators({
+
+  let components = await resolve(content, ctx);
+
+  // Evaluate static operators (_sum, _if, etc.) that don't depend on runtime data
+  components = evaluateStaticOperators({
     context,
     input: components,
     refDef,

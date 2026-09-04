@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -90,8 +90,8 @@ const meta = {
     namedArgs: ['year', 'month', 'day', 'hours', 'minutes', 'seconds'],
     validTypes: ['array', 'object'],
   },
-  valueOf: { singleArg: true, prep, validTypes: ['date', 'null'] },
-  __default: { singleArg: true, validTypes: ['number', 'string'] },
+  valueOf: { singleArg: true, prep, validTypes: ['date', 'null'], dynamic: true },
+  __default: { singleArg: true, validTypes: ['number', 'string', 'date'] },
 };
 
 function _date({ params, location, methodName }) {
@@ -115,5 +115,7 @@ function _date({ params, location, methodName }) {
     instanceType: 'date',
   });
 }
+
+_date.dynamic = true;
 
 export default _date;

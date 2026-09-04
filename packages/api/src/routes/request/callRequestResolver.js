@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,30 +14,105 @@
   limitations under the License.
 */
 
-import { RequestError } from '../../context/errors.js';
+import { RequestError, ServiceError } from '@lowdefy/errors';
+
+import invokeEndpoint from '../endpoints/invokeEndpoint.js';
 
 async function callRequestResolver(
-  { logger },
-  { blockId, connectionProperties, payload, requestConfig, requestProperties, requestResolver }
+  context,
+  { connectionProperties, endpointDepth, requestConfig, requestProperties, requestResolver }
 ) {
+  const { blockId, endpointId, logger, pageId, payload } = context;
+  // stepId for endpoint steps (after build), requestId for page requests
+  const stepOrRequestId = requestConfig.stepId ?? requestConfig.requestId;
+
+  const callApi = async ({ endpointId: targetEndpointId, payload: targetPayload } = {}) => {
+    logger.debug({
+      event: 'debug_start_call_api',
+      connectionId: requestConfig.connectionId,
+      requestId: stepOrRequestId,
+      endpointId: targetEndpointId,
+    });
+
+    const result = await invokeEndpoint(context, {
+      endpointId: targetEndpointId,
+      payload: targetPayload,
+      endpointDepth,
+    });
+
+    if (result.status === 'error' || result.status === 'reject') {
+      throw result.error;
+    }
+
+    const response = result.status === 'return' ? result.response : null;
+
+    logger.debug({
+      event: 'debug_end_call_api',
+      connectionId: requestConfig.connectionId,
+      requestId: stepOrRequestId,
+      endpointId: targetEndpointId,
+    });
+
+    return response;
+  };
+
   try {
     const response = await requestResolver({
       blockId,
+      callApi,
       connection: connectionProperties,
       connectionId: requestConfig.connectionId,
-      pageId: requestConfig.pageId,
+      endpointId,
+      pageId,
       payload,
       request: requestProperties,
-      requestId: requestConfig.requestId,
+      requestId: stepOrRequestId,
     });
     return response;
   } catch (error) {
-    const err = new RequestError(error.message);
+    // Add configKey to any error for location tracing
+    if (!error.configKey) {
+      error.configKey = requestConfig['~k'];
+    }
+
+    // Lowdefy errors pass through unchanged — re-wrapping every boundary would
+    // nest causes and truncate the deepest (most informative) frame.
+    if (error.isLowdefyError) {
+      logger.debug(
+        { params: { id: stepOrRequestId, type: requestConfig.type }, err: error },
+        error.message
+      );
+      throw error;
+    }
+
+    // Check if this is a service error (network, timeout, 5xx)
+    if (ServiceError.isServiceError(error)) {
+      const serviceError = new ServiceError(undefined, {
+        cause: error,
+        service: requestConfig.connectionId,
+        configKey: requestConfig['~k'],
+      });
+      logger.debug(
+        { params: { id: stepOrRequestId, type: requestConfig.type }, err: serviceError },
+        serviceError.message
+      );
+      throw serviceError;
+    }
+
+    // Wrap other errors in RequestError (request/connection logic error)
+    const requestError = new RequestError(error.message, {
+      cause: error,
+      typeName: requestConfig.type,
+      received: requestProperties,
+      location: `${requestConfig.connectionId}/${stepOrRequestId}`,
+      configKey: requestConfig['~k'],
+    });
+
     logger.debug(
-      { params: { id: requestConfig.requestId, type: requestConfig.type }, err },
-      err.message
+      { params: { id: stepOrRequestId, type: requestConfig.type }, err: requestError },
+      requestError.message
     );
-    throw err;
+    throw requestError;
   }
 }
 

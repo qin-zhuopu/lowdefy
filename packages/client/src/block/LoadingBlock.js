@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,13 +15,10 @@
 */
 import React, { useEffect } from 'react';
 import { BlockLayout } from '@lowdefy/layout';
-import { makeCssClass } from '@lowdefy/block-utils';
-
 import LoadingContainer from './LoadingContainer.js';
 import LoadingList from './LoadingList.js';
 
 const blockMethods = {
-  makeCssClass,
   moveItemDown: () => {},
   moveItemUp: () => {},
   pushItem: () => {},
@@ -34,6 +31,7 @@ const blockMethods = {
 };
 
 const LoadingBlock = ({
+  blockClass,
   blockId,
   blockLayout,
   blockProperties,
@@ -56,7 +54,9 @@ const LoadingBlock = ({
     Component = lowdefy._internal.blockComponents.Box;
   }
 
-  switch (Component.meta.category) {
+  const resolvedType = Component === lowdefy._internal.blockComponents.Box ? 'Box' : skeleton.type;
+  const category = lowdefy._internal.blockMetas[resolvedType]?.category;
+  switch (category) {
     case 'list':
       return (
         <LoadingList
@@ -70,6 +70,7 @@ const LoadingBlock = ({
     case 'container':
       return (
         <LoadingContainer
+          blockClass={blockClass}
           blockId={blockId}
           blockLayout={blockLayout}
           blockProperties={blockProperties}
@@ -83,10 +84,10 @@ const LoadingBlock = ({
     default:
       return (
         <BlockLayout
-          blockStyle={skeleton.style ?? blockStyle}
+          style={skeleton.style ?? blockStyle}
           id={`s-bl-${blockId}-${skeleton.id}`}
           layout={skeleton.layout ?? blockLayout}
-          makeCssClass={makeCssClass}
+          className={skeleton.class ?? blockClass}
         >
           <Component
             basePath={lowdefy.basePath}

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,16 +16,23 @@
 
 import getHomeAndMenus from './getHomeAndMenus.js';
 import getLowdefyGlobal from './getLowdefyGlobal.js';
+import getLowdefyI18n from './getLowdefyI18n.js';
+import getLowdefyTheme from './getLowdefyTheme.js';
 
 async function getRootConfig(context) {
-  const [lowdefyGlobal, { home, menus }] = await Promise.all([
+  const [lowdefyGlobal, theme, i18n, { home, menus }] = await Promise.all([
     getLowdefyGlobal(context),
+    getLowdefyTheme(context),
+    getLowdefyI18n(context),
     getHomeAndMenus(context),
   ]);
   return {
     home,
+    i18n,
+    lowdefyApp: context.appMeta,
     lowdefyGlobal,
     menus,
+    theme,
   };
 }
 

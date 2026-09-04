@@ -1,11 +1,13 @@
 const defaultTypesMap = {
   actions: {},
+  agents: {},
   auth: {
     adapters: {},
     callbacks: {},
     events: {},
     providers: {},
   },
+  blockMetas: {},
   blocks: {},
   connections: {},
   icons: {},
@@ -14,9 +16,10 @@ const defaultTypesMap = {
     server: {},
   },
   requests: {},
-  styles: {
-    packages: {},
+  schemas: {
+    actions: {},
     blocks: {},
+    operators: {},
   },
 };
 

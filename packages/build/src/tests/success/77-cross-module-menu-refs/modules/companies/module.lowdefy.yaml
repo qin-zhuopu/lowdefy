@@ -1,0 +1,10 @@
+name: Companies
+
+dependencies:
+  - id: contacts
+
+menus:
+  - _ref: menus.yaml
+
+pages:
+  - _ref: pages/company-list.yaml

@@ -83,6 +83,11 @@
           pageId: events-and-actions
           properties:
             title: Events and Actions
+        - id: keyboard-shortcuts
+          type: MenuLink
+          pageId: keyboard-shortcuts
+          properties:
+            title: Keyboard Shortcuts
         - id: operators
           type: MenuLink
           pageId: operators
@@ -98,11 +103,31 @@
           pageId: page-and-app-state
           properties:
             title: Page and App State
+        - id: selectors
+          type: MenuLink
+          pageId: selectors
+          properties:
+            title: Driving Selectors
+        - id: lowdefy-api
+          type: MenuLink
+          pageId: lowdefy-api
+          properties:
+            title: APIs
         - id: references-and-templates
           type: MenuLink
           pageId: references-and-templates
           properties:
             title: References and Templates
+        - id: modules
+          type: MenuLink
+          pageId: modules
+          properties:
+            title: Modules
+        - id: module-authoring
+          type: MenuLink
+          pageId: module-authoring
+          properties:
+            title: Writing Modules
         - id: menus
           type: MenuLink
           pageId: menus
@@ -118,6 +143,11 @@
           pageId: secrets
           properties:
             title: Secrets
+        - id: logger
+          type: MenuLink
+          pageId: logger
+          properties:
+            title: Logger
         - id: lists
           type: MenuLink
           pageId: lists
@@ -133,6 +163,16 @@
           pageId: custom-styling
           properties:
             title: Custom Styling
+        - id: theming
+          type: MenuLink
+          pageId: theming
+          properties:
+            title: Theming
+        - id: i18n
+          type: MenuLink
+          pageId: i18n
+          properties:
+            title: Internationalization
         - id: custom-html
           type: MenuLink
           pageId: custom-html
@@ -143,11 +183,53 @@
           pageId: cli
           properties:
             title: The CLI
-        - id: licenses
+
+    - id: agents_group
+      type: MenuGroup
+      properties:
+        title: Agents
+        icon: AiOutlineRobot
+      links:
+        - id: agents-introduction
           type: MenuLink
-          pageId: licenses
+          pageId: agents-introduction
           properties:
-            title: Licenses
+            title: Introduction
+        - id: agent-properties
+          type: MenuLink
+          pageId: agent-properties
+          properties:
+            title: Agent Properties
+        - id: agent-endpoint-tools
+          type: MenuLink
+          pageId: agent-endpoint-tools
+          properties:
+            title: Endpoint Tools
+        - id: agent-mcp-tools
+          type: MenuLink
+          pageId: agent-mcp-tools
+          properties:
+            title: MCP Tools
+        - id: agent-multi-agent
+          type: MenuLink
+          pageId: agent-multi-agent
+          properties:
+            title: Multi-Agent
+        - id: agent-server-hooks
+          type: MenuLink
+          pageId: agent-server-hooks
+          properties:
+            title: Server Hooks
+        - id: AgentChat
+          type: MenuLink
+          pageId: AgentChat
+          properties:
+            title: AgentChat
+        - id: AgentConversations
+          type: MenuLink
+          pageId: AgentConversations
+          properties:
+            title: AgentConversations
 
     - id: deployment
       type: MenuGroup
@@ -214,11 +296,11 @@
           pageId: users-introduction
           properties:
             title: Introduction
-        - id: protected-pages
+        - id: protected-pages-apis
           type: MenuLink
-          pageId: protected-pages
+          pageId: protected-pages-apis
           properties:
-            title: Protected Pages
+            title: Protected Pages and APIs
         - id: roles
           type: MenuLink
           pageId: roles
@@ -265,6 +347,9 @@
             - id: MongoDBAdapter
               type: MenuLink
               pageId: MongoDBAdapter
+            - id: MultiAppMongoDBAdapter
+              type: MenuLink
+              pageId: MultiAppMongoDBAdapter
         - id: auth_callback_reference
           type: MenuGroup
           properties:
@@ -274,12 +359,54 @@
               type: MenuLink
               pageId: Auth0LogoutCallback
 
+    - id: testing
+      type: MenuGroup
+      properties:
+        title: Testing
+        icon: AiOutlineExperiment
+      links:
+        - id: e2e-introduction
+          type: MenuLink
+          pageId: e2e-introduction
+          properties:
+            title: Introduction
+        - id: e2e-getting-started
+          type: MenuLink
+          pageId: e2e-getting-started
+          properties:
+            title: Getting Started
+        - id: e2e-writing-tests
+          type: MenuLink
+          pageId: e2e-writing-tests
+          properties:
+            title: Writing Tests
+        - id: e2e-mocking
+          type: MenuLink
+          pageId: e2e-mocking
+          properties:
+            title: Mocking Requests
+        - id: e2e-auth
+          type: MenuLink
+          pageId: e2e-auth
+          properties:
+            title: Testing Authentication
+        - id: e2e-configuration
+          type: MenuLink
+          pageId: e2e-configuration
+          properties:
+            title: Configuration
+
     - id: blocks_input
       type: MenuGroup
       properties:
         title: Input Blocks
         icon: AiOutlineForm
       links:
+        - id: InputGallery
+          type: MenuLink
+          pageId: InputGallery
+          properties:
+            title: Input Gallery
         - id: AutoComplete
           type: MenuLink
           pageId: AutoComplete
@@ -331,6 +458,9 @@
         - id: RatingSlider
           type: MenuLink
           pageId: RatingSlider
+        - id: SegmentedSelector
+          type: MenuLink
+          pageId: SegmentedSelector
         - id: S3UploadButton
           type: MenuLink
           pageId: S3UploadButton
@@ -352,9 +482,21 @@
         - id: TextInput
           type: MenuLink
           pageId: TextInput
+        - id: TiptapInput
+          type: MenuLink
+          pageId: TiptapInput
+        - id: TiptapMentionInput
+          type: MenuLink
+          pageId: TiptapMentionInput
         - id: TitleInput
           type: MenuLink
           pageId: TitleInput
+        - id: TreeInput
+          type: MenuLink
+          pageId: TreeInput
+        - id: TreeMultipleSelector
+          type: MenuLink
+          pageId: TreeMultipleSelector
         - id: TreeSelector
           type: MenuLink
           pageId: TreeSelector
@@ -370,9 +512,6 @@
         - id: AgGrid
           type: MenuLink
           pageId: AgGrid
-        - id: Alert
-          type: MenuLink
-          pageId: Alert
         - id: Anchor
           type: MenuLink
           pageId: Anchor
@@ -385,24 +524,39 @@
         - id: Button
           type: MenuLink
           pageId: Button
+        - id: Calendar
+          type: MenuLink
+          pageId: Calendar
         - id: DangerousHtml
           type: MenuLink
           pageId: DangerousHtml
         - id: DangerousMarkdown
           type: MenuLink
           pageId: DangerousMarkdown
-        - id: Descriptions
+        - id: DiffGit
           type: MenuLink
-          pageId: Descriptions
+          pageId: DiffGit
+        - id: DiffList
+          type: MenuLink
+          pageId: DiffList
+        - id: DiffSideBySide
+          type: MenuLink
+          pageId: DiffSideBySide
+        - id: DiffTimeline
+          type: MenuLink
+          pageId: DiffTimeline
         - id: Divider
           type: MenuLink
           pageId: Divider
-        - id: DocSearch
+        - id: DropdownButton
           type: MenuLink
-          pageId: DocSearch
+          pageId: DropdownButton
         - id: EChart
           type: MenuLink
           pageId: EChart
+        - id: FloatButton
+          type: MenuLink
+          pageId: FloatButton
         - id: Html
           type: MenuLink
           pageId: Html
@@ -424,9 +578,6 @@
         - id: Message
           type: MenuLink
           pageId: Message
-        - id: MobileMenu
-          type: MenuLink
-          pageId: MobileMenu
         - id: Notification
           type: MenuLink
           pageId: Notification
@@ -436,9 +587,15 @@
         - id: Progress
           type: MenuLink
           pageId: Progress
+        - id: QRCode
+          type: MenuLink
+          pageId: QRCode
         - id: S3Download
           type: MenuLink
           pageId: S3Download
+        - id: Search
+          type: MenuLink
+          pageId: Search
         - id: Skeleton
           type: MenuLink
           pageId: Skeleton
@@ -457,12 +614,18 @@
         - id: Statistic
           type: MenuLink
           pageId: Statistic
+        - id: Steps
+          type: MenuLink
+          pageId: Steps
         - id: Tag
           type: MenuLink
           pageId: Tag
         - id: Title
           type: MenuLink
           pageId: Title
+        - id: Tour
+          type: MenuLink
+          pageId: Tour
 
     - id: blocks_container
       type: MenuGroup
@@ -473,6 +636,9 @@
         - id: Affix
           type: MenuLink
           pageId: Affix
+        - id: Alert
+          type: MenuLink
+          pageId: Alert
         - id: Badge
           type: MenuLink
           pageId: Badge
@@ -488,18 +654,27 @@
         - id: Collapse
           type: MenuLink
           pageId: Collapse
-        - id: Comment
+        - id: ConfigProvider
           type: MenuLink
-          pageId: Comment
+          pageId: ConfigProvider
         - id: ConfirmModal
           type: MenuLink
           pageId: ConfirmModal
         - id: Content
           type: MenuLink
           pageId: Content
+        - id: Descriptions
+          type: MenuLink
+          pageId: Descriptions
         - id: Drawer
           type: MenuLink
           pageId: Drawer
+        - id: DropdownMenu
+          type: MenuLink
+          pageId: DropdownMenu
+        - id: Flex
+          type: MenuLink
+          pageId: Flex
         - id: Footer
           type: MenuLink
           pageId: Footer
@@ -521,12 +696,21 @@
         - id: Layout
           type: MenuLink
           pageId: Layout
+        - id: Masonry
+          type: MenuLink
+          pageId: Masonry
+        - id: MobileMenu
+          type: MenuLink
+          pageId: MobileMenu
         - id: Modal
           type: MenuLink
           pageId: Modal
         - id: PageHeaderMenu
           type: MenuLink
           pageId: PageHeaderMenu
+        - id: PageSidebarLayout
+          type: MenuLink
+          pageId: PageSidebarLayout
         - id: PageSiderMenu
           type: MenuLink
           pageId: PageSiderMenu
@@ -542,6 +726,9 @@
         - id: Span
           type: MenuLink
           pageId: Span
+        - id: Splitter
+          type: MenuLink
+          pageId: Splitter
         - id: Spinner
           type: MenuLink
           pageId: Spinner
@@ -551,6 +738,9 @@
         - id: Tooltip
           type: MenuLink
           pageId: Tooltip
+        - id: Watermark
+          type: MenuLink
+          pageId: Watermark
 
     - id: blocks_list
       type: MenuGroup
@@ -564,6 +754,12 @@
         - id: List
           type: MenuLink
           pageId: List
+        - id: ListSelector
+          type: MenuLink
+          pageId: ListSelector
+        - id: MasonryList
+          type: MenuLink
+          pageId: MasonryList
         # - id: TimelineList
         #   type: MenuLink
         #   pageId: TimelineList
@@ -573,6 +769,9 @@
         title: Connections
         icon: AiOutlineApi
       links:
+        - id: Anthropic
+          type: MenuLink
+          pageId: Anthropic
         - id: AmazonRedshift
           type: MenuLink
           pageId: AmazonRedshift
@@ -593,6 +792,11 @@
           pageId: Elasticsearch
           properties:
             title: Elasticsearch
+        - id: Google
+          type: MenuLink
+          pageId: Google
+          properties:
+            title: Google Gemini
         - id: GoogleSheet
           type: MenuLink
           pageId: GoogleSheet
@@ -604,6 +808,11 @@
         - id: MariaDB
           type: MenuLink
           pageId: MariaDB
+        - id: Mcp
+          type: MenuLink
+          pageId: Mcp
+          properties:
+            title: MCP
         - id: MongoDB
           type: MenuLink
           pageId: MongoDB
@@ -615,11 +824,11 @@
         - id: MySQL
           type: MenuLink
           pageId: MySQL
-        # - id: OracleDB
-        #   type: MenuLink
-        #   pageId: OracleDB
-        #   properties:
-        #     title: Oracle Database
+        - id: OpenAI-connection
+          type: MenuLink
+          pageId: OpenAI-connection
+          properties:
+            title: OpenAI
         - id: PostgreSQL
           type: MenuLink
           pageId: PostgreSQL
@@ -643,6 +852,9 @@
         title: Actions
         icon: AiOutlineThunderbolt
       links:
+        - id: CallAPI
+          type: MenuLink
+          pageId: CallAPI
         - id: CallMethod
           type: MenuLink
           pageId: CallMethod
@@ -685,12 +897,18 @@
         - id: ScrollTo
           type: MenuLink
           pageId: ScrollTo
+        - id: SetDarkMode
+          type: MenuLink
+          pageId: SetDarkMode
         - id: SetFocus
           type: MenuLink
           pageId: SetFocus
         - id: SetGlobal
           type: MenuLink
           pageId: SetGlobal
+        - id: SetLocale
+          type: MenuLink
+          pageId: SetLocale
         - id: SetState
           type: MenuLink
           pageId: SetState
@@ -715,6 +933,9 @@
         - id: _and
           type: MenuLink
           pageId: _and
+        - id: _api
+          type: MenuLink
+          pageId: _api
         - id: _args
           type: MenuLink
           pageId: _args
@@ -724,6 +945,9 @@
         - id: _base64
           type: MenuLink
           pageId: _base64
+        - id: _boolean
+          type: MenuLink
+          pageId: _boolean
         - id: _build
           type: MenuLink
           pageId: _build
@@ -778,12 +1002,21 @@
         - id: _intl
           type: MenuLink
           pageId: _intl
+        - id: _item
+          type: MenuLink
+          pageId: _item
         - id: _js
           type: MenuLink
           pageId: _js
         - id: _json
           type: MenuLink
           pageId: _json
+        - id: _jsonata
+          type: MenuLink
+          pageId: _jsonata
+        - id: _locale
+          type: MenuLink
+          pageId: _locale
         - id: _location
           type: MenuLink
           pageId: _location
@@ -805,9 +1038,12 @@
         - id: _menu
           type: MenuLink
           pageId: _menu
-        - id: _moment
+        - id: _module
           type: MenuLink
-          pageId: _moment
+          pageId: _module
+        - id: _dayjs
+          type: MenuLink
+          pageId: _dayjs
         - id: _mql
           type: MenuLink
           pageId: _mql
@@ -856,6 +1092,9 @@
         - id: _state
           type: MenuLink
           pageId: _state
+        - id: _step
+          type: MenuLink
+          pageId: _step
         - id: _string
           type: MenuLink
           pageId: _string
@@ -868,6 +1107,12 @@
         - id: _switch
           type: MenuLink
           pageId: _switch
+        - id: _t
+          type: MenuLink
+          pageId: _t
+        - id: _theme
+          type: MenuLink
+          pageId: _theme
         - id: _type
           type: MenuLink
           pageId: _type
@@ -889,25 +1134,66 @@
         - id: _yaml
           type: MenuLink
           pageId: _yaml
+    - id: controls-menu-group
+      type: MenuGroup
+      properties:
+        title: Controls
+        icon: MdAltRoute
+      links:
+        - id: :for
+          type: MenuLink
+          pageId: :for
+        - id: :if
+          type: MenuLink
+          pageId: :if
+        - id: :log
+          type: MenuLink
+          pageId: :log
+        - id: :parallel
+          type: MenuLink
+          pageId: :parallel
+        - id: :parallel_for
+          type: MenuLink
+          pageId: :parallel_for
+        - id: :reject
+          type: MenuLink
+          pageId: :reject
+        - id: :return
+          type: MenuLink
+          pageId: :return
+        - id: :set_state
+          type: MenuLink
+          pageId: :set_state
+        - id: :switch
+          type: MenuLink
+          pageId: :switch
+        - id: :throw
+          type: MenuLink
+          pageId: :throw
+        - id: :try
+          type: MenuLink
+          pageId: :try
+        # - id: :while # TODO: Add back when while control implemented
+        #   type: MenuLink
+        #   pageId: :while
     - id: migration
       type: MenuGroup
       properties:
         title: Migration
         icon: RiArrowLeftRightLine
       links:
+        - id: upgrade-guide
+          type: MenuLink
+          pageId: upgrade-guide
+          properties:
+            title: Upgrade Guide
+        - id: v4-to-v5
+          type: MenuLink
+          pageId: v4-to-v5
+          properties:
+            title: V4 to V5
         - id: v3-to-v4
           type: MenuLink
           pageId: v3-to-v4
           properties:
             title: V3 to V4
-    - id: versions
-      type: MenuGroup
-      properties:
-        title: Lowdefy Versions
-        icon: AiOutlineBranches
-      links:
-        - id: v3
-          type: MenuLink
-          url: https://docs-v3.lowdefy.com
-          properties:
-            title: Version 3

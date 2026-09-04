@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,29 +14,36 @@
   limitations under the License.
 */
 
-import { applyArrayIndices, get, serializer, type } from '@lowdefy/helpers';
+import { ReservedKeyError, applyArrayIndices, get, serializer, type } from '@lowdefy/helpers';
 
-function _request({ arrayIndices, params, requests, location }) {
+function _request({ arrayIndices, params, requests }) {
   if (!type.isString(params)) {
-    throw new Error(
-      `Operator Error: _request accepts a string value. Received: ${JSON.stringify(
-        params
-      )} at ${location}.`
-    );
+    throw new Error(`_request accepts a string value.`);
   }
   const splitKey = params.split('.');
   const [requestId, ...keyParts] = splitKey;
-  if (requestId in requests && !requests[requestId][0].loading) {
+  const entry = requests[requestId]?.[0];
+  if (entry && (!entry.loading || entry.holdValue)) {
     if (splitKey.length === 1) {
-      return serializer.copy(requests[requestId][0].response);
+      return serializer.copy(entry.response);
     }
     const key = keyParts.reduce((acc, value) => (acc === '' ? value : acc.concat('.', value)), '');
-    return get(requests[requestId][0].response, applyArrayIndices(arrayIndices, key), {
-      copy: true,
-      default: null,
-    });
+    try {
+      return get(entry.response, applyArrayIndices(arrayIndices, key), {
+        copy: true,
+        default: null,
+      });
+    } catch (error) {
+      // A runtime read: the key comes from app data or an author keypath evaluated at render time,
+      // and there is no config location to attach in the browser. The reserved rule's job — refusing
+      // the read — is already done, so degrade to the miss value rather than crashing the page.
+      if (error instanceof ReservedKeyError) return null;
+      throw error;
+    }
   }
   return null;
 }
+
+_request.dynamic = true;
 
 export default _request;

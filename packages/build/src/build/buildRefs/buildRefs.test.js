@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import { jest } from '@jest/globals';
 
-import testContext from '../../test/testContext.js';
+import testContext from '../../test-utils/testContext.js';
 import buildRefs from './buildRefs.js';
 
 const mockLogWarn = jest.fn();
@@ -41,6 +41,18 @@ const mockReadConfigFile = jest.fn();
 const context = testContext({
   logger,
   readConfigFile: mockReadConfigFile,
+});
+
+// collectExceptions needs errors[] and keyMap to collect instead of throwing
+context.errors = [];
+context.keyMap = context.keyMap ?? {};
+context.unresolvedRefVars = context.unresolvedRefVars ?? {};
+
+beforeEach(() => {
+  context.errors = [];
+  context.unresolvedRefVars = {};
+  mockLogWarn.mockClear();
+  mockReadConfigFile.mockClear();
 });
 
 test('buildRefs no refs', async () => {
@@ -109,12 +121,13 @@ doesNotExist:
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow(
-    'Tried to reference file "doesNotExist" from "lowdefy.yaml", but file does not exist.'
-  );
+  const res = await buildRefs({ context });
+  expect(res).toEqual({ doesNotExist: null });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Referenced file does not exist: "doesNotExist"');
 });
 
-test('buildRefs max recursion depth', async () => {
+test('buildRefs circular reference detection', async () => {
   const files = [
     {
       path: 'lowdefy.yaml',
@@ -131,10 +144,59 @@ _ref: maxRecursion1.json`,
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow();
-  await expect(buildRefs({ context })).rejects.toThrow(
-    'Maximum recursion depth of references exceeded.'
-  );
+  await buildRefs({ context });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Circular reference detected');
+  expect(context.errors[0].message).toMatch('maxRecursion1.json');
+  expect(context.errors[0].message).toMatch('maxRecursion2.json');
+});
+
+test('buildRefs circular reference self-referencing file', async () => {
+  const files = [
+    {
+      path: 'lowdefy.yaml',
+      content: `
+_ref: selfRef.yaml`,
+    },
+    {
+      path: 'selfRef.yaml',
+      content: `nested:
+  _ref: selfRef.yaml`,
+    },
+  ];
+  mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+  await buildRefs({ context });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Circular reference detected');
+  expect(context.errors[0].message).toMatch('selfRef.yaml');
+});
+
+test('buildRefs circular reference with longer chain', async () => {
+  const files = [
+    {
+      path: 'lowdefy.yaml',
+      content: `_ref: a.yaml`,
+    },
+    {
+      path: 'a.yaml',
+      content: `ref: { "_ref": "b.yaml" }`,
+    },
+    {
+      path: 'b.yaml',
+      content: `ref: { "_ref": "c.yaml" }`,
+    },
+    {
+      path: 'c.yaml',
+      content: `ref: { "_ref": "a.yaml" }`,
+    },
+  ];
+  mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+  await buildRefs({ context });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Circular reference detected');
+  expect(context.errors[0].message).toMatch('a.yaml');
+  expect(context.errors[0].message).toMatch('b.yaml');
+  expect(context.errors[0].message).toMatch('c.yaml');
 });
 
 test('load refs to text files', async () => {
@@ -194,7 +256,10 @@ invalid:
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow('Invalid _ref definition');
+  const res = await buildRefs({ context });
+  expect(res).toEqual({ invalid: null });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Invalid _ref definition');
 });
 
 test('buildRefs invalid ref definition', async () => {
@@ -207,7 +272,10 @@ invalid:
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow('Invalid _ref definition');
+  const res = await buildRefs({ context });
+  expect(res).toEqual({ invalid: null });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Invalid _ref definition');
 });
 
 test('buildRefs invalid ref definition 2', async () => {
@@ -221,7 +289,10 @@ invalid:
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow('Invalid _ref definition');
+  const res = await buildRefs({ context });
+  expect(res).toEqual({ invalid: null });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Invalid _ref definition');
 });
 
 test('buildRefs for file not found', async () => {
@@ -234,9 +305,10 @@ invalid:
     },
   ];
   mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-  await expect(buildRefs({ context })).rejects.toThrow(
-    'Tried to reference file "no_file.yaml" from "lowdefy.yaml", but file does not exist.'
-  );
+  const res = await buildRefs({ context });
+  expect(res).toEqual({ invalid: null });
+  expect(context.errors).toHaveLength(1);
+  expect(context.errors[0].message).toMatch('Referenced file does not exist: "no_file.yaml"');
 });
 
 describe('Parse ref content', () => {
@@ -437,7 +509,7 @@ describe('vars', () => {
     });
   });
 
-  test("buildRefs var default value can be empty string, boolean false or 0, but not NaN nor Inf which aren't JSON serializable", async () => {
+  test('buildRefs var default value can be empty string, boolean false, 0, NaN, or Infinity', async () => {
     const files = [
       {
         path: 'lowdefy.yaml',
@@ -477,8 +549,8 @@ describe('vars', () => {
       ref: {
         field_empty_str: '',
         field_false: false,
-        field_NaN: null,
-        field_Inf: null,
+        field_NaN: NaN,
+        field_Inf: Infinity,
         field_zero: 0,
       },
     });
@@ -503,8 +575,11 @@ describe('vars', () => {
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-    await expect(buildRefs({ context })).rejects.toThrow(
-      '"_var" operator takes a string or object with "key" field as arguments.'
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ ref: { field: null } });
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch(
+      '_var operator takes a string or object with "key" field as arguments.'
     );
   });
 
@@ -757,7 +832,7 @@ ref1:
 ref2:
   _ref:
     path: file2.yaml
-    transformer: src/test/buildRefs/testBuildRefsTransformIdentity.js
+    transformer: src/test-utils/buildRefs/testBuildRefsTransformIdentity.js
     vars:
       var2:
         _var: var1`,
@@ -1025,7 +1100,7 @@ describe('transformer functions', () => {
         content: `
   _ref:
     path: target.yaml
-    transformer: src/test/buildRefs/testBuildRefsTransform.js
+    transformer: src/test-utils/buildRefs/testBuildRefsTransform.js
     vars:
       var1: var1`,
       },
@@ -1050,7 +1125,7 @@ describe('transformer functions', () => {
         content: `
 _ref:
   path: target.yaml
-  transformer: src/test/buildRefs/testBuildRefsAsyncFunction.js`,
+  transformer: src/test-utils/buildRefs/testBuildRefsAsyncFunction.js`,
       },
       {
         path: 'target.yaml',
@@ -1061,6 +1136,30 @@ _ref:
     const res = await buildRefs({ context });
     expect(res).toEqual({ async: true });
   });
+
+  test('buildRefs transformer error reports filePath as referencing manifest', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  path: target.yaml
+  transformer: src/test-utils/buildRefs/testBuildRefsErrorResolver.js`,
+      },
+      {
+        path: 'target.yaml',
+        content: 'a: 1',
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch(
+      /Error calling transformer ".*testBuildRefsErrorResolver\.js" from "target\.yaml"\./
+    );
+    // filePath points to the referencing manifest, not the transformer JS file.
+    expect(context.errors[0].filePath).toBe('lowdefy.yaml');
+  });
 });
 
 describe('resolver functions', () => {
@@ -1070,7 +1169,7 @@ describe('resolver functions', () => {
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsResolver.js`,
+  resolver: src/test-utils/buildRefs/testBuildRefsResolver.js`,
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
@@ -1090,7 +1189,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsResolver.js
   path: target
   vars:
     var: var1`,
@@ -1115,7 +1214,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsAsyncFunction.js`,
+  resolver: src/test-utils/buildRefs/testBuildRefsAsyncFunction.js`,
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
@@ -1129,7 +1228,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.yaml
   vars:
     var: var1`,
@@ -1146,7 +1245,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.yml
   vars:
     var: var1`,
@@ -1163,7 +1262,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.json
   vars:
     var: var1`,
@@ -1180,7 +1279,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.yaml.njk
   vars:
     var: var1`,
@@ -1197,7 +1296,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.yaml.njk
   vars:
     var: var1`,
@@ -1214,7 +1313,7 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsParsingResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsParsingResolver.js
   path: target.json.njk
   vars:
     var: var1`,
@@ -1231,12 +1330,15 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsErrorResolver.js`,
+  resolver: src/test-utils/buildRefs/testBuildRefsErrorResolver.js`,
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-    await expect(buildRefs({ context })).rejects.toThrow(
-      'Error calling resolver "src/test/buildRefs/testBuildRefsErrorResolver.js" from "lowdefy.yaml": Test error'
+    const res = await buildRefs({ context });
+    expect(res).toEqual({});
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch(
+      'Error calling resolver "src/test-utils/buildRefs/testBuildRefsErrorResolver.js".'
     );
   });
 
@@ -1246,13 +1348,16 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsNullResolver.js
+  resolver: src/test-utils/buildRefs/testBuildRefsNullResolver.js
   path: "null"`,
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-    await expect(buildRefs({ context })).rejects.toThrow(
-      'Tried to reference with resolver "src/test/buildRefs/testBuildRefsNullResolver.js" from "lowdefy.yaml", but received "null".'
+    const res = await buildRefs({ context });
+    expect(res).toEqual({});
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch(
+      'Resolver "src/test-utils/buildRefs/testBuildRefsNullResolver.js" returned "null".'
     );
   });
 
@@ -1262,12 +1367,15 @@ _ref:
         path: 'lowdefy.yaml',
         content: `
 _ref:
-  resolver: src/test/buildRefs/testBuildRefsNullResolver.js`,
+  resolver: src/test-utils/buildRefs/testBuildRefsNullResolver.js`,
       },
     ];
     mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
-    await expect(buildRefs({ context })).rejects.toThrow(
-      'Tried to reference with resolver "src/test/buildRefs/testBuildRefsNullResolver.js" from "lowdefy.yaml", but received "undefined".'
+    const res = await buildRefs({ context });
+    expect(res).toEqual({});
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch(
+      'Resolver "src/test-utils/buildRefs/testBuildRefsNullResolver.js" returned "undefined".'
     );
   });
 
@@ -1283,7 +1391,7 @@ _ref: target`,
     const res = await buildRefs({
       context: {
         ...context,
-        refResolver: 'src/test/buildRefs/testBuildRefsResolver.js',
+        refResolver: 'src/test-utils/buildRefs/testBuildRefsResolver.js',
       },
     });
     expect(mockReadConfigFile.mock.calls).toEqual([['lowdefy.yaml']]);
@@ -1294,6 +1402,31 @@ _ref: target`,
       vars: {},
       stage: 'test',
     });
+  });
+
+  test('buildRefs stores original definition on refMap for resolver refs (no path)', async () => {
+    context.refMap = {};
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  resolver: src/test-utils/buildRefs/testBuildRefsResolver.js
+  vars:
+    var: var1`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    // Find the refMap entry for the resolver ref (not the root lowdefy.yaml entry)
+    const resolverEntry = Object.values(context.refMap).find(
+      (entry) => !entry.path && entry.original
+    );
+    expect(resolverEntry).toBeDefined();
+    expect(resolverEntry.original.resolver).toBe(
+      'src/test-utils/buildRefs/testBuildRefsResolver.js'
+    );
+    expect(resolverEntry.original.vars.var).toBe('var1');
   });
 });
 
@@ -1353,10 +1486,86 @@ answer:
     expect(res).toEqual({
       answer: null,
     });
-    expect(mockLogWarn.mock.calls).toEqual([
-      ['Build operator errors.'],
-      ['Operator Error: _sum takes an array type as input. Received: "A" at lowdefy.yaml.'],
-    ]);
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toContain('_sum takes an array type as input.');
+  });
+
+  test('Evaluate build time operator inside _var default value', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: template.yaml`,
+      },
+      {
+        path: 'template.yaml',
+        content: `
+events:
+  onChange:
+    _var:
+      key: onChange
+      default:
+        _build.array.concat:
+          - - id: action_one
+              type: SetState
+          - - id: action_two
+              type: Request`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({
+      ref: {
+        events: {
+          onChange: [
+            { id: 'action_one', type: 'SetState' },
+            { id: 'action_two', type: 'Request' },
+          ],
+        },
+      },
+    });
+  });
+
+  test('Evaluate _ref inside _var default value', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: template.yaml`,
+      },
+      {
+        path: 'template.yaml',
+        content: `
+actions:
+  _var:
+    key: actions
+    default:
+      _build.array.concat:
+        - - id: action_one
+            type: SetState
+        - _ref: extra_actions.yaml`,
+      },
+      {
+        path: 'extra_actions.yaml',
+        content: `
+- id: action_two
+  type: Request`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({
+      ref: {
+        actions: [
+          { id: 'action_one', type: 'SetState' },
+          { id: 'action_two', type: 'Request' },
+        ],
+      },
+    });
   });
 
   test('Build time operator error in referenced file', async () => {
@@ -1378,9 +1587,1162 @@ _build.sum: A`,
     expect(res).toEqual({
       answer: null,
     });
-    expect(mockLogWarn.mock.calls).toEqual([
-      ['Build operator errors.'],
-      ['Operator Error: _sum takes an array type as input. Received: "A" at file.yaml.'],
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toContain('_sum takes an array type as input.');
+  });
+});
+
+describe('unresolvedRefVars', () => {
+  test('buildRefs does not store vars on refMap entries', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: file.yaml
+    vars:
+      var1: value`,
+      },
+      {
+        path: 'file.yaml',
+        content: `
+field:
+  _var: var1`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    const refMapEntries = Object.values(context.refMap);
+    refMapEntries.forEach((entry) => {
+      expect(entry).not.toHaveProperty('vars');
+    });
+  });
+
+  test('buildRefs populates unresolvedRefVars for refs with vars', async () => {
+    context.unresolvedRefVars = {};
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: file.yaml
+    vars:
+      var1: value`,
+      },
+      {
+        path: 'file.yaml',
+        content: `
+field:
+  _var: var1`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    const varsEntries = Object.values(context.unresolvedRefVars);
+    expect(varsEntries.length).toBeGreaterThan(0);
+    expect(varsEntries[0]).toEqual(expect.objectContaining({ var1: 'value' }));
+  });
+
+  test('buildRefs stores unresolved _ref objects in unresolvedRefVars, not resolved content', async () => {
+    context.unresolvedRefVars = {};
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: template.yaml
+    vars:
+      data:
+        _ref: data.yaml`,
+      },
+      {
+        path: 'data.yaml',
+        content: `
+id: map_script
+type: GoogleAPIProvider
+blocks:
+  - id: view_map
+    type: GoogleMaps`,
+      },
+      {
+        path: 'template.yaml',
+        content: `
+field:
+  _var: data`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    const varsEntries = Object.values(context.unresolvedRefVars);
+    expect(varsEntries.length).toBeGreaterThan(0);
+    // The stored var should be the unresolved _ref, not the resolved content
+    expect(varsEntries[0].data).toEqual({ _ref: 'data.yaml' });
+  });
+
+  test('buildRefs unresolvedRefVars are cloned so resolution does not mutate them', async () => {
+    context.unresolvedRefVars = {};
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref:
+    path: template.yaml
+    vars:
+      title:
+        _ref:
+          path: config.yaml
+          key: title`,
+      },
+      {
+        path: 'config.yaml',
+        content: `title: Hello`,
+      },
+      {
+        path: 'template.yaml',
+        content: `
+field:
+  _var: title`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const result = await buildRefs({ context });
+    const varsEntries = Object.values(context.unresolvedRefVars);
+    // unresolvedRefVars should have the original _ref definition
+    expect(varsEntries[0].title).toEqual({ _ref: { path: 'config.yaml', key: 'title' } });
+    // The resolved output should have the actual value
+    expect(result.ref.field).toBe('Hello');
+  });
+
+  test('buildRefs does not populate unresolvedRefVars for refs without vars', async () => {
+    context.unresolvedRefVars = {};
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+ref:
+  _ref: file.yaml`,
+      },
+      {
+        path: 'file.yaml',
+        content: `field: value`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await buildRefs({ context });
+    expect(Object.keys(context.unresolvedRefVars)).toHaveLength(0);
+  });
+});
+
+describe('Error collection', () => {
+  test('collects multiple missing file errors', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+a:
+  _ref: missing1.yaml
+b:
+  _ref: missing2.yaml
+c:
+  _ref: missing3.yaml`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ a: null, b: null, c: null });
+    expect(context.errors).toHaveLength(3);
+    expect(context.errors[0].message).toMatch('missing1.yaml');
+    expect(context.errors[1].message).toMatch('missing2.yaml');
+    expect(context.errors[2].message).toMatch('missing3.yaml');
+  });
+
+  test('collects multiple YAML parse errors', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+a:
+  _ref: bad1.yaml
+b:
+  _ref: bad2.yaml`,
+      },
+      { path: 'bad1.yaml', content: `key: [unclosed` },
+      { path: 'bad2.yaml', content: `key: {also: bad` },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ a: null, b: null });
+    expect(context.errors).toHaveLength(2);
+    expect(context.errors[0].message).toMatch('YAML parse error in "bad1.yaml"');
+    expect(context.errors[1].message).toMatch('YAML parse error in "bad2.yaml"');
+  });
+
+  test('collects mixed error types', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+missing:
+  _ref: nothere.yaml
+badYaml:
+  _ref: bad.yaml
+valid:
+  _ref: good.yaml`,
+      },
+      { path: 'bad.yaml', content: `key: [unclosed` },
+      { path: 'good.yaml', content: `key: value` },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.missing).toBeNull();
+    expect(res.badYaml).toBeNull();
+    expect(res.valid).toEqual({ key: 'value' });
+    expect(context.errors).toHaveLength(2);
+  });
+
+  test('resolves valid refs alongside failed refs', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+good1:
+  _ref: good1.yaml
+bad:
+  _ref: missing.yaml
+good2:
+  _ref: good2.json`,
+      },
+      { path: 'good1.yaml', content: `title: Hello` },
+      { path: 'good2.json', content: `{"count": 42}` },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.good1).toEqual({ title: 'Hello' });
+    expect(res.good2).toEqual({ count: 42 });
+    expect(res.bad).toBeNull();
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch('missing.yaml');
+  });
+
+  test('collects errors from nested refs', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+outer:
+  _ref: outer.yaml`,
+      },
+      {
+        path: 'outer.yaml',
+        content: `
+a:
+  _ref: missing_nested.yaml
+b: works`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.outer.a).toBeNull();
+    expect(res.outer.b).toBe('works');
+    expect(context.errors).toHaveLength(1);
+    expect(context.errors[0].message).toMatch('missing_nested.yaml');
+  });
+
+  test('non-ConfigError still throws immediately', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+a:
+  _ref: a.yaml`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(() => {
+      throw new TypeError('Unexpected programming error');
+    });
+    await expect(buildRefs({ context })).rejects.toThrow('Unexpected programming error');
+    expect(context.errors).toHaveLength(0);
+  });
+});
+
+describe('parallel resolution', () => {
+  test('wide array resolves all siblings in correct positions', async () => {
+    const count = 20;
+    const pageRefs = Array.from(
+      { length: count },
+      (_, i) => `  - _ref: page-${String(i + 1).padStart(2, '0')}.yaml`
+    ).join('\n');
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `pages:\n${pageRefs}`,
+      },
+      ...Array.from({ length: count }, (_, i) => ({
+        path: `page-${String(i + 1).padStart(2, '0')}.yaml`,
+        content: `id: page-${String(i + 1).padStart(2, '0')}`,
+      })),
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.pages).toHaveLength(count);
+    for (let i = 0; i < count; i++) {
+      expect(res.pages[i]).toEqual({ id: `page-${String(i + 1).padStart(2, '0')}` });
+    }
+  });
+
+  test('wide object resolves all sibling keys correctly', async () => {
+    const keys = Array.from({ length: 10 }, (_, i) => `key${i + 1}`);
+    const yamlLines = keys.map((k) => `${k}:\n  _ref: ${k}.yaml`).join('\n');
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: yamlLines,
+      },
+      ...keys.map((k) => ({
+        path: `${k}.yaml`,
+        content: `value: ${k}`,
+      })),
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    for (const k of keys) {
+      expect(res[k]).toEqual({ value: k });
+    }
+  });
+
+  test('multiple errors collected from sibling refs with missing files', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+items:
+  - _ref: missing-1.yaml
+  - _ref: exists.yaml
+  - _ref: missing-2.yaml`,
+      },
+      {
+        path: 'exists.yaml',
+        content: 'id: exists',
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.items[0]).toBeNull();
+    expect(res.items[1]).toEqual({ id: 'exists' });
+    expect(res.items[2]).toBeNull();
+    expect(context.errors).toHaveLength(2);
+    expect(context.errors.some((e) => e.message.includes('missing-1.yaml'))).toBe(true);
+    expect(context.errors.some((e) => e.message.includes('missing-2.yaml'))).toBe(true);
+  });
+
+  test('malformed _var errors collected from siblings alongside valid refs', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+items:
+  - _var: 42
+  - _ref: valid.yaml
+  - _var:
+    - 1
+    - 2`,
+      },
+      {
+        path: 'valid.yaml',
+        content: 'id: valid',
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.items[0]).toBeNull();
+    expect(res.items[1]).toEqual({ id: 'valid' });
+    expect(res.items[2]).toBeNull();
+    expect(context.errors).toHaveLength(2);
+    expect(
+      context.errors.every((e) =>
+        e.message.includes('_var operator takes a string or object with "key" field')
+      )
+    ).toBe(true);
+  });
+
+  test('nested parallel resolves refs inside refs correctly', async () => {
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+root:
+  _ref: parent.yaml`,
+      },
+      {
+        path: 'parent.yaml',
+        content: `
+a:
+  _ref: child-a.yaml
+b:
+  _ref: child-b.yaml
+c:
+  _ref: child-c.yaml`,
+      },
+      {
+        path: 'child-a.yaml',
+        content: 'value: a',
+      },
+      {
+        path: 'child-b.yaml',
+        content: 'value: b',
+      },
+      {
+        path: 'child-c.yaml',
+        content: 'value: c',
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.root).toEqual({
+      a: { value: 'a' },
+      b: { value: 'b' },
+      c: { value: 'c' },
+    });
+  });
+});
+
+describe('module component refs', () => {
+  test('component ref with vars resolves through deferred _ref', async () => {
+    const componentContent = { _ref: '/mod/components/page.yaml' };
+    Object.defineProperty(componentContent, '~deferredFrom', {
+      value: '/mod/module.lowdefy.yaml',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: componentContent }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    title: Users`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+heading:
+  _var: title`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ heading: 'Users' });
+  });
+
+  test('component ref without ~deferredFrom resolves consumer vars (JIT path)', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: { _ref: '/mod/components/page.yaml' } }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    id: my-page`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+id:
+  _var: id
+type: PageHeaderMenu`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ id: 'my-page', type: 'PageHeaderMenu' });
+  });
+
+  test('component ref with vars resolves inline content', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: { heading: { _var: 'title' } } }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    title: Users`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ heading: 'Users' });
+  });
+
+  test('component ref vars override inner _ref vars', async () => {
+    const componentContent = {
+      _ref: { path: '/mod/components/page.yaml', vars: { color: 'blue' } },
+    };
+    Object.defineProperty(componentContent, '~deferredFrom', {
+      value: '/mod/module.lowdefy.yaml',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: componentContent }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    title: Users
+    color: red`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+heading:
+  _var: title
+color:
+  _var: color`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ heading: 'Users', color: 'red' });
+  });
+
+  test('component ref with no vars resolves through deferred _ref', async () => {
+    const componentContent = { _ref: '/mod/components/page.yaml' };
+    Object.defineProperty(componentContent, '~deferredFrom', {
+      value: '/mod/module.lowdefy.yaml',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: componentContent }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+heading:
+  _var: title`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({ heading: null });
+  });
+
+  test('two consumers of same deferred component do not leak vars', async () => {
+    const componentContent = { _ref: '/mod/components/page.yaml' };
+    Object.defineProperty(componentContent, '~deferredFrom', {
+      value: '/mod/module.lowdefy.yaml',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: componentContent }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+consumerA:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      id: users
+consumerB:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      title: Orders`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+id:
+  _var: id
+title:
+  _var: title`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.consumerA).toEqual({ id: 'users', title: null });
+    expect(res.consumerB).toEqual({ id: null, title: 'Orders' });
+  });
+
+  test('two consumers of same inline component do not cross-contaminate', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { id: { _var: 'id' }, type: 'PageHeaderMenu' },
+            },
+          ],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+consumerA:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      id: users
+consumerB:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      id: orders`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.consumerA).toEqual({ id: 'users', type: 'PageHeaderMenu' });
+    expect(res.consumerB).toEqual({ id: 'orders', type: 'PageHeaderMenu' });
+  });
+
+  test('two consumers of same inline component with different var sets', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { id: { _var: 'id' }, title: { _var: 'title' }, type: 'Box' },
+            },
+          ],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+consumerA:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      id: users
+      title: User List
+consumerB:
+  _ref:
+    module: layout
+    component: page
+    vars:
+      id: orders`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res.consumerA).toEqual({ id: 'users', title: 'User List', type: 'Box' });
+    expect(res.consumerB).toEqual({ id: 'orders', title: null, type: 'Box' });
+  });
+
+  test('inline component with nested _ref does not leak consumer vars into nested ref scope', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: {
+                id: 'static-id',
+                type: 'Title',
+                properties: { _ref: '/mod/properties.yaml' },
+              },
+            },
+          ],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    color: red`,
+      },
+      {
+        path: '/mod/properties.yaml',
+        content: `
+color:
+  _var: color
+size: large`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(res).toEqual({
+      id: 'static-id',
+      type: 'Title',
+      properties: { color: null, size: 'large' },
+    });
+  });
+
+  test('consumer _module.pageId object form in vars resolves at app level', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { type: 'PageHeaderMenu', blocks: { _var: 'blocks' } },
+            },
+          ],
+          pages: [{ id: 'dashboard' }, { id: 'users-list' }],
+          connections: [],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    blocks:
+      - id: user-link
+        type: Anchor
+        properties:
+          pageId:
+            _module.pageId:
+              module: layout
+              id: users-list`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual({
+      type: 'PageHeaderMenu',
+      blocks: [
+        {
+          id: 'user-link',
+          type: 'Anchor',
+          properties: {
+            pageId: 'layout/users-list',
+          },
+        },
+      ],
+    });
+  });
+
+  test('consumer _module.pageId string form in vars errors at app level', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { type: 'PageHeaderMenu', blocks: { _var: 'blocks' } },
+            },
+          ],
+          pages: [{ id: 'dashboard' }, { id: 'users-list' }],
+          connections: [],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    blocks:
+      - id: user-link
+        type: Anchor
+        properties:
+          pageId:
+            _module.pageId: users-list`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    await expect(buildRefs({ context })).rejects.toThrow(/ambiguous at the app level/);
+  });
+
+  test('consumer _module.connectionId object form in vars resolves at app level', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { type: 'Box', content: { _var: 'content' } },
+            },
+          ],
+          pages: [],
+          connections: [{ id: 'user-contacts' }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    content:
+      connectionId:
+        _module.connectionId:
+          module: layout
+          id: user-contacts`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual({
+      type: 'Box',
+      content: {
+        connectionId: 'layout/user-contacts',
+      },
+    });
+  });
+
+  test('consumer _module.endpointId object form in vars resolves at app level', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [
+            {
+              id: 'page',
+              component: { type: 'Box', endpoint: { _var: 'endpoint' } },
+            },
+          ],
+          pages: [],
+          connections: [],
+          api: [{ id: 'update-user' }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    endpoint:
+      endpointId:
+        _module.endpointId:
+          module: layout
+          id: update-user`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual({
+      type: 'Box',
+      endpoint: {
+        endpointId: 'layout/update-user',
+      },
+    });
+  });
+
+  test('menu ref with _module.pageId still resolves', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          menus: [
+            {
+              id: 'main',
+              links: [
+                {
+                  id: 'dashboard-link',
+                  type: 'MenuLink',
+                  pageId: { '_module.pageId': 'dashboard' },
+                },
+              ],
+            },
+          ],
+          pages: [{ id: 'dashboard' }],
+          connections: [],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  menu: main`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual([
+      {
+        id: 'layout/dashboard-link',
+        type: 'MenuLink',
+        pageId: 'layout/dashboard',
+      },
     ]);
+  });
+
+  test('menu ref with _module.connectionId still resolves', async () => {
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          menus: [
+            {
+              id: 'main',
+              links: [
+                {
+                  id: 'data-link',
+                  type: 'MenuLink',
+                  connectionId: { '_module.connectionId': 'db' },
+                },
+              ],
+            },
+          ],
+          pages: [],
+          connections: [{ id: 'db' }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  menu: main`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual([
+      {
+        id: 'layout/data-link',
+        type: 'MenuLink',
+        connectionId: 'layout/db',
+      },
+    ]);
+  });
+
+  test('component ref with deferred _ref, vars, and _module.* object form resolves', async () => {
+    const componentContent = { _ref: '/mod/components/page.yaml' };
+    Object.defineProperty(componentContent, '~deferredFrom', {
+      value: '/mod/module.lowdefy.yaml',
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    });
+    context.modules = {
+      layout: {
+        id: 'layout',
+        manifest: {
+          components: [{ id: 'page', component: componentContent }],
+          pages: [{ id: 'dashboard' }, { id: 'users-list' }],
+          connections: [{ id: 'db' }, { id: 'user-contacts' }],
+        },
+        moduleRoot: '/mod',
+        packageRoot: '/mod',
+        vars: {},
+        moduleDependencies: {},
+      },
+    };
+    const files = [
+      {
+        path: 'lowdefy.yaml',
+        content: `
+_ref:
+  module: layout
+  component: page
+  vars:
+    id: users
+    blocks:
+      - id: user-link
+        type: Anchor
+        properties:
+          pageId:
+            _module.pageId:
+              module: layout
+              id: users-list
+          connectionId:
+            _module.connectionId:
+              module: layout
+              id: user-contacts`,
+      },
+      {
+        path: '/mod/components/page.yaml',
+        content: `
+id:
+  _var: id
+type: PageHeaderMenu
+blocks:
+  _var: blocks`,
+      },
+    ];
+    mockReadConfigFile.mockImplementation(readConfigFileMockImplementation(files));
+    const res = await buildRefs({ context });
+    expect(context.errors).toHaveLength(0);
+    expect(res).toEqual({
+      id: 'users',
+      type: 'PageHeaderMenu',
+      blocks: [
+        {
+          id: 'user-link',
+          type: 'Anchor',
+          properties: {
+            pageId: 'layout/users-list',
+            connectionId: 'layout/user-contacts',
+          },
+        },
+      ],
+    });
   });
 });

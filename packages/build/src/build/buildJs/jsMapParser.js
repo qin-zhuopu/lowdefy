@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,13 +14,14 @@
   limitations under the License.
 */
 
+import { ConfigError } from '@lowdefy/errors';
 import { serializer, type } from '@lowdefy/helpers';
 import crypto from 'crypto';
 
-function makeHash({ jsMap, env, value }) {
+function hashFn({ jsMap, env, value }) {
   const hash = crypto.createHash('sha1').update(value).digest('base64');
   jsMap[env][hash] = value;
-  return { _js: hash };
+  return hash;
 }
 
 function JsMapParser({ input, jsMap, env }) {
@@ -34,10 +35,20 @@ function JsMapParser({ input, jsMap, env }) {
     const key = Object.keys(value)[0];
     if (key !== '_js') return value;
 
-    if (!type.isString(value[key])) {
-      throw new Error('_js operator expects the JavaScript definition as a string.');
+    const inner = value[key];
+
+    if (type.isString(inner)) {
+      return { _js: hashFn({ jsMap, env, value: inner }) };
     }
-    return makeHash({ jsMap, env, value: value[key] });
+
+    if (type.isObject(inner) && type.isString(inner.fn)) {
+      return { _js: { fn: hashFn({ jsMap, env, value: inner.fn }), args: inner.args } };
+    }
+
+    throw new ConfigError(
+      `_js operator expects a JavaScript string or { fn: string, args?: object }. Received ${JSON.stringify(inner)}.`,
+      { configKey: value['~k'] }
+    );
   };
   return serializer.copy(input, { reviver });
 }

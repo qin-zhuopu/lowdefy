@@ -1,0 +1,11 @@
+name: Layout
+
+components:
+  - id: header
+    type: Component
+    component:
+      id: app-header
+      type: Title
+      properties:
+        content:
+          _var: title

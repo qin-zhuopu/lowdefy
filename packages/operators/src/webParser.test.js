@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -30,8 +30,10 @@ const arrayIndices = [1];
 const context = {
   _internal: {
     lowdefy: {
+      apiResponses: {},
       basePath: 'basePath',
       inputs: { id: true },
+      lowdefyApp: { app: true },
       lowdefyGlobal: { global: true },
       menus: [{ menus: true }],
       user: { user: true },
@@ -108,7 +110,7 @@ test('parse location not string', () => {
   );
 });
 
-test('operator returns value and removes ~k', () => {
+test('operator returns value with ~k present', () => {
   const input = { a: { _test: { params: true, '~k': 'c' }, '~k': 'b' }, '~k': 'a' };
   const location = 'location.$';
   const parser = new WebParser({ context, operators });
@@ -123,6 +125,7 @@ test('operator returns value and removes ~k', () => {
               "actions": true,
             },
           ],
+          "apiResponses": Object {},
           "args": Array [
             Object {
               "args": true,
@@ -159,9 +162,13 @@ test('operator returns value and removes ~k', () => {
             "configured": false,
             "pageId": "home.pageId",
           },
+          "i18n": undefined,
           "input": true,
           "jsMap": undefined,
           "location": "location.1",
+          "lowdefyApp": Object {
+            "app": true,
+          },
           "lowdefyGlobal": Object {
             "global": true,
           },
@@ -210,6 +217,7 @@ test('operator returns value and removes ~k', () => {
                       },
                     },
                   },
+                  "apiResponses": Object {},
                   "basePath": "basePath",
                   "home": Object {
                     "configured": false,
@@ -217,6 +225,9 @@ test('operator returns value and removes ~k', () => {
                   },
                   "inputs": Object {
                     "id": true,
+                  },
+                  "lowdefyApp": Object {
+                    "app": true,
                   },
                   "lowdefyGlobal": Object {
                     "global": true,
@@ -270,6 +281,7 @@ test('operator returns value and removes ~k', () => {
           "state": Object {
             "state": true,
           },
+          "theme": undefined,
           "user": Object {
             "user": true,
           },
@@ -278,6 +290,14 @@ test('operator returns value and removes ~k', () => {
     ]
   `);
   expect(res.errors).toEqual([]);
+});
+
+test('forwards lowdefyApp into operator context', () => {
+  const input = { a: { _test: { params: true } } };
+  const parser = new WebParser({ context, operators });
+  parser.parse({ actions, args, arrayIndices, event, input, location });
+  const lastCall = operators._test.mock.calls[operators._test.mock.calls.length - 1][0];
+  expect(lastCall.lowdefyApp).toEqual({ app: true });
 });
 
 test('operator should be object with 1 key', () => {
@@ -310,5 +330,50 @@ test('operator errors', () => {
   const parser = new WebParser({ context, operators });
   const res = parser.parse({ actions, args, arrayIndices, event, input, location });
   expect(res.output).toEqual({ a: null });
-  expect(res.errors).toEqual([new Error('Test error.')]);
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0].name).toBe('OperatorError');
+  expect(res.errors[0]._message).toBe('Test error.');
+  expect(res.errors[0].message).toBe('Test error. at location.');
+  expect(res.errors[0].received).toEqual({ _error: { params: true } });
+  expect(res.errors[0].location).toBe('location');
+});
+
+test('operator errors include configKey from ~k', () => {
+  const input = { a: { _error: { params: true }, '~k': 'config-key-123' } };
+  Object.defineProperty(input.a, '~k', {
+    value: 'config-key-123',
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  const parser = new WebParser({ context, operators });
+  const res = parser.parse({ actions, args, arrayIndices, event, input, location });
+  expect(res.output).toEqual({ a: null });
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0].name).toBe('OperatorError');
+  expect(res.errors[0]._message).toBe('Test error.');
+  expect(res.errors[0].received).toEqual({ _error: { params: true } });
+  expect(res.errors[0].configKey).toBe('config-key-123');
+});
+
+test('operator errors preserve existing configKey', () => {
+  const errorWithConfigKey = new Error('Pre-configured error');
+  errorWithConfigKey.configKey = 'existing-key';
+  const operatorsWithPreConfiguredError = {
+    ...operators,
+    _errorWithKey: jest.fn(() => {
+      throw errorWithConfigKey;
+    }),
+  };
+  const input = { a: { _errorWithKey: { params: true } } };
+  Object.defineProperty(input.a, '~k', {
+    value: 'new-key',
+    enumerable: false,
+    writable: true,
+    configurable: true,
+  });
+  const parser = new WebParser({ context, operators: operatorsWithPreConfiguredError });
+  const res = parser.parse({ actions, args, arrayIndices, event, input, location });
+  expect(res.errors.length).toBe(1);
+  expect(res.errors[0].configKey).toBe('existing-key'); // Should preserve existing key
 });

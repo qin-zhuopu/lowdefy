@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,11 +14,11 @@
   limitations under the License.
 */
 
-import knex from 'knex';
+import createKnex from '../createKnex.js';
 import schema from './schema.js';
 
 async function KnexRaw({ request, connection }) {
-  const client = knex(connection);
+  const client = createKnex(connection);
   const res = await client.raw(request.query, request.parameters);
   Object.keys(res).forEach((key) => {
     if (key.startsWith('_')) {

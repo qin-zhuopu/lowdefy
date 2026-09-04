@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -38,8 +38,9 @@ const trackedFiles = [
   'build/plugins/operators/clientJsMap.js',
   'build/plugins/operators/server.js',
   'build/plugins/operators/serverJsMap.js',
-  'build/plugins/styles.less',
-  'public/styles.less',
+  'build/plugins/styles.css',
+  'build/globals.css',
+  'public/styles.css',
   'package.json',
 ];
 
@@ -86,7 +87,7 @@ async function nextBuildWatcher(context) {
       })
     );
     if (!build) {
-      context.logger.info({ print: 'succeed' }, 'Reloaded app.');
+      context.logger.info({ spin: 'succeed' }, 'Reloaded app.');
       return;
     }
 
@@ -94,8 +95,19 @@ async function nextBuildWatcher(context) {
     if (install) {
       context.logger.warn('Plugin dependencies have changed and will be reinstalled.');
       await context.installPlugins();
+      // Rebuild Lowdefy artifacts (blocks.js, icons.js, styles.css, etc.)
+      // so newly installed packages are included in the Next.js bundle.
+      await context.lowdefyBuild();
+      // Re-hash all tracked files to avoid detecting our own build output
+      // changes as new changes on the next watcher callback.
+      await Promise.all(
+        trackedFiles.map(async (filePath) => {
+          hashes[filePath] = await sha1(filePath);
+        })
+      );
     }
     await context.nextBuild();
+    await context.compileCss();
     context.restartServer();
   };
 

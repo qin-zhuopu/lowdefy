@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -81,7 +81,7 @@ _ref:
       - _ref:
           path: templates/navigation_buttons.yaml
           vars:
-            previous_page_title: Additional Page
-            previous_page_id: tutorial-additional-page
+            previous_page_title: Display Data
+            previous_page_id: tutorial-display-data-page
             next_page_title: Lowdefy overview
             next_page_id: overview

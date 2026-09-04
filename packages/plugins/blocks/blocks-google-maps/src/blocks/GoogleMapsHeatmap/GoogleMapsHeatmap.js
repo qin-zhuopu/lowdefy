@@ -1,6 +1,6 @@
 /* eslint-disable react/jsx-props-no-spreading */
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 */
 
 import React from 'react';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import { HeatmapLayer } from '@react-google-maps/api';
 import Map from '../Map.js';
 
@@ -29,8 +29,22 @@ function updateHeatmap(data) {
   return new window.google.maps.LatLng(data);
 }
 
-const GoogleMapsHeatmap = ({ blockId, content, methods, properties }) => (
-  <Map blockId={blockId} content={content} methods={methods} properties={properties}>
+const GoogleMapsHeatmap = ({
+  blockId,
+  classNames = {},
+  content,
+  methods,
+  properties,
+  styles = {},
+}) => (
+  <Map
+    blockId={blockId}
+    classNames={classNames}
+    content={content}
+    methods={methods}
+    properties={properties}
+    styles={styles}
+  >
     {(map, bounds) =>
       map &&
       bounds &&
@@ -56,11 +70,9 @@ const GoogleMapsHeatmap = ({ blockId, content, methods, properties }) => (
   </Map>
 );
 
-GoogleMapsHeatmap.defaultProps = blockDefaultProps;
 GoogleMapsHeatmap.meta = {
   category: 'container',
   icons: [],
-  styles: [],
 };
 
-export default GoogleMapsHeatmap;
+export default withBlockDefaults(GoogleMapsHeatmap);

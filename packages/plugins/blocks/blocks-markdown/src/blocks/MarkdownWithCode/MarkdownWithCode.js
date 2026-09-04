@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,15 +14,19 @@
   limitations under the License.
 */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Light as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
+import { theme as antdTheme } from 'antd';
 import ReactMarkdown from 'react-markdown';
 
 import gfm from 'remark-gfm';
 
+import markdownStyles from '../../style.module.css';
+import codeblockStyles from '../../codeblock.module.css';
+
 // See https://github.com/react-syntax-highlighter/react-syntax-highlighter/issues/393 for esm issue.
-import { github } from 'react-syntax-highlighter/dist/cjs/styles/hljs/index.js';
+import { github, a11yDark } from 'react-syntax-highlighter/dist/cjs/styles/hljs/index.js';
 import javascript from 'react-syntax-highlighter/dist/cjs/languages/hljs/javascript.js';
 import typescript from 'react-syntax-highlighter/dist/cjs/languages/hljs/typescript.js';
 import python from 'react-syntax-highlighter/dist/cjs/languages/hljs/python.js';
@@ -33,57 +37,70 @@ import yaml from 'react-syntax-highlighter/dist/cjs/languages/hljs/yaml.js';
 import markdown from 'react-syntax-highlighter/dist/cjs/languages/hljs/markdown.js';
 import handlebars from 'react-syntax-highlighter/dist/cjs/languages/hljs/handlebars.js';
 
-SyntaxHighlighter.registerLanguage('handlebars', handlebars.default);
-SyntaxHighlighter.registerLanguage('nunjucks', handlebars.default);
-SyntaxHighlighter.registerLanguage('html', handlebars.default);
-SyntaxHighlighter.registerLanguage('java', java.default);
-SyntaxHighlighter.registerLanguage('javascript', javascript.default);
-SyntaxHighlighter.registerLanguage('js', javascript.default);
-SyntaxHighlighter.registerLanguage('jsx', javascript.default);
-SyntaxHighlighter.registerLanguage('json', json.default);
-SyntaxHighlighter.registerLanguage('markdown', markdown.default);
-SyntaxHighlighter.registerLanguage('python', python.default);
-SyntaxHighlighter.registerLanguage('py', python.default);
-SyntaxHighlighter.registerLanguage('typescript', typescript.default);
-SyntaxHighlighter.registerLanguage('ts', typescript.default);
-SyntaxHighlighter.registerLanguage('xml', xml.default);
-SyntaxHighlighter.registerLanguage('yaml', yaml.default);
+// Handle CJS/ESM interop: webpack gives { default: fn }, Turbopack may give fn directly.
+const lang = (m) => m.default || m;
 
-const components = {
-  code({ inline, className, children, ...props }) {
-    return !inline ? (
-      <SyntaxHighlighter
-        style={github}
-        language={String(className).replace('language-', '')}
-        {...props}
+SyntaxHighlighter.registerLanguage('handlebars', lang(handlebars));
+SyntaxHighlighter.registerLanguage('nunjucks', lang(handlebars));
+SyntaxHighlighter.registerLanguage('html', lang(handlebars));
+SyntaxHighlighter.registerLanguage('java', lang(java));
+SyntaxHighlighter.registerLanguage('javascript', lang(javascript));
+SyntaxHighlighter.registerLanguage('js', lang(javascript));
+SyntaxHighlighter.registerLanguage('jsx', lang(javascript));
+SyntaxHighlighter.registerLanguage('json', lang(json));
+SyntaxHighlighter.registerLanguage('markdown', lang(markdown));
+SyntaxHighlighter.registerLanguage('python', lang(python));
+SyntaxHighlighter.registerLanguage('py', lang(python));
+SyntaxHighlighter.registerLanguage('typescript', lang(typescript));
+SyntaxHighlighter.registerLanguage('ts', lang(typescript));
+SyntaxHighlighter.registerLanguage('xml', lang(xml));
+SyntaxHighlighter.registerLanguage('yaml', lang(yaml));
+
+function makeComponents(isDark) {
+  return {
+    code({ inline, className, children, ...props }) {
+      return !inline ? (
+        <SyntaxHighlighter
+          style={isDark ? a11yDark : github}
+          language={String(className).replace('language-', '')}
+          {...props}
+        >
+          {children}
+        </SyntaxHighlighter>
+      ) : (
+        <code className={className} {...props}>
+          {children}
+        </code>
+      );
+    },
+  };
+}
+
+const MarkdownWithCode = ({ blockId, classNames, properties, styles }) => {
+  const { token } = antdTheme.useToken();
+  // Ant Design dark algorithm sets colorBgBase to '#000' or '#141414'.
+  // Parse the hex value and check if it's below mid-brightness.
+  let bgHex = (token.colorBgBase || '#ffffff').replace('#', '');
+  if (bgHex.length === 3) {
+    bgHex = bgHex[0] + bgHex[0] + bgHex[1] + bgHex[1] + bgHex[2] + bgHex[2];
+  }
+  const r = parseInt(bgHex.substring(0, 2) || 'ff', 16);
+  const g = parseInt(bgHex.substring(2, 4) || 'ff', 16);
+  const b = parseInt(bgHex.substring(4, 6) || 'ff', 16);
+  const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128;
+  const components = useMemo(() => makeComponents(isDark), [isDark]);
+  return (
+    <div id={blockId} className={classNames?.element} style={styles?.element}>
+      <ReactMarkdown
+        className={markdownStyles['markdown-body']}
+        skipHtml={properties.skipHtml}
+        remarkPlugins={[gfm]}
+        components={components}
       >
-        {children}
-      </SyntaxHighlighter>
-    ) : (
-      <code className={className} {...props}>
-        {children}
-      </code>
-    );
-  },
-};
-const MarkdownWithCode = ({ blockId, properties, methods }) => (
-  <div id={blockId} className={methods.makeCssClass(properties.style)}>
-    <ReactMarkdown
-      className="markdown-body"
-      skipHtml={properties.skipHtml}
-      remarkPlugins={[gfm]}
-      components={components}
-    >
-      {properties.content}
-    </ReactMarkdown>
-  </div>
-);
-
-MarkdownWithCode.defaultProps = blockDefaultProps;
-MarkdownWithCode.meta = {
-  category: 'container',
-  icons: [],
-  styles: [],
+        {properties.content}
+      </ReactMarkdown>
+    </div>
+  );
 };
 
-export default MarkdownWithCode;
+export default withBlockDefaults(MarkdownWithCode);

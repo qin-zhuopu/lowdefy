@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,22 +14,38 @@
   limitations under the License.
 */
 
-function _function({ actions, arrayIndices, event, location, operatorPrefix, params, parser }) {
+import { serializer } from '@lowdefy/helpers';
+
+function _function({
+  actions,
+  arrayIndices,
+  event,
+  location,
+  operatorPrefix,
+  params,
+  parser,
+  payload,
+  steps,
+}) {
   return (...args) => {
     const { output, errors } = parser.parse({
       actions,
       arrayIndices,
       args,
       event,
-      input: params,
+      input: serializer.copy(params),
       location,
       operatorPrefix: `_${operatorPrefix}`,
+      payload,
+      steps,
     });
     if (errors.length > 0) {
-      throw new Error(errors[0]);
+      throw errors[0];
     }
     return output;
   };
 }
+
+_function.dynamic = true;
 
 export default _function;

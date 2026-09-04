@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,11 +15,13 @@
 */
 
 import createCallMethod from './createCallMethod.js';
+import createCallAPI from './createCallAPI.js';
 import createGetActions from './createGetActions.js';
 import createGetBlockId from './createGetBlockId.js';
 import createGetEvent from './createGetEvent.js';
 import createGetGlobal from './createGetGlobal.js';
 import createGetInput from './createGetInput.js';
+import createGetLocale from './createGetLocale.js';
 import createGetPageId from './createGetPageId.js';
 import createGetRequestDetails from './createGetRequestDetails.js';
 import createGetState from './createGetState.js';
@@ -34,11 +36,13 @@ import createReset from './createReset.js';
 import createResetValidation from './createResetValidation.js';
 import createSetGlobal from './createSetGlobal.js';
 import createSetState from './createSetState.js';
+import createTranslate from './createTranslate.js';
 import createUpdateSession from './createUpdateSession.js';
 import createValidate from './createValidate.js';
 
 function getActionMethods(props) {
   return {
+    callAPI: createCallAPI(props),
     callMethod: createCallMethod(props),
     displayMessage: createDisplayMessage(props),
     getActions: createGetActions(props),
@@ -46,6 +50,7 @@ function getActionMethods(props) {
     getEvent: createGetEvent(props),
     getGlobal: createGetGlobal(props),
     getInput: createGetInput(props),
+    getLocale: createGetLocale(props),
     getPageId: createGetPageId(props),
     getRequestDetails: createGetRequestDetails(props),
     getState: createGetState(props),
@@ -59,6 +64,7 @@ function getActionMethods(props) {
     resetValidation: createResetValidation(props),
     setGlobal: createSetGlobal(props),
     setState: createSetState(props),
+    translate: createTranslate(props),
     updateSession: createUpdateSession(props),
     validate: createValidate(props),
   };

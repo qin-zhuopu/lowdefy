@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -18,13 +18,14 @@ function setPageId(router, rootConfig) {
   if (router.pathname === `/404`) {
     return { redirect: false, pageId: '404' };
   }
-  if (!router.query.pageId) {
+  const segments = router.query.pageId;
+  if (!segments || segments.length === 0) {
     if (rootConfig.home.configured === false) {
       return { redirect: true, pageId: rootConfig.home.pageId };
     }
     return { redirect: false, pageId: rootConfig.home.pageId };
   }
-  return { redirect: false, pageId: router.query.pageId };
+  return { redirect: false, pageId: segments.join('/') };
 }
 
 export default setPageId;

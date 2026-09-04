@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -27,6 +27,8 @@ test('_media full media object', () => {
     height: 300,
     size: 'xs',
     width: 500,
+    darkMode: false,
+    darkModePreference: 'system',
   });
 });
 
@@ -72,7 +74,7 @@ test('_media size', () => {
       location: 'locationId',
       globals: { window: { innerHeight: 300, innerWidth: 1900 } },
     })
-  ).toEqual('xxl');
+  ).toEqual('2xl');
 });
 
 test('_media width', () => {
@@ -83,8 +85,104 @@ test('_media height', () => {
   expect(media({ params: 'height', location: 'locationId', globals })).toEqual(300);
 });
 
+test('_media darkMode returns false when no localStorage and no matchMedia', () => {
+  expect(
+    media({
+      params: 'darkMode',
+      location: 'locationId',
+      globals: { window: { innerHeight: 300, innerWidth: 500 } },
+    })
+  ).toEqual(false);
+});
+
+test('_media darkMode returns true when __lowdefy_isDark is true', () => {
+  expect(
+    media({
+      params: 'darkMode',
+      location: 'locationId',
+      globals: {
+        window: {
+          innerHeight: 300,
+          innerWidth: 500,
+          __lowdefy_isDark: true,
+        },
+      },
+    })
+  ).toEqual(true);
+});
+
+test('_media darkMode returns false when __lowdefy_isDark is false', () => {
+  expect(
+    media({
+      params: 'darkMode',
+      location: 'locationId',
+      globals: {
+        window: {
+          innerHeight: 300,
+          innerWidth: 500,
+          __lowdefy_isDark: false,
+        },
+      },
+    })
+  ).toEqual(false);
+});
+
+test('_media darkMode defaults to false when __lowdefy_isDark is not set', () => {
+  expect(
+    media({
+      params: 'darkMode',
+      location: 'locationId',
+      globals: {
+        window: {
+          innerHeight: 300,
+          innerWidth: 500,
+        },
+      },
+    })
+  ).toEqual(false);
+});
+
+test('_media darkModePreference returns system when no localStorage', () => {
+  expect(
+    media({
+      params: 'darkModePreference',
+      location: 'locationId',
+      globals: { window: { innerHeight: 300, innerWidth: 500 } },
+    })
+  ).toEqual('system');
+});
+
+test('_media darkModePreference returns stored preference', () => {
+  expect(
+    media({
+      params: 'darkModePreference',
+      location: 'locationId',
+      globals: {
+        window: {
+          innerHeight: 300,
+          innerWidth: 500,
+          localStorage: { getItem: () => 'dark' },
+        },
+      },
+    })
+  ).toEqual('dark');
+  expect(
+    media({
+      params: 'darkModePreference',
+      location: 'locationId',
+      globals: {
+        window: {
+          innerHeight: 300,
+          innerWidth: 500,
+          localStorage: { getItem: () => 'light' },
+        },
+      },
+    })
+  ).toEqual('light');
+});
+
 test('_media throw on no innerWidth', () => {
   expect(() => media({ params: true, location: 'locationId', globals: { window: {} } })).toThrow(
-    'Operator Error: device window width not available for _media. Received: true at locationId.'
+    'device window width not available for _media.'
   );
 });

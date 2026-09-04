@@ -1,0 +1,77 @@
+# Copyright 2020-2026 Lowdefy, Inc
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+_ref:
+  path: templates/actions.yaml.njk
+  vars:
+    pageId: SetDarkMode
+    pageTitle: SetDarkMode
+    filePath: actions/SetDarkMode.yaml
+    types: |
+      ```
+      (params?: {
+        darkMode?: 'system' | 'light' | 'dark'
+      }): void
+      ```
+    description: |
+      The `SetDarkMode` action sets the user's dark mode preference. When called without params, it cycles through `light`, `dark`, and `system`. When `darkMode` is provided, it sets the preference to that value.
+
+      - `'system'`: Follow the operating system's dark mode preference (and update live when the OS setting changes).
+      - `'light'`: Force light mode.
+      - `'dark'`: Force dark mode.
+
+      The preference is persisted to `localStorage` and triggers re-rendering of the root Ant Design `ConfigProvider`. All blocks and `_media: darkMode` expressions update automatically.
+
+      > **Note:** If the app's `theme.darkMode` config is set to `'light'` or `'dark'`, the developer has locked the mode. `SetDarkMode` still stores the user's preference, but it won't take visual effect until the config is changed to `'system'`.
+    params: |
+      ###### object (optional)
+        - `darkMode: 'system' | 'light' | 'dark'`: Set the dark mode preference. When omitted, cycles through light, dark, and system.
+    examples: |
+      ###### Cycle dark mode preference:
+      ```yaml
+      - id: toggle_button
+        type: Button
+        properties:
+          title: Toggle Dark Mode
+          icon:
+            _if:
+              test:
+                _media: darkMode
+              then: AiOutlineSun
+              else: AiOutlineMoon
+        events:
+          onClick:
+            - id: toggle
+              type: SetDarkMode
+      ```
+
+      ###### Set dark mode to follow system preference:
+      ```yaml
+      events:
+        onClick:
+          - id: use_system
+            type: SetDarkMode
+            params:
+              darkMode: system
+      ```
+
+      ###### Force dark mode:
+      ```yaml
+      events:
+        onClick:
+          - id: enable_dark
+            type: SetDarkMode
+            params:
+              darkMode: dark
+      ```

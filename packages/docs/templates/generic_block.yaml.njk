@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,19 +31,18 @@ events:
 properties:
   title: {{ block_type }}
 blocks:
-  - id: v3_alert
-    type: Alert
-    properties:
-      banner: true
-      description: <div style="text-align:center;">For version 3 apps find the docs <a href="https://docs-v3.lowdefy.com">here</a>.</div>
-      showIcon: false
-      type: info
   - id: {{ pageId }}_page
     type: PageSiderMenu
     properties:
       title: {{ block_type }}
+      darkModeToggle: true
       header:
-        theme: light
+        theme:
+          _if:
+            test:
+              _media: darkMode
+            then: dark
+            else: light
       menu:
         forceSubMenuRender: true
       sider:
@@ -68,8 +67,8 @@ blocks:
           - {{ category }}
           - {{ block_type }}
     layout:
-      contentGutter: 16
-    areas:
+      gap: 16
+    slots:
       header:
         blocks:
           _ref: templates/header.yaml
@@ -108,11 +107,11 @@ blocks:
               content: |
                 {% if user_defined_areas -%}
                 ```
-                areas: [key]
+                slots: [key]
                 ```
                 {% else %}
                 ```
-                areas: {{ areas | join(', ') }}
+                slots: {{ areas | join(', ') }}
                 ```
                 {% endif %}
           {% endif %}

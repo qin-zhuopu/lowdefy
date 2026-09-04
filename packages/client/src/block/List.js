@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,26 +16,30 @@
 
 import React from 'react';
 import { Area, BlockLayout } from '@lowdefy/layout';
-import { makeCssClass } from '@lowdefy/block-utils';
+import { cn } from '@lowdefy/block-utils';
+import { get } from '@lowdefy/helpers';
 
 import Block from './Block.js';
+import resolveClassNames from './resolveClassNames.js';
 
 const List = ({ block, Blocks, Component, context, loading, lowdefy }) => {
+  const classNames = resolveClassNames(block.eval.class);
   const content = {};
   const contentList = [];
-  Blocks.subBlocks[block.id].forEach((SBlock) => {
-    Object.keys(SBlock.areas).forEach((areaKey) => {
-      content[areaKey] = (areaStyle) => (
+  Blocks.subSlots[block.id].forEach((SBlock) => {
+    Object.keys(SBlock.slots).forEach((slotKey) => {
+      if (SBlock.slots[slotKey].blocks.length === 0) return;
+      content[slotKey] = (contentStyle) => (
         <Area
-          area={block.eval.areas[areaKey]}
-          areaKey={areaKey}
-          areaStyle={[areaStyle, block.eval.areas[areaKey]?.style]}
-          id={`ar-${block.blockId}-${SBlock.id}-${areaKey}`}
-          key={`ar-${block.blockId}-${SBlock.id}-${areaKey}`}
+          area={block.eval.slots[slotKey]}
+          areaKey={slotKey}
+          style={{ ...block.eval.slots[slotKey]?.style, ...contentStyle }}
+          className={cn(block.eval.class?.[slotKey])}
+          id={`ar-${block.blockId}-${SBlock.id}-${slotKey}`}
+          key={`ar-${block.blockId}-${SBlock.id}-${slotKey}`}
           layout={block.eval.layout}
-          makeCssClass={makeCssClass}
         >
-          {SBlock.areas[areaKey].blocks.map((bl) => (
+          {SBlock.slots[slotKey].blocks.map((bl) => (
             <Block
               block={bl}
               Blocks={SBlock}
@@ -52,34 +56,38 @@ const List = ({ block, Blocks, Component, context, loading, lowdefy }) => {
   });
   return (
     <BlockLayout
-      blockStyle={block.eval.style}
+      style={block.eval.style?.block}
+      className={classNames.block}
       id={`bl-${block.blockId}`}
       layout={block.eval.layout}
-      makeCssClass={makeCssClass}
     >
       <Component
         methods={Object.assign(block.methods, {
-          makeCssClass,
+          getLocale: () => lowdefy.i18n?.active ?? lowdefy.i18n?.defaultLocale,
           moveItemDown: block.moveItemDown,
           moveItemUp: block.moveItemUp,
           pushItem: block.pushItem,
           registerEvent: block.registerEvent,
           registerMethod: block.registerMethod,
           removeItem: block.removeItem,
+          translate: lowdefy._internal.translate,
           triggerEvent: block.triggerEvent,
           unshiftItem: block.unshiftItem,
         })}
         basePath={lowdefy.basePath}
         blockId={block.blockId}
+        classNames={classNames}
         components={lowdefy._internal.components}
-        events={block.eval.events}
+        events={block.eval.events ?? {}}
         key={block.blockId}
         list={contentList}
+        value={get(context.state, block.blockId) ?? []}
         loading={loading}
         menus={lowdefy.menus}
         pageId={lowdefy.pageId}
         properties={block.eval.properties}
         required={block.eval.required}
+        styles={block.eval.style ?? {}}
         validation={block.eval.validation}
       />
     </BlockLayout>

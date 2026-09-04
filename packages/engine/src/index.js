@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,14 +15,15 @@
 */
 
 import Actions from './Actions.js';
-import Events from './Events.js';
-import Blocks from './Blocks.js';
+import Slots from './Slots.js';
 import createLink from './createLink.js';
+import Events from './Events.js';
+import getContext from './getContext.js';
+import getHomePathname from './getHomePathname.js';
 import Requests from './Requests.js';
+import resolveTarget from './resolveTarget.js';
 import State from './State.js';
 
-import getContext from './getContext.js';
-
-export { Actions, Events, Blocks, createLink, Requests, State };
+export { Actions, Slots, createLink, Events, getHomePathname, Requests, resolveTarget, State };
 
 export default getContext;

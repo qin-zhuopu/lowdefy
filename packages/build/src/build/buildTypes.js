@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,27 +14,35 @@
   limitations under the License.
 */
 
+import { ConfigError, ConfigWarning } from '@lowdefy/errors';
+
 import basicTypes from '@lowdefy/blocks-basic/types';
 import loaderTypes from '@lowdefy/blocks-loaders/types';
+import findSimilarString from '../utils/findSimilarString.js';
 
 function buildTypeClass(
   context,
   { counter, definitions, store, typeClass, warnIfMissing = false }
 ) {
   const counts = counter.getCounts();
+  const definedTypes = Object.keys(definitions);
   Object.keys(counts).forEach((typeName) => {
     if (!definitions[typeName]) {
+      const configKey = counter.getLocation(typeName);
+
+      let message = `${typeClass} type "${typeName}" was used but is not defined.`;
+      const suggestion = findSimilarString({ input: typeName, candidates: definedTypes });
+      if (suggestion) {
+        message += ` Did you mean "${suggestion}"?`;
+      }
       if (warnIfMissing) {
-        if (typeName === '_id') {
-          return;
-        }
-        context.logger.warn(`${typeClass} type "${typeName}" was used but is not defined.`);
+        context.handleWarning(new ConfigWarning(message, { configKey, checkSlug: 'types' }));
         return;
       }
-      throw new Error(`${typeClass} type "${typeName}" was used but is not defined.`);
+      throw new ConfigError(message, { configKey, checkSlug: 'types' });
     }
     store[typeName] = {
-      originalTypeName: definitions[typeName].originalTypeName,
+      originalTypeName: definitions[typeName].originalTypeName ?? typeName,
       package: definitions[typeName].package,
       version: definitions[typeName].version,
       count: counts[typeName],
@@ -54,13 +62,12 @@ function buildTypes({ components, context }) {
   loaderTypes.blocks.forEach((block) => typeCounters.blocks.increment(block));
   // Used for DisplayMessage in @lowdefy/client
   typeCounters.blocks.increment('Message');
-  // Used by license-invalid page
-  typeCounters.blocks.increment('Button');
-  typeCounters.blocks.increment('Result');
-  typeCounters.operators.client.increment('_get');
+  // Used by blocks-antd Header/PageHeaderMenu/PageSiderMenu darkModeToggle
+  typeCounters.actions.increment('SetDarkMode');
 
   components.types = {
     actions: {},
+    agents: {},
     auth: {
       adapters: {},
       callbacks: {},
@@ -70,6 +77,7 @@ function buildTypes({ components, context }) {
     blocks: {},
     connections: {},
     requests: {},
+    api: {},
     operators: {
       client: {},
       server: {},
@@ -81,6 +89,13 @@ function buildTypes({ components, context }) {
     definitions: context.typesMap.actions,
     store: components.types.actions,
     typeClass: 'Action',
+  });
+
+  buildTypeClass(context, {
+    counter: typeCounters.agents,
+    definitions: context.typesMap.agents,
+    store: components.types.agents,
+    typeClass: 'Agent',
   });
 
   buildTypeClass(context, {

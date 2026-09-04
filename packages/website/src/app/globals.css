@@ -1,0 +1,286 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+  }
+}
+
+@layer components {
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary-400 to-cyan-400 bg-clip-text text-transparent;
+  }
+}
+
+/* Grid pattern background */
+.bg-grid {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+:is(.dark .bg-grid) {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
+}
+
+/* Dense grid for accent areas */
+.bg-grid-dense {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+:is(.dark .bg-grid-dense) {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.04) 1px, transparent 1px);
+}
+
+/* Glow effect for key elements */
+.glow-blue {
+  box-shadow:
+    0 0 40px rgba(25, 144, 255, 0.08),
+    0 0 80px rgba(25, 144, 255, 0.03);
+}
+
+:is(.dark .glow-blue) {
+  box-shadow:
+    0 0 40px rgba(25, 144, 255, 0.15),
+    0 0 80px rgba(25, 144, 255, 0.05);
+}
+
+.glow-cyan {
+  box-shadow:
+    0 0 40px rgba(34, 211, 186, 0.08),
+    0 0 80px rgba(34, 211, 186, 0.03);
+}
+
+:is(.dark .glow-cyan) {
+  box-shadow:
+    0 0 40px rgba(34, 211, 186, 0.15),
+    0 0 80px rgba(34, 211, 186, 0.05);
+}
+
+/* Engineering bracket corners for cards */
+.bracket-corners {
+  position: relative;
+}
+
+.bracket-corners::before,
+.bracket-corners::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.bracket-corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid rgba(25, 144, 255, 0.4);
+  border-left: 2px solid rgba(25, 144, 255, 0.4);
+}
+
+.bracket-corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid rgba(25, 144, 255, 0.4);
+  border-right: 2px solid rgba(25, 144, 255, 0.4);
+}
+
+.bracket-corners-red::before {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.bracket-corners-red::after {
+  border-color: rgba(248, 113, 113, 0.4);
+}
+
+.bracket-corners-green::before {
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+.bracket-corners-green::after {
+  border-color: rgba(74, 222, 128, 0.4);
+}
+
+.bracket-corners-cyan::before {
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+.bracket-corners-cyan::after {
+  border-color: rgba(34, 211, 238, 0.4);
+}
+
+/* Syntax highlighting for YAML -light mode */
+.yaml-key {
+  color: #0369a1;
+}
+.yaml-value {
+  color: #a16207;
+}
+.yaml-string {
+  color: #0e7490;
+}
+.yaml-comment {
+  color: #94a3b8;
+}
+.yaml-dash {
+  color: #64748b;
+}
+
+/* Syntax highlighting for YAML -dark mode */
+:is(.dark .yaml-key) {
+  color: #7dd3fc;
+}
+:is(.dark .yaml-value) {
+  color: #fef08a;
+}
+:is(.dark .yaml-string) {
+  color: #a5f3fc;
+}
+:is(.dark .yaml-comment) {
+  color: #64748b;
+}
+:is(.dark .yaml-dash) {
+  color: #94a3b8;
+}
+
+/* Article content typography */
+.article-content {
+  @apply text-slate-700 dark:text-slate-300 leading-relaxed;
+}
+
+.article-content p {
+  @apply mb-6 text-base sm:text-lg leading-relaxed;
+}
+
+.article-content h2 {
+  @apply text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white font-mono mt-12 mb-4;
+}
+
+.article-content h3 {
+  @apply text-xl sm:text-2xl font-bold text-slate-900 dark:text-white font-mono mt-10 mb-3;
+}
+
+.article-content ul,
+.article-content ol {
+  @apply mb-6 pl-6;
+}
+
+.article-content ul {
+  @apply list-disc;
+}
+
+.article-content ol {
+  @apply list-decimal;
+}
+
+.article-content li {
+  @apply mb-2 text-base sm:text-lg leading-relaxed;
+}
+
+.article-content code {
+  @apply font-mono text-sm bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 border border-slate-200 dark:border-slate-700;
+}
+
+.article-content pre {
+  @apply mb-6 p-4 bg-slate-900 dark:bg-slate-800/80 border border-slate-800 dark:border-slate-700 overflow-x-auto;
+}
+
+.article-content pre code {
+  @apply bg-transparent border-none p-0 text-slate-100;
+}
+
+.article-content blockquote {
+  @apply mb-6 pl-4 border-l-2 border-primary-500/40 text-slate-600 dark:text-slate-400 italic;
+}
+
+.article-content strong {
+  @apply font-bold text-slate-900 dark:text-white;
+}
+
+.article-content a {
+  @apply text-primary-500 hover:text-primary-400 underline underline-offset-2 transition-colors;
+}
+
+.article-content img {
+  @apply my-8 w-full;
+}
+
+.article-content hr {
+  @apply my-8 border-slate-200 dark:border-slate-800;
+}
+
+.article-content table {
+  @apply mb-6 w-full text-sm sm:text-base border-collapse border border-slate-200 dark:border-slate-700;
+}
+
+.article-content thead {
+  @apply bg-slate-50 dark:bg-slate-800/60;
+}
+
+.article-content th {
+  @apply px-4 py-2 text-left font-semibold text-slate-900 dark:text-white border border-slate-200 dark:border-slate-700;
+}
+
+.article-content td {
+  @apply px-4 py-2 border border-slate-200 dark:border-slate-700;
+}
+
+/* Dark scrollbar for code blocks */
+.scrollbar-dark::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+
+.scrollbar-dark::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+.scrollbar-dark::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+.scrollbar-dark {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+
+/* Clear the 64px fixed nav after anchor jumps */
+.article-content :is(h2, h3) {
+  scroll-margin-top: 5rem;
+}
+
+/* Permalink: hidden until heading is hovered or anchor is focused */
+.article-content .heading-anchor {
+  opacity: 0;
+  margin-left: 0.4rem;
+  text-decoration: none;
+  color: rgb(148 163 184); /* slate-400 */
+  transition: opacity 150ms;
+}
+.article-content :is(h2, h3):hover .heading-anchor,
+.article-content .heading-anchor:focus {
+  opacity: 1;
+}
+.dark .article-content .heading-anchor {
+  color: rgb(100 116 139); /* slate-500 */
+}

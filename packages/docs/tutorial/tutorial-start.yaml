@@ -1,4 +1,4 @@
-# Copyright 2020-2024 Lowdefy, Inc
+# Copyright 2020-2026 Lowdefy, Inc
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,7 +89,7 @@ _ref:
           path: templates/cli_command.yaml.njk
           vars:
             id: init
-            command: 'pnpx lowdefy@4 init'
+            command: 'pnpx lowdefy@5 init'
 
       - id: body_init
         type: MarkdownWithCode
@@ -111,7 +111,7 @@ _ref:
           path: templates/cli_command.yaml.njk
           vars:
             id: dev
-            command: 'pnpx lowdefy@4 dev'
+            command: 'pnpx lowdefy@5 dev'
 
       - id: body_open_browser
         type: MarkdownWithCode
@@ -122,8 +122,6 @@ _ref:
       - id: example1
         type: PageHeaderMenu
         properties:
-          style:
-            minHeight: 300px
           menu:
             links:
               - id: welcome
@@ -131,10 +129,13 @@ _ref:
                 properties:
                   title: welcome
 
+        style:
+          .element:
+            minHeight: 300px
         blocks:
           - id: content_card
             type: Card
-            areas:
+            slots:
               content:
                 blocks:
                   - id: content
@@ -146,7 +147,7 @@ _ref:
                       icon:
                         name: AiOutlineHeart
                         color: '#f00'
-                    areas:
+                    slots:
                       extra:
                         blocks:
                           - id: docs_button
@@ -161,8 +162,6 @@ _ref:
                                   params:
                                     url: https://docs.lowdefy.com
                                     newTab: true
-              footer:
-                blocks:
                   - id: footer
                     type: Paragraph
                     properties:
@@ -198,7 +197,7 @@ _ref:
                     type: PageHeaderMenu
                     properties:
                       title: Welcome
-                    areas:
+                    slots:
                       content:
                         justify: center
                         blocks:
@@ -215,7 +214,7 @@ _ref:
                                   icon:
                                     name: AiOutlineHeart
                                     color: '#f00'
-                                areas:
+                                slots:
                                   extra:
                                     blocks:
                                       - id: docs_button
@@ -258,9 +257,9 @@ _ref:
 
             The Lowdefy CLI helps you develop a Lowdefy app.
 
-            We used the `pnpx lowdefy@4 init` command to initialize a new project. This created all the essential files.
+            We used the `pnpx lowdefy@5 init` command to initialize a new project. This created all the essential files.
 
-            We also used the `pnpx lowdefy@4 dev` command to start a development server. The development server runs a Lowdefy app locally on your computer, which can be accessed at http://localhost:3000. The development server watches your configuration files, and if any of them changes it "builds" (compiles the configuration together for the server to serve) the configuration again and refreshes the browser to show the changes.
+            We also used the `pnpx lowdefy@5 dev` command to start a development server. The development server runs a Lowdefy app locally on your computer, which can be accessed at http://localhost:3000. The development server watches your configuration files, and if any of them changes it "builds" (compiles the configuration together for the server to serve) the configuration again and refreshes the browser to show the changes.
 
             ### Up next
 

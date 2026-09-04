@@ -1,5 +1,313 @@
 # Change Log
 
+## 5.6.0
+
+### Minor Changes
+
+- 8306262: feat(blocks-aggrid): Add `AgGridLowdefy`, upgrade to AG Grid v33, and theme every grid through the Theming API.
+
+  **Two new blocks.** `AgGridLowdefy` (display) and `AgGridLowdefyInput` (input) are grids themed from the app's antd design tokens — primary colour, surfaces, fonts and radius — so they look like they belong in a Lowdefy app and follow light/dark mode automatically, with no configuration and no separate dark block. They take a `size` property (`small | middle | large`, default `middle`) mirroring antd Table's densities, which sets row and header height to 36 / 44 / 54 pixels. Everything else — properties, events, methods, cell renderers — is identical to the existing grids.
+
+  To adopt, change `type: AgGridBalham` to `type: AgGridLowdefy` (or `type: AgGridInputBalham` to `type: AgGridLowdefyInput`). Every property carries over unchanged and the grid will deliberately look different afterwards. It is a visual opt-in, so there is no codemod.
+
+  Note that `size` loses to an explicit height: `rowHeight` and `headerHeight` are AG Grid grid options, and a grid option beats the theme parameter `size` sets. Setting `size: large` alongside `rowHeight: 30` gives 30 pixel rows under a 54 pixel header — use one or the other.
+
+  **AG Grid v33.** The package moves from `@ag-grid-community/*@32` to `ag-grid-community` + `ag-grid-react@33.3.2`, with `AllCommunityModule` registered explicitly. The Theming API is v33's default and class-based file themes are gone, so no block imports AG Grid CSS any more.
+
+  **The Balham, Alpine and Material blocks change appearance slightly.** They are kept indefinitely with the same API and the same names, but they now render AG Grid's prebuilt Theming API equivalents of those themes, with the antd colour mapping carried across as theme parameters. No config change is needed. What shifts:
+
+  - Spacing and header weight move a little — Balham rows go 28px to 29px, cell horizontal padding tightens on Balham and Alpine, the wrapper corner radius now comes from each theme (Balham 2px, Alpine 3px, Material 0) rather than a uniform 6px, and Balham's header weight goes from 600 to bold. Icons come from each theme's own SVG set, so glyph shapes differ from the old icon font.
+  - Row height now tracks the app's antd font size on Balham and Material, because v33 derives it from the data font size. It was font-size-independent before. The height only moves once the font size passes the theme's icon size (16px on Balham, 18px on Material), so at antd's default 14px nothing changes — you will see it at 18px or 20px. Alpine is unaffected at any font size.
+  - Four colours are re-pointed: row hover is a neutral fill rather than a primary tint, borders are lighter, the checkbox outline tone changes, and popup shadows are softer.
+  - Zebra striping, fonts and overall row density are preserved.
+
+  **A new `themeParams` property, on all eight blocks.** `themeParams` takes AG Grid Theming API parameter names and merges them onto the block's theme — the recommended way to retint a single grid:
+
+  ```yaml
+  - id: my_table
+    type: AgGridLowdefy
+    properties:
+      themeParams:
+        headerBackgroundColor: '#1a1a2e'
+        headerTextColor: '#e0e0ff'
+        borderColor: var(--ant-color-primary)
+  ```
+
+  Values are CSS strings and may reference antd tokens. Neither Lowdefy nor AG Grid validates parameter names, so a misspelled key is a silent no-op — check spelling against AG Grid's theming parameter reference.
+
+  Overriding `--ag-*` variables through a block's `style` — the documented `custom_theme` technique — **still works**; the Theming API honours an ancestor's declaration by design. The one caveat is that v33 renamed or folded away a number of the v32 `--ag-*` variables, and an override naming one of those is now a silent no-op. `--ag-header-foreground-color`, which appears in the documented example, is the case to watch: it is now `headerTextColor` (`--ag-header-text-color`). The AgGrid docs page carries the mapping table.
+
+  **One deprecation warning existing apps may see.** `rowSelection: multiple` / `single` is deprecated in v33 in favour of `rowSelection: { mode: multiRow }` / `{ mode: singleRow }`. The string form still works. If you migrate it, three things must move together:
+
+  - **Set `enableClickSelection: true`.** The string form defaults click-to-select on; the object form defaults it **off**. A bare `{ mode: singleRow }` silently stops clicking a row from selecting it, and `onRowSelected` / `onSelectionChanged` stop firing. The object form is not equivalent without this.
+  - **Move the colDef flags in the same edit.** `checkboxSelection` and `headerCheckboxSelection` on a column become `rowSelection.checkboxes` and `rowSelection.headerCheckbox`. v33 only supports `headerCheckboxSelection` alongside the _string_ form, so migrating one without the other breaks the header checkbox.
+  - **Six sibling options are read only in the string branch and are silently lost on migration:** `suppressRowClickSelection`, `suppressRowDeselection`, `rowMultiSelectWithClick`, `groupSelectsChildren`, `groupSelectsFiltered` and `isRowSelectable`. All six are deprecated in favour of `rowSelection.*` — move any you use across.
+
+  **Dark-mode apps now get dark browser chrome throughout (`@lowdefy/client`, `@lowdefy/server`, `@lowdefy/server-dev`, `@lowdefy/server-e2e`).** `color-scheme` is now set on `<html>` from the resolved dark-mode state — in the client's dark-mode effect and in each server's pre-hydration inline script, so first paint matches too. Native scrollbars, `<select>` dropdowns, date pickers and autofill backgrounds render dark in a dark app, inside grids and everywhere else. This is an app-wide behaviour change, well beyond AgGrid, and it is what lets the grid's own scrollbars follow dark mode. Apps pinned to light with `theme.darkMode: light` are unaffected, including on a dark OS. Apps that leave `theme.darkMode` unset get the default, `system`, so on a dark OS they resolve to dark and do pick up `color-scheme: dark` — set `theme.darkMode: light` if that is not wanted.
+
+### Patch Changes
+
+- Updated dependencies [3ead269]
+- Updated dependencies [9399e4e]
+- Updated dependencies [79bbd84]
+- Updated dependencies [508708d]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+  - @lowdefy/blocks-antd@5.6.0
+  - @lowdefy/block-utils@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- Updated dependencies [59cae71]
+  - @lowdefy/blocks-antd@5.5.1
+  - @lowdefy/block-utils@5.5.1
+  - @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Minor Changes
+
+- c5cc340: feat(blocks-aggrid): Add interactive cell inputs — `selector`, `multipleSelector`, `switch`, `textInput`, and `paragraphInput`.
+
+  The display AgGrid theme blocks (`AgGridAlpine`, `AgGridMaterial`, `AgGridBalham`) gain five new built-in `cell.type` renderers that put an input control in each row, alongside the existing `buttons` cell. They follow the same event-only model: the control is bound to the row value, and on change it fires the column's `eventName` with `{ row, value, newValue }`. The app persists the change by updating the data bound to `rowData` (e.g. a `SetState` or `Request` in the event chain); the cell also writes the new value into ag-grid's row node for immediate feedback.
+
+  - `selector` / `multipleSelector` — antd `Select` (single / multiple). Reuses the standalone `Selector`/`MultipleSelector` block option handling, so `options` (primitives or `{ label, value, disabled, color, filterString, style }`), `valueKey`, `primaryKey`, `variant` (incl. `solid` fill), colored labels and tag pills all work. Other config: `placeholder`, `allowClear`, `showSearch`, `showArrow`, `maxTagCount`, `autoClearSearchValue`, `size`, `disabled`.
+  - `switch` — antd `Switch`, fires on every toggle (boolean value). Config: `checkedText`, `uncheckedText`, `checkedIcon`, `uncheckedIcon`, `color`, `size`.
+  - `textInput` — antd `Input`, commits on blur / Enter (typing is held locally so the cell keeps focus). Config: `placeholder`, `allowClear`, `maxLength`, `showCount`, `inputType` (HTML input type — renamed to avoid clashing with `cell.type`), `variant`/`bordered`, `size`.
+  - `paragraphInput` — antd `Typography.Paragraph` with inline editing; commits on edit confirm. Config: `editable`, `maxLength`, `autoSize`, `editTooltip`, `copyable`, `ellipsis`, and text styling (`code`, `strong`, `italic`, `underline`, `delete`, `mark`, `textType`).
+
+### Patch Changes
+
+- @lowdefy/blocks-antd@5.5.0
+- @lowdefy/block-utils@5.5.0
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+  - @lowdefy/helpers@5.4.0
+  - @lowdefy/block-utils@5.4.0
+
+## 5.3.0
+
+### Minor Changes
+
+- 99fe9b8: feat(blocks-aggrid): Buttons cell renderer and ag-grid v32 update.
+
+  **New `cell.type: buttons` renderer** — render a list of action buttons in a column with each button firing its own block-level event with the row data on the payload. Per-button properties mirror the antd Button block (`title`, `icon`, `type`, `variant`, `color`, `size`, `shape`, `danger`, `ghost`, `hideTitle`, `disabled`) plus row-data-path variants (`titleField`, `iconField`, `disabledField`, `hiddenField`) for per-row state. Use this for inline Edit/Delete/Approve actions without `_if` dispatching.
+
+  **ag-grid updated to v32.3.9** — pulls in two majors of upstream fixes. The column header UX (hamburger column menu with filter popup) is preserved by default; opt into the new ag-grid v32 column menu via `columnMenu: 'new'` on the block.
+
+  **Cell focus suppressed by default** — `suppressCellFocus` now defaults to `true` so the keyboard focus outline doesn't visually compete with built-in cell renderers (tags, buttons, links). Override with `suppressCellFocus: false` if needed. Cell overflow is also clipped so flex-rendered content stays inside its column.
+
+- 7f40746: feat(blocks-aggrid): Tag cell renders one tag per item for array-valued fields.
+
+  The `cell.type: tag` renderer now accepts an array of strings in addition to a single string. Each item is rendered as its own styled tag and resolves its colour through the existing `colorMap` / `colorFrom` / `default` configuration. Empty arrays and arrays containing only null/empty entries render the em-dash placeholder, matching the existing null-value behaviour. Single-string values are unchanged.
+
+- e3a08cc: feat(blocks-aggrid): Auto-colour tag cells by default for consistent per-value colouring.
+
+  When a `cell.type: tag` column is used with no `colorMap`, no `colorFrom`, and no `default`, tag values are now coloured from a stable hash so the same value always gets the same colour across rows, columns, and tables. The palette uses 12 antd named hues (red, volcano, orange, gold, yellow, lime, green, cyan, blue, geekblue, purple, magenta) and respects the active theme.
+
+  The grey fallback is still available — set `cell: { type: tag, default: default }` on any column to opt out. When `colorMap`, `colorFrom`, or `default` is set, behaviour is unchanged.
+
+### Patch Changes
+
+- @lowdefy/block-utils@5.3.0
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Patch Changes
+
+- 186a57d: fix(blocks-aggrid): Suppress cell focus by default and clip overflowing cell content.
+
+  The ag-grid cell focus outline visually competed with built-in cell renderers (buttons, links, tags), so `suppressCellFocus` now defaults to `true` and can still be overridden per grid. The antd cell wrapper also clips overflowing flex children so long text and inline cell components no longer blow out the cell width.
+
+  - @lowdefy/block-utils@5.2.0
+  - @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Minor Changes
+
+- b2a2a981d: feat(blocks-aggrid): Add built-in cell renderer types.
+
+  Every AgGrid column now accepts a `cell` object on `columnDefs` entries that selects a first-class renderer — `tag`, `avatar`, `link`, `date`, `boolean`, `progress`, `number` — plus an `ellipsis: N` column-level helper that auto-enables `wrapText` + `autoHeight` with an N-line clamp.
+
+  The `number` renderer wraps `Intl.NumberFormat` with Excel-style config: `format` (`number` / `currency` / `percent` / `compact`), `locale`, `currency`, `decimals`, accounting-style `negative: parentheses`, `signColor` (green/red by sign), and optional `prefix` / `suffix`. Number columns auto-right-align (`cellStyle.justifyContent: flex-end` + `ag-right-aligned-header`) and every `cell.type` supports an `align: left | center | right` override. Renderer output is React, vertically centred, and styled entirely through antd CSS tokens (`--ant-control-height`, `--ant-margin-xs`, `--ant-color-*`, `--ant-border-radius`, `--ant-font-size`, etc.) so the grid adapts to Material vs Balham row heights and to dark / compact antd `theme.algorithm` without per-theme overrides.
+
+  Field-valued keys (`nameField`, `srcField`, `idField`, `colorFrom`, and every value inside `link.urlQuery`) are plain row-data path strings — no `_function` wrapping required. Null values render a muted em-dash across every built-in type.
+
+  Link navigation: `cell.type: link` and `avatar.link` render anchors and emit a new `onCellLink` block event with the resolved link config; wire it to a `Link` action (`params: { _event: link }`) to navigate — matches the existing Lowdefy event → action pattern.
+
+  `antd`, `@ant-design/icons`, and `dayjs` are now declared as peer dependencies on `@lowdefy/blocks-aggrid` (de-facto required by the existing `ag-grid-antd.module.css` token mapping).
+
+  Also fixes the long-standing cell vertical-centering drift: `.ag-cell` is now a flex container via the antd theme CSS module, which also benefits users' existing `renderHtml` cells.
+
+- 72625593e: feat(blocks-aggrid): Declare tooltip properties in block schemas.
+
+  All six AgGrid variants (Alpine/Balham/Material for display and input) now declare `enableBrowserTooltips`, `tooltipShowDelay`, and `tooltipHideDelay` at the grid level and `tooltipField`, `tooltipValueGetter`, and `tooltipComponent` at the column level. These AG Grid props already worked — they were passed through via property spreading — but were not documented in the block schemas. Users can now discover and configure tooltips directly from the schema.
+
+### Patch Changes
+
+- a7f2480b4: fix(blocks-aggrid): React to `loading` prop changes on AgGrid.
+
+  The `loading` block flag now toggles AG Grid's native `showLoadingOverlay` / `hideOverlay` at runtime. Previously the overlay calls were inside a `useEffect` with an empty dependency array, so they only ran once on mount and never reacted to subsequent `loading` changes. The effect has been split in two — method registration still runs once, overlay toggling now runs whenever `loading` changes — and an `onGridReady` callback applies the initial overlay state safely after the grid api is attached.
+
+- 797ab5b2d: fix(blocks-aggrid): Safari loading overlay stuck.
+
+  `AgGrid` and `AgGridInput` no longer use ag-grid's internal `showLoadingOverlay` / `hideOverlay` API to reflect the block's `loading` prop. On Safari / WebKit, a microtask race between our `hideOverlay()` call and ag-grid's own late `showOverlay` tick left the "Loading…" box stuck on screen even after data had rendered (ag-grid issues #4421, #1665, #8358). Chromium happened to win the race the other way, which hid the symptom.
+
+  Both blocks now wrap `AgGridReact` in a `position: relative` div, set `suppressLoadingOverlay` on the grid, and render a small themed overlay component (`LoadingOverlay.js`) when the Lowdefy `loading` prop is `true`. The overlay is styled via antd CSS custom properties, so it follows the active theme.
+
+  - @lowdefy/block-utils@5.1.0
+  - @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- 29eb199c7f: Restructure block metadata from component static properties to dedicated `meta.js` files.
+
+  ### Breaking Changes
+
+  - **`schema.js` renamed to `meta.js`**: Block definitions moved from `schema.js` to `meta.js`. The `meta.js` files export `category`, `icons`, `valueType`, `cssKeys`, `events`, and `properties` (JSON Schema).
+  - **`schemas.js` barrel renamed to `metas.js`**: Block packages export `./metas` instead of `./schemas`.
+  - **`.meta` removed from components**: Block components no longer have a `.meta` static property. Metadata is loaded from the `blockMetas.json` build artifact at runtime.
+  - **`blockMetas.json` build artifact**: The build pipeline writes `plugins/blockMetas.json` containing category, valueType, and initValue for each block type.
+  - **`buildBlockSchema(meta)`**: New function in `@lowdefy/block-utils` generates complete JSON Schema from meta objects with operator support and CSS slot key validation.
+
+- f430f02dde: Replace auto-generated `types.json` with source `types.js` files in all plugin packages.
+
+  ### Breaking Changes
+
+  - **Plugin type resolution**: Plugin types are now read from source `types.js` files instead of auto-generated `types.json`. Block packages derive types from their `metas.js` barrel using the `extractBlockTypes` helper.
+  - **`extract-plugin-types` script removed**: The build-time extraction script in `@lowdefy/node-utils` has been deleted. Each plugin package maintains its own `types.js`.
+
+- f430f02dde: Migrate all blocks from `defaultProps` to `withBlockDefaults` wrapper for React 19 compatibility.
+
+  ### Breaking Changes
+
+  - **`defaultProps` removed**: React 19 silently ignores `defaultProps` on function components. All ~101 block components now use a `withBlockDefaults` wrapper from `@lowdefy/block-utils`.
+  - **`withBlockDefaults` API**: New export from `@lowdefy/block-utils` that wraps block components with default property injection. Antd blocks use `withTheme` which absorbs defaults; non-antd blocks use the generic wrapper.
+
+- f430f02dde: Replace the Less/Emotion styling system with unified `style` and `class` properties using `.` prefixed CSS slot keys.
+
+  ### Breaking Changes
+
+  - **Less removed**: `.less` files are no longer supported. All styling uses CSS, CSS Modules, or Tailwind utilities.
+  - **`makeCssClass` removed**: Blocks no longer call `methods.makeCssClass()`. They receive `classNames` and `styles` objects as props, keyed by CSS slot names (`element`, `icon`, `header`, `body`, etc.).
+  - **`mediaToCssObject` removed** from `@lowdefy/block-utils`.
+  - **`style` replaces `styles`**: The `style` (singular) property handles all styling. Using `styles` (plural) throws a `ConfigError`.
+  - **`class` property added**: New `class` property for CSS classes (Tailwind utilities, custom classes). Supports string, array, or object with `.` slot keys.
+  - **`properties.style` moved**: Block-specific `properties.style` maps to `style: { .element }` at build time.
+  - **Inline style props removed**: `headerStyle`, `bodyStyle`, `maskStyle`, `contentWrapperStyle`, `contentStyle`, `labelStyle`, `valueStyle`, `tabBarStyle`, `overlayStyle` are replaced by CSS slot keys (e.g., `style: { .header }`, `style: { .body }`).
+
+  ### CSS Slot Keys
+
+  `.` prefixed keys target specific parts of a block:
+
+  | Key                                | Target                                                  |
+  | ---------------------------------- | ------------------------------------------------------- |
+  | `.block`                           | Layout wrapper (grid column)                            |
+  | `.element`                         | Component root element                                  |
+  | `.header`, `.body`, `.cover`, etc. | Antd semantic sub-elements (declared in `meta.cssKeys`) |
+
+  Flat shorthand (no `.` keys) maps to `.block`:
+
+  ```yaml
+  # These are equivalent:
+  style: { marginTop: 20 }
+  style:
+    .block: { marginTop: 20 }
+  ```
+
+### Minor Changes
+
+- 45964f1506: AG Grid blocks now follow the Ant Design theme automatically. All six grid blocks (AgGridAlpine, AgGridBalham, AgGridMaterial, and their Input variants) map ag-grid CSS variables to antd design tokens, so they respond to light/dark mode and custom theme colors without any configuration. Override individual `--ag-*` variables via the block's `style` property for per-instance customization. The explicit dark variant blocks (AgGridAlpineDark, AgGridBalhamDark, AgGridInputAlpineDark, AgGridInputBalhamDark) have been removed.
+
+### Patch Changes
+
+- Updated dependencies [29eb199c7f]
+- Updated dependencies [130a569d36]
+- Updated dependencies [905d5d406]
+- Updated dependencies [f430f02dde]
+- Updated dependencies [f430f02dde]
+  - @lowdefy/block-utils@5.0.0
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.3
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.2
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.7.1
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+  - @lowdefy/block-utils@4.7.0
+
+## 4.6.0
+
+### Patch Changes
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+  - @lowdefy/block-utils@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.2
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.1
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/block-utils@4.5.0
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Patch Changes

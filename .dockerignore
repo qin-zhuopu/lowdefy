@@ -1,0 +1,54 @@
+# Keep the build context small and reproducible. The production build is
+# generated *inside* the image by `pnpm app:build`, so we must NOT copy any
+# host-built artifacts that could shadow a clean build.
+
+# Version control / CI metadata
+.git
+.github
+.turbo
+.changeset
+
+# Agent / editor scratch state (gitignored on host, irrelevant in image)
+.agents
+.claude
+.superpowers
+.worktrees
+.vscode
+
+# Node dependencies - reinstalled fresh in the image
+node_modules
+**/node_modules
+
+# Build outputs - regenerated inside the image.
+# NOTE: do NOT use a broad "**/build/**" here. Several packages keep *source*
+# files under a directory literally named build/ (e.g.
+# packages/plugins/operators/operators-js/src/operators/build/env.js, a
+# build-time operator). Excluding those would break `lowdefy build`. Only the
+# server package's generated build/ output is excluded, by exact path.
+_server
+**/dist
+**/es
+**/.next
+**/.lowdefy
+**/lowdefy-build
+**/out
+**/coverage
+packages/build/build
+packages/servers/*/build
+packages/servers/*/lowdefy-build
+packages/servers/*/public
+packages/servers/*/package.original.json
+packages/docs/public/sitemap.xml
+packages/docs/public/search-index.json
+packages/website/public/sitemap.xml
+
+# Local runtime data / logs
+.lowdefy-jenkins
+*.sqlite
+*.sqlite-*
+log.txt
+lerna-debug.log
+
+# Deployment descriptors not needed inside the image
+Dockerfile
+.dockerignore

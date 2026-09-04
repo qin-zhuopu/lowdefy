@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,18 +16,27 @@
 
 import React from 'react';
 import { get } from '@lowdefy/helpers';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
-const AnchorBlock = ({ blockId, events, components: { Icon, Link }, methods, properties }) => {
+const AnchorBlock = ({
+  blockId,
+  classNames,
+  events,
+  components: { Icon, Link, ShortcutBadge },
+  methods,
+  properties,
+  styles,
+}) => {
   const disabled = properties.disabled || get(events, 'onClick.loading');
   const { icon, title, ...linkProperties } = properties;
   return (
     <Link
       id={blockId}
-      className={methods.makeCssClass([
-        properties.style,
-        disabled && { color: '#BEBEBE', cursor: 'not-allowed' },
-      ])}
+      className={classNames?.element}
+      style={{
+        ...(disabled ? { color: '#BEBEBE', cursor: 'not-allowed' } : {}),
+        ...styles?.element,
+      }}
       disabled={disabled}
       onClick={() => methods.triggerEvent({ name: 'onClick' })}
       {...linkProperties}
@@ -37,26 +46,22 @@ const AnchorBlock = ({ blockId, events, components: { Icon, Link }, methods, pro
           {icon && (
             <Icon
               blockId={`${blockId}_icon`}
+              classNames={{ element: classNames?.icon }}
               events={events}
               properties={
                 get(events, 'onClick.loading')
                   ? { name: 'AiOutlineLoading3Quarters', spin: true }
                   : icon
               }
+              styles={{ element: { marginRight: 4, ...styles?.icon } }}
             />
           )}
           {title || defaultTitle}
+          <ShortcutBadge shortcut={events.onClick?.shortcut} />
         </>
       )}
     </Link>
   );
 };
 
-AnchorBlock.defaultProps = blockDefaultProps;
-AnchorBlock.meta = {
-  category: 'display',
-  icons: ['AiOutlineLoading3Quarters'],
-  styles: [],
-};
-
-export default AnchorBlock;
+export default withBlockDefaults(AnchorBlock);

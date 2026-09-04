@@ -1,0 +1,385 @@
+# @lowdefy/api
+
+Server-side API handler for Lowdefy applications. Executes requests, manages connections, and handles authentication context.
+
+## Purpose
+
+This package provides the server-side logic that:
+
+- Executes data requests against configured connections
+- Handles custom API endpoints
+- Manages authentication/authorization context
+- Serves page and menu configurations to the client
+
+## Key Exports
+
+```javascript
+import {
+  callEndpoint, // Execute custom API endpoints
+  callRequest, // Execute data requests
+  createApiContext, // Create server context with auth info
+  getHomeAndMenus, // Fetch menu configuration
+  getNextAuthConfig, // Auth.js configuration
+  getPageConfig, // Fetch page configuration
+  getRootConfig, // Fetch app root configuration
+  logClientError, // Process client errors with schema validation
+  ConfigurationError,
+  RequestError,
+  ServerError,
+} from '@lowdefy/api';
+```
+
+## Architecture
+
+### Request Flow
+
+```
+Client Action (Request)
+        │
+        ▼
+┌───────────────────┐
+│   callRequest()   │
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐     ┌────────────────────────┐
+│ getRequestConfig  │────▶│ Read from build output │
+└───────────────────┘     └────────────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│authorizeRequest() │  ◀── Check user roles/permissions
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│  getConnection()  │  ◀── Load connection handler (MongoDB, HTTP, etc.)
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│evaluateOperators()│  ◀── Resolve _secret, _user, etc. in connection/request
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│  validateSchemas  │  ◀── Validate connection/request properties
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│callRequestResolver│  ◀── Execute the actual database/API call
+└───────────────────┘
+        │
+        ▼
+    Response
+```
+
+### Endpoint Flow (Custom API)
+
+Endpoints allow multi-step server-side routines:
+
+```
+Client Action (Endpoint)
+        │
+        ▼
+┌───────────────────┐
+│  callEndpoint()   │
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│getEndpointConfig()│
+└───────────────────┘
+        │
+        ▼
+  InternalApi? ──yes──▶ throw "does not exist"
+        │ no
+        ▼
+┌───────────────────┐
+│authorizeEndpoint()│
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│   runRoutine()    │  ◀── Dispatch by prefix: request:, endpoint:, control
+└───────────────────┘
+     │          │
+     ▼          ▼
+ handleRequest  handleEndpointCall
+     │              │
+     │              ▼
+     │          invokeEndpoint ──▶ runRoutine (child)
+     │              ▲
+     │              │
+     │       callApi (resolver-side, constructed in callRequestResolver)
+     ▼
+   Response/Error
+```
+
+`invokeEndpoint` is the shared chokepoint for endpoint-to-endpoint calls. Both the routine `CallApi` step (via `handleEndpointCall`) and the resolver-side `callApi` function (constructed in `callRequestResolver` and passed into the request resolver argument bag) flow through it. The routine-step path wraps the returned envelope with `addStepResult` and status mapping; the resolver path throws on `error`/`reject` and returns the response otherwise.
+
+### Agent Flow
+
+Agents handle AI chat with streaming responses:
+
+```
+Client (AgentChat block)
+        │
+        ▼
+POST /api/agent/{pageId}/{agentId}?conversationId=...
+Body: { messages: UIMessage[], urlQuery }
+        │
+        ▼
+┌───────────────────┐
+│   callAgent()     │
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐     ┌──────────────────────────────┐
+│ getAgentConfig()  │────▶│ Read from agents/{id}.json   │
+└───────────────────┘     └──────────────────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│evaluateOperators()│  ◀── Resolve _secret, _user in agent properties
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│  getConnection()  │  ◀── Load AI provider (Anthropic, OpenAI, Google)
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│getAgentResolver() │  ◀── Get agent type (ClaudeAgent, OpenAIAgent, etc.)
+└───────────────────┘
+        │
+        ▼
+┌───────────────────┐
+│ resolver(context) │  ◀── Calls handleAgentChat in @lowdefy/ai-utils
+└───────────────────┘
+        │
+        ▼
+   Streaming Response (text/event-stream)
+```
+
+The resolver context includes `callEndpoint` (for tool execution), `getAgentConfig` (for sub-agents), `getConnectionForAgent` (for sub-agent connections), and `resolveMcpSources` (for MCP connectionId references).
+
+See [Agent System Architecture](../architecture/agent-system.md) for the complete flow.
+
+## Key Modules
+
+### `/context/`
+
+| Module                       | Purpose                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `createApiContext.js`        | Initializes context with user session, state, and helper functions (steps/payload live on routineContext, not here) |
+| `createAuthorize.js`         | Creates authorization checker for role-based access                                                                 |
+| `createReadConfigFile.js`    | Utility to read build output files                                                                                  |
+| `createEvaluateOperators.js` | Server-side operator evaluation; accepts `steps`/`payload` per call for routine isolation                           |
+| `errors.js`                  | Error types: ConfigurationError, RequestError, ServerError                                                          |
+
+### `/routes/request/`
+
+| Module                    | Purpose                                                |
+| ------------------------- | ------------------------------------------------------ |
+| `callRequest.js`          | Main entry point for request execution                 |
+| `authorizeRequest.js`     | Check if user can execute this request                 |
+| `getRequestConfig.js`     | Load request definition from build output              |
+| `getConnectionConfig.js`  | Load connection definition                             |
+| `getConnection.js`        | Get the connection handler (e.g., MongoDB client)      |
+| `evaluateOperators.js`    | Resolve operators in connection/request properties     |
+| `checkConnectionRead.js`  | Verify read permissions on connection                  |
+| `checkConnectionWrite.js` | Verify write permissions on connection                 |
+| `validateSchemas.js`      | Validate properties against connection/request schemas |
+| `callRequestResolver.js`  | Execute the resolver function. Constructs `callApi` (closing over `context` + `endpointDepth`) and threads it into the resolver argument bag. Lowdefy errors pass through unchanged; raw errors wrap into `RequestError` / `ServiceError`. |
+
+### `/routes/endpoints/`
+
+| Module                    | Purpose                                                       |
+| ------------------------- | ------------------------------------------------------------- |
+| `callEndpoint.js`         | HTTP entry point for endpoint execution; blocks `InternalApi` |
+| `runRoutine.js`           | Dispatch steps by ID prefix: `request:`, `endpoint:`, control. Catch sets `error.handled = true` so a single error crossing multiple `runRoutine` boundaries (e.g. a deep `callApi` chain) triggers `context.handleError` exactly once. |
+| `handleRequest.js`        | Execute a database/API request step                           |
+| `handleEndpointCall.js`   | Execute a `CallApi` step. Evaluates operator-form `endpointId` / `payload`, calls `invokeEndpoint`, then maps the returned envelope (`addStepResult` + status mapping). |
+| `invokeEndpoint.js`       | Shared helper: depth check → load config → authorize → build child `routineContext` → `runRoutine`. Used by `handleEndpointCall` (routine `CallApi` step) and `callApi` (resolver-side, constructed in `callRequestResolver`). |
+| `addStepResult.js`        | Store step results in `routineContext.steps`                  |
+| `getEndpointConfig.js`    | Load endpoint config from build artifacts                     |
+| `authorizeApiEndpoint.js` | Check user access to endpoint                                 |
+| `control/`                | Control flow handlers (if, for, try, switch, return, etc.). `controlThrow` and `controlReject` build `UserError` so routine-step and JS-boundary surfaces carry the same class for user-authored failures. `controlSetState` writes to `routineContext.state` — state is scoped to the routine frame, not the request. |
+
+### `/routes/agent/`
+
+| Module                | Purpose                                                         |
+| --------------------- | --------------------------------------------------------------- |
+| `callAgent.js`        | Main entry point for agent chat execution with streaming        |
+| `getAgentConfig.js`   | Load agent definition from build artifacts (`agents/{id}.json`) |
+| `getAgentResolver.js` | Load agent type resolver from plugin registry                   |
+
+### `/routes/auth/`
+
+Handles Auth.js (NextAuth) configuration retrieval.
+
+| Module                                | Purpose                                                     |
+| ------------------------------------- | ----------------------------------------------------------- |
+| `callbacks/createSessionCallback.js`  | Assembles session from OIDC claims, userFields, and plugins |
+| `callbacks/validateSessionRoles.js`   | Validates `session.user.roles` is an array of strings       |
+| `callbacks/createJWTCallback.js`      | JWT token assembly                                          |
+| `callbacks/addUserFieldsToSession.js` | Maps provider fields to session via `auth.userFields`       |
+| `callbacks/addUserFieldsToToken.js`   | Maps provider fields to JWT token via `auth.userFields`     |
+| `callbacks/createCallbackPlugins.js`  | Filters callback plugins by type                            |
+
+### `/routes/page/`
+
+Serves page configuration to the client.
+
+### `/routes/rootConfig/`
+
+Serves app configuration, menus, and home page info.
+
+## Design Decisions
+
+### Why Server-Side Operators?
+
+Operators like `_secret` and `_user` must run server-side because:
+
+- Secrets should never reach the client
+- User session data comes from server
+- Some operators need database access
+
+### Why Separate Request and Endpoint?
+
+**Requests** are simple data operations:
+
+- Single connection, single operation
+- Suitable for CRUD operations
+- Limited to what the connection supports
+
+**Endpoints** are programmable APIs:
+
+- Multi-step routines with control flow
+- Can chain multiple requests
+- Support custom logic and transformations
+
+### Connection Isolation
+
+Each request gets a fresh connection context. Connections are:
+
+- Loaded from the connection plugin
+- Validated against schemas
+- Given only the properties they need
+
+## Integration Points
+
+- **@lowdefy/build**: Consumes build output files (pages, requests, connections)
+- **@lowdefy/operators**: Uses ServerParser for operator evaluation
+- **plugin-next-auth**: Provides auth session and configuration
+- **Connection plugins**: Provides request resolvers (MongoDB, HTTP, etc.)
+
+## Error Handling
+
+Three error types for different scenarios:
+
+| Error                | When Used                                         |
+| -------------------- | ------------------------------------------------- |
+| `ConfigurationError` | Invalid config (wrong schema, missing connection) |
+| `RequestError`       | Expected errors (validation failed, unauthorized) |
+| `ServerError`        | Unexpected errors (connection failed, bug)        |
+
+### Error Classes with Config Tracing
+
+All error classes support optional `configKey` parameter for build artifact tracing:
+
+```javascript
+import { ConfigurationError, RequestError, ServerError } from '@lowdefy/api';
+
+// Throw error with config location tracking
+throw new ConfigurationError({
+  message: 'Connection "mongoDB" not found',
+  configKey: request['~k'], // Links error to source YAML location
+});
+
+// Error without location (still valid)
+throw new ServerError({ message: 'Database connection failed' });
+```
+
+**Implementation:** `packages/api/src/context/errors.js`
+
+The error classes accept an options object:
+
+- `message` (string, required): Error message
+- `configKey` (string, optional): The `~k` value for error tracing
+
+When errors reach the client or logs, the `configKey` can be resolved to show file:line location using `resolveConfigLocation` from `@lowdefy/helpers`.
+
+### Client Error Logging & Plugin Schema Validation
+
+Client-side errors are sent to the server for centralized logging via the `logClientError` route. When errors carry `received` data (the params/properties that caused the failure), the server validates them against plugin schemas to produce more helpful error messages.
+
+**Client-side:** `lowdefy._internal.handleError(error)` serializes the error with `serializer.serialize()` (using the `~e` marker) and POSTs to `/api/client-error`. The `received` property is preserved in the payload for server-side schema validation.
+
+**Server route:** `packages/api/src/routes/log/logClientError.js`
+
+Processes client errors:
+
+1. Deserializes error via `serializer.deserialize()` — restores correct Lowdefy error class
+2. **Schema validation** — if the error is a `BlockError`, `ActionError`, or `OperatorError` with `received` data, validates against plugin schemas (see below)
+3. Calls `loadAndResolveErrorLocation()` — reads keyMap/refMap from build artifacts
+4. Sets `error.source` and `error.config` on the error object
+5. If validation produced a `ConfigError`, logs that (with cause chain preserving the original error)
+6. Returns `{ source, configError }` to client — `configError` is the serialized validation error if schema validation failed
+
+### `/routes/log/` — Plugin Schema Validation
+
+| Module                     | Purpose                                                            |
+| -------------------------- | ------------------------------------------------------------------ |
+| `validatePluginSchema.js`  | Validates data against a plugin's JSON schema using `@lowdefy/ajv` |
+| `formatValidationError.js` | Converts AJV errors into human-readable messages                   |
+| `logClientError.js`        | Orchestrates error logging with optional schema validation         |
+
+**Validation flow in `logClientError`:**
+
+```
+Client sends error (e.g., BlockError with received: { title: 123 })
+    │
+    ▼
+┌──────────────────────────┐
+│ Look up schema for type  │  ◀── Read from plugins/blockSchemas.json
+└──────────────────────────┘
+    │
+    ▼
+┌──────────────────────────┐
+│  validatePluginSchema()  │  ◀── Validate received data against schema
+└──────────────────────────┘
+    │ (if invalid)
+    ▼
+┌──────────────────────────┐
+│ formatValidationError()  │  ◀── Convert AJV errors to readable messages
+└──────────────────────────┘
+    │
+    ▼
+ConfigError with cause chain → logged to terminal
+```
+
+**Schema map files** (generated at build time):
+
+| Error Type      | Schema File                    | Schema Key   | Field Label |
+| --------------- | ------------------------------ | ------------ | ----------- |
+| `BlockError`    | `plugins/blockSchemas.json`    | `properties` | property    |
+| `ActionError`   | `plugins/actionSchemas.json`   | `params`     | param       |
+| `OperatorError` | `plugins/operatorSchemas.json` | `params`     | param       |
+
+**Example output:**
+
+```
+/Users/dev/app/pages/home.yaml:15
+[ConfigError] Block "Button" property "title" must be type "string".
+  Caused by: [BlockError] Error rendering block "submitBtn".
+```
+
+**Operator method names:** For operators with method-qualified names (e.g., `_yaml.parse`), the validation extracts params from the method-style `received` key (e.g., `{ '_yaml.parse': { on: ... } }`) and uses the display name `_yaml.parse` in error messages.
+
+**Graceful degradation:** If schema files are missing, the plugin has no schema, or validation itself fails, the original error is logged unchanged. Schema validation never prevents error logging.
+
+See [Error Tracing System](../architecture/error-tracing.md) for complete documentation.

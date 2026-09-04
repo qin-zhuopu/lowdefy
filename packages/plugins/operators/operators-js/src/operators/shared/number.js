@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ const meta = {
   parseInt: { namedArgs: ['on', 'radix'], validTypes: ['array', 'object'] },
   toExponential: { namedArgs: ['on', 'fractionDigits'], validTypes: ['array', 'object'] },
   toFixed: { namedArgs: ['on', 'digits'], validTypes: ['array', 'object'] },
-  toLocaleString: { namedArgs: ['on', 'locales'], validTypes: ['array', 'object'] },
+  toLocaleString: { namedArgs: ['on', 'locales'], validTypes: ['array', 'object'], dynamic: true },
   toPrecision: { namedArgs: ['on', 'precision'], validTypes: ['array', 'object'] },
   toString: { namedArgs: ['on', 'radix'], validTypes: ['array', 'object'] },
 };
@@ -60,5 +60,8 @@ function _number({ params, location, methodName }) {
     params,
   });
 }
+
+_number.dynamic = false;
+_number.meta = meta;
 
 export default _number;

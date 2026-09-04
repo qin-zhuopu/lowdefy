@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,18 +16,16 @@
 
 import React from 'react';
 
-const Blank = ({ blockId, makeCssClass, children }) => (
+const Blank = ({ blockId, children }) => (
   <div
     id={blockId}
-    className={makeCssClass([
-      {
-        background: '#900000',
-        border: '2px solid #f00',
-        textAlign: 'center',
-        fontSize: 12,
-        color: '#fff',
-      },
-    ])}
+    style={{
+      background: '#900000',
+      border: '2px solid #f00',
+      textAlign: 'center',
+      fontSize: 12,
+      color: '#fff',
+    }}
   >
     {children}
   </div>

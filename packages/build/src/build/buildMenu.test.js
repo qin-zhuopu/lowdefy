@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@
 import { jest } from '@jest/globals';
 
 import buildMenu from './buildMenu.js';
-import testContext from '../test/testContext.js';
+import testContext from '../test-utils/testContext.js';
 
 const mockLogWarn = jest.fn();
 
@@ -95,7 +95,7 @@ test('menu id is not a string', () => {
     ],
   };
   expect(() => buildMenu({ components, context })).toThrow(
-    'Menu id is not a string. Received true.'
+    'Menu id is not a string.'
   );
 });
 
@@ -491,9 +491,10 @@ test('buildMenu page does not exist', () => {
     ],
     pages: [],
   });
-  expect(mockLogWarn.mock.calls).toEqual([
-    ['Page "page_1" referenced in menu link "menu_page_1" not found.'],
-  ]);
+  expect(mockLogWarn.mock.calls.length).toBe(1);
+  expect(mockLogWarn.mock.calls[0][0]).toContain(
+    'Page "page_1" referenced in menu link "menu_page_1" not found.'
+  );
 });
 
 test('buildMenu page does not exist, nested', () => {
@@ -569,10 +570,13 @@ test('buildMenu page does not exist, nested', () => {
     ],
     pages: [],
   });
-  expect(mockLogWarn.mock.calls).toEqual([
-    ['Page "page_1" referenced in menu link "menu_page_1" not found.'],
-    ['Page "page_2" referenced in menu link "menu_page_2" not found.'],
-  ]);
+  expect(mockLogWarn.mock.calls.length).toBe(2);
+  expect(mockLogWarn.mock.calls[0][0]).toContain(
+    'Page "page_1" referenced in menu link "menu_page_1" not found.'
+  );
+  expect(mockLogWarn.mock.calls[1][0]).toContain(
+    'Page "page_2" referenced in menu link "menu_page_2" not found.'
+  );
 });
 
 test('buildMenu pages not array, menu exists', () => {
@@ -632,6 +636,214 @@ test('buildMenu pages not array, no menu', () => {
       },
     ],
     pages: 'pages',
+  });
+});
+
+test('menu item id is not defined', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [
+          {
+            type: 'MenuLink',
+            pageId: 'page_1',
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+    ],
+  };
+  expect(() => buildMenu({ components, context })).toThrow(
+    'Menu item id missing on menu "my_menu".'
+  );
+});
+
+test('menu item id is not a string', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [
+          {
+            id: 42,
+            type: 'MenuLink',
+            pageId: 'page_1',
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+    ],
+  };
+  expect(() => buildMenu({ components, context })).toThrow(
+    'Menu item id is not a string on menu "my_menu".'
+  );
+});
+
+test('menu item type is not defined', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [
+          {
+            id: 'menu_page_1',
+            pageId: 'page_1',
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+    ],
+  };
+  expect(() => buildMenu({ components, context })).toThrow(
+    'Menu item type is not defined at "menu_page_1" on menu "my_menu".'
+  );
+});
+
+test('menu item type is not a string', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [
+          {
+            id: 'menu_page_1',
+            type: 123,
+            pageId: 'page_1',
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+    ],
+  };
+  expect(() => buildMenu({ components, context })).toThrow(
+    'Menu item type is not a string at "menu_page_1" on menu "my_menu".'
+  );
+});
+
+test('menu item is not an object', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [null],
+      },
+    ],
+    pages: [],
+  };
+  expect(() => buildMenu({ components, context })).toThrow(
+    'Menu item should be an object on menu "my_menu".'
+  );
+});
+
+test('buildMenu preserves MenuDivider items and assigns public auth', () => {
+  const components = {
+    menus: [
+      {
+        id: 'my_menu',
+        links: [
+          {
+            id: 'menu_page_1',
+            type: 'MenuLink',
+            pageId: 'page_1',
+          },
+          {
+            id: 'sep',
+            type: 'MenuDivider',
+            properties: {
+              dashed: true,
+            },
+          },
+          {
+            id: 'menu_page_2',
+            type: 'MenuLink',
+            pageId: 'page_2',
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+      {
+        id: 'page:page_2',
+        pageId: 'page_2',
+        auth: { public: true },
+      },
+    ],
+  };
+  const res = buildMenu({ components, context });
+  expect(res).toEqual({
+    menus: [
+      {
+        id: 'menu:my_menu',
+        menuId: 'my_menu',
+        links: [
+          {
+            id: 'menuitem:my_menu:menu_page_1',
+            menuItemId: 'menu_page_1',
+            type: 'MenuLink',
+            pageId: 'page_1',
+            auth: { public: true },
+          },
+          {
+            id: 'menuitem:my_menu:sep',
+            menuItemId: 'sep',
+            type: 'MenuDivider',
+            auth: { public: true },
+            properties: {
+              dashed: true,
+            },
+          },
+          {
+            id: 'menuitem:my_menu:menu_page_2',
+            menuItemId: 'menu_page_2',
+            type: 'MenuLink',
+            pageId: 'page_2',
+            auth: { public: true },
+          },
+        ],
+      },
+    ],
+    pages: [
+      {
+        id: 'page:page_1',
+        pageId: 'page_1',
+        auth: { public: true },
+      },
+      {
+        id: 'page:page_2',
+        pageId: 'page_2',
+        auth: { public: true },
+      },
+    ],
   });
 });
 

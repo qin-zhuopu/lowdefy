@@ -1,7 +1,7 @@
 /* eslint-disable dot-notation */
 
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -66,7 +66,7 @@ test('parse nunjucks value 500 blocks', async () => {
     lowdefy,
     pageConfig,
   });
-  const { b0 } = context._internal.RootBlocks.map;
+  const { b0 } = context._internal.RootSlots.map;
 
   const fn = (i) => {
     b0.setValue(i);
@@ -109,7 +109,7 @@ test('parse nunjucks value 100 blocks', async () => {
     lowdefy,
     pageConfig,
   });
-  const { b0 } = context._internal.RootBlocks.map;
+  const { b0 } = context._internal.RootSlots.map;
 
   const fn = (i) => {
     b0.setValue(i);
@@ -152,7 +152,7 @@ test('parse state value 1000 blocks', async () => {
     lowdefy,
     pageConfig,
   });
-  const { b0 } = context._internal.RootBlocks.map;
+  const { b0 } = context._internal.RootSlots.map;
 
   const fn = (i) => {
     b0.setValue(`${i}`);
@@ -195,7 +195,7 @@ test('parse state value 1000 blocks', async () => {
 //     pageConfig,
 //     pageId,
 //   });
-//   const b0 = context._internal.RootBlocks.subBlocks[context._internal.RootBlocks.blocks[0].id][0].blocks[0];
+//   const b0 = context._internal.RootSlots.subBlocks[context._internal.RootSlots.blocks[0].id][0].blocks[0];
 
 //   const fn = (i) => {
 //     console.log('-----------------------');
@@ -249,15 +249,15 @@ test('parse state value 1000 blocks', async () => {
 //     // },
 //   ];
 //   context.State.state = {};
-//   context._internal.RootBlocks = new Blocks({
+//   context._internal.RootSlots = new Blocks({
 //     blocks,
 //     context,
 //     arrayIndices: [],
 //   });
-//   context._internal.RootBlocks.init();
-//   context._internal.RootBlocks.update();
-//   // context._internal.RootBlocks.blocks[1].pushItem();
-//   context._internal.RootBlocks.blocks[0].setValue('x');
+//   context._internal.RootSlots.init();
+//   context._internal.RootSlots.update();
+//   // context._internal.RootSlots.blocks[1].pushItem();
+//   context._internal.RootSlots.blocks[0].setValue('x');
 //   expect(Object.keys(context.State.state.list[0]).length).toEqual(80);
 // });
 
@@ -279,14 +279,14 @@ test('parse state value 1000 blocks', async () => {
 //     })),
 //   ];
 //   context.State.state = {};
-//   context._internal.RootBlocks = new Blocks({
+//   context._internal.RootSlots = new Blocks({
 //     blocks,
 //     context,
 //     arrayIndices: [],
 //   });
-//   context._internal.RootBlocks.init();
-//   context._internal.RootBlocks.update();
-//   context._internal.RootBlocks.blocks[0].setValue('x');
+//   context._internal.RootSlots.init();
+//   context._internal.RootSlots.update();
+//   context._internal.RootSlots.blocks[0].setValue('x');
 //   expect(Object.keys(context.State.state).length).toEqual(101);
 // });
 
@@ -308,14 +308,14 @@ test('parse state value 1000 blocks', async () => {
 //     })),
 //   ];
 //   context.State.state = {};
-//   context._internal.RootBlocks = new Blocks({
+//   context._internal.RootSlots = new Blocks({
 //     blocks,
 //     context,
 //     arrayIndices: [],
 //   });
-//   context._internal.RootBlocks.init();
-//   context._internal.RootBlocks.update();
-//   context._internal.RootBlocks.blocks[0].setValue('x');
+//   context._internal.RootSlots.init();
+//   context._internal.RootSlots.update();
+//   context._internal.RootSlots.blocks[0].setValue('x');
 //   expect(Object.keys(context.State.state).length).toEqual(1001);
 // });
 
@@ -337,13 +337,13 @@ test('parse state value 1000 blocks', async () => {
 //     })),
 //   ];
 //   context.State.state = {};
-//   context._internal.RootBlocks = new Blocks({
+//   context._internal.RootSlots = new Blocks({
 //     blocks,
 //     context,
 //     arrayIndices: [],
 //   });
-//   context._internal.RootBlocks.init();
-//   context._internal.RootBlocks.update();
-//   context._internal.RootBlocks.blocks[0].setValue('x');
+//   context._internal.RootSlots.init();
+//   context._internal.RootSlots.update();
+//   context._internal.RootSlots.blocks[0].setValue('x');
 //   expect(Object.keys(context.State.state).length).toEqual(101);
 // });

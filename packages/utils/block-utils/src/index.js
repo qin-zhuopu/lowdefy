@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,18 +16,24 @@
 
 import blockDefaultProps from './blockDefaultProps.js';
 import blockSchema from './blockSchema.js';
-import HtmlComponent from './HtmlComponent.js';
+import buildBlockSchema from './buildBlockSchema.js';
+import cn from './cn.js';
 import ErrorBoundary from './ErrorBoundary.js';
-import makeCssClass from './makeCssClass.js';
-import mediaToCssObject from './mediaToCssObject.js';
+import ErrorPage from './ErrorPage.js';
+import extractBlockTypes from './extractBlockTypes.js';
+import HtmlComponent from './HtmlComponent.js';
 import renderHtml from './renderHtml.js';
+import withBlockDefaults from './withBlockDefaults.js';
 
 export {
   blockDefaultProps,
   blockSchema,
+  buildBlockSchema,
+  cn,
   ErrorBoundary,
+  ErrorPage,
+  extractBlockTypes,
   HtmlComponent,
-  makeCssClass,
-  mediaToCssObject,
   renderHtml,
+  withBlockDefaults,
 };

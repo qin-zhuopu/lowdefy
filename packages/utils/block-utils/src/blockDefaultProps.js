@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -13,18 +13,17 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
-import makeCssClass from './makeCssClass.js';
-
 const blockDefaultProps = {
   basePath: '',
   blockId: 'undefined_id',
-  components: {},
+  components: {
+    ShortcutBadge: () => null,
+  },
   content: {},
   events: {},
   list: [],
   menus: [],
   methods: {
-    makeCssClass,
     registerEvent: () => undefined,
     registerMethod: () => undefined,
     triggerEvent: () => undefined,

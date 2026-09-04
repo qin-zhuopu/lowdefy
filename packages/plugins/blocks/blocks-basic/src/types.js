@@ -1,6 +1,5 @@
-/* eslint-disable import/namespace */
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,21 +14,8 @@
   limitations under the License.
 */
 
-import * as blocks from './blocks.js';
+import { extractBlockTypes } from '@lowdefy/block-utils';
 
-const icons = {};
-const styles = {};
-Object.keys(blocks).forEach((block) => {
-  icons[block] = blocks[block].meta.icons ?? [];
-  styles[block] = blocks[block].meta.styles ?? [];
-});
-export default {
-  blocks: Object.keys(blocks),
-  icons,
-  styles: { default: [], ...styles },
-};
+import * as metas from './metas.js';
 
-// export default {
-//   blocks: ['Anchor', 'Box', 'DangerousHtml', 'Html', 'Icon', 'Img', 'List', 'Span'],
-//   styles: { default: ['style.less'], Anchor: ['blocks/Anchor/style.less']  },
-// };
+export default extractBlockTypes(metas);

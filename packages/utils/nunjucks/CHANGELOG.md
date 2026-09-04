@@ -1,5 +1,154 @@
 # Change Log
 
+## 5.6.0
+
+### Patch Changes
+
+- 6785e0e: fix(nunjucks): Fix a template cache that could return the wrong render function.
+
+  Templates whose source was exactly `toString`, `constructor`, or a handful of other names
+  inherited from `Object.prototype` previously rendered a built-in instead of their own
+  source, silently. A template source of `__proto__` was worse: writing it re-parented the
+  cache itself, so every template rendered afterwards could be affected. All of these now
+  render as the literal string you wrote.
+
+  This also fixed a second, separate collision: `nunjucksFunction({ x: 1 })` and
+  `nunjucksFunction({ y: 2 })` previously returned the same render function, because
+  non-string templates were cached under a key derived from `Object.prototype.toString`, so
+  every plain object collided on `"[object Object]"` (and `100` collided with `'100'`). Only
+  strings are meaningfully cacheable - there is nothing to compile for a non-string template -
+  so these are no longer cached at all; each call now gets its own render function.
+
+  The cache is also now bounded to the 500 most recently used templates instead of growing
+  without limit. This only matters if your app renders a very large number of distinct,
+  runtime-computed template strings (for example, templates built from user input rather than
+  written in your YAML) - older ones are now evicted and recompiled on next use instead of
+  being retained forever.
+
+- Updated dependencies [3ead269]
+- Updated dependencies [79bbd84]
+- Updated dependencies [824f4be]
+- Updated dependencies [824f4be]
+- Updated dependencies [3ead269]
+- Updated dependencies [1a6223f]
+- Updated dependencies [3ead269]
+  - @lowdefy/helpers@5.6.0
+
+## 5.5.1
+
+### Patch Changes
+
+- @lowdefy/helpers@5.5.1
+
+## 5.5.0
+
+### Patch Changes
+
+- @lowdefy/helpers@5.5.0
+
+## 5.4.0
+
+### Patch Changes
+
+- Updated dependencies [25225ab]
+- Updated dependencies [f11addd]
+- Updated dependencies [0108f38]
+  - @lowdefy/helpers@5.4.0
+
+## 5.3.0
+
+### Patch Changes
+
+- @lowdefy/helpers@5.3.0
+
+## 5.2.0
+
+### Patch Changes
+
+- @lowdefy/helpers@5.2.0
+
+## 5.1.0
+
+### Patch Changes
+
+- @lowdefy/helpers@5.1.0
+
+## 5.0.0
+
+### Major Changes
+
+- 155c0b9724: Replace moment.js with day.js across the monorepo.
+
+  ### Breaking Changes
+
+  - **`_moment` operator removed**: Use `_dayjs` instead. The new `@lowdefy/operators-dayjs` package provides the `_dayjs` operator with the same API patterns.
+  - **`@lowdefy/operators-moment` package removed**: Apps using `_moment` must migrate to `_dayjs`.
+  - **Nunjucks `date` filter**: Now uses day.js internally. Format strings are day.js compatible (mostly identical to moment).
+  - **Date picker blocks**: All date/time picker blocks use day.js instead of moment for value parsing and formatting.
+  - **Google Sheets connection**: Date serialization uses day.js internally.
+  - **`humanizeDuration` thresholds**: The `thresholds` parameter on `_dayjs.humanizeDuration` is silently ignored (day.js does not support it).
+  - **AgGrid cell renderers**: Update `__moment` to `__dayjs` in custom AG Grid cell renderer references.
+  - **Date selector UTC handling**: Antd v6 bundles its own dayjs without the UTC plugin. Date selector blocks wrap antd's dayjs instances with the extended dayjs before calling `.utc()` — this is handled internally and requires no user action.
+
+### Patch Changes
+
+- Updated dependencies [905d5d406]
+  - @lowdefy/helpers@5.0.0
+
+## 4.7.3
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.3
+
+## 4.7.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.2
+
+## 4.7.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.7.1
+
+## 4.7.0
+
+### Patch Changes
+
+- Updated dependencies [4543688f7]
+- Updated dependencies [dea6651a1]
+  - @lowdefy/helpers@4.7.0
+
+## 4.6.0
+
+### Patch Changes
+
+- Updated dependencies [aa0d6d363e]
+- Updated dependencies [aebca6ab51]
+- Updated dependencies [ab19b1bb77]
+- Updated dependencies [8ec5f1be05]
+  - @lowdefy/helpers@4.6.0
+
+## 4.5.2
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.2
+
+## 4.5.1
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.1
+
+## 4.5.0
+
+### Patch Changes
+
+- @lowdefy/helpers@4.5.0
+
 ## 4.4.0
 
 ### Minor Changes

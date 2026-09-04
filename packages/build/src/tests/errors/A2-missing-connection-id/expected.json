@@ -1,0 +1,14 @@
+{
+  "tests": [
+    {
+      "mode": "prod",
+      "errors": [
+        "Connection id missing"
+      ],
+      "errorContains": [
+        "Connection id missing.",
+        "lowdefy.yaml:13"
+      ]
+    }
+  ]
+}

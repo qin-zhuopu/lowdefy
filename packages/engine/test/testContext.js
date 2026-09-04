@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 */
 
 import buildTestPage from '@lowdefy/build/buildTestPage';
+import { translate } from '@lowdefy/helpers';
 
 import getContext from '../src/getContext.js';
 import testOperators from './testOperators.js';
@@ -34,56 +35,33 @@ const testContext = async ({ lowdefy, pageConfig }) => {
       callRequest: () => {},
       displayMessage: () => () => {},
       updateBlock: () => {},
+      logger: { error: () => {}, warn: () => {}, log: () => {}, debug: () => {} },
+      handleError: () => {},
+      translate: (key, values) => translate({ key, values, i18n: lowdefy?.i18n }),
       ...lowdefy?._internal,
       operators: testOperators,
       actions: { ...testActions, ...lowdefy?._internal?.actions },
       blockComponents: {
-        TextInput: {
-          meta: {
-            category: 'input',
-            valueType: 'string',
-          },
-        },
-        Box: {
-          meta: {
-            category: 'container',
-          },
-        },
-        Button: {
-          meta: {
-            category: 'display',
-          },
-        },
-        List: {
-          meta: {
-            category: 'list',
-            valueType: 'array',
-          },
-        },
-        Paragraph: {
-          meta: {
-            category: 'display',
-          },
-        },
-        Switch: {
-          meta: {
-            category: 'input',
-            valueType: 'boolean',
-          },
-        },
-        MultipleSelector: {
-          meta: {
-            category: 'input',
-            valueType: 'array',
-          },
-        },
-        NumberInput: {
-          meta: {
-            category: 'input',
-            valueType: 'number',
-          },
-        },
+        TextInput: {},
+        Box: {},
+        Button: {},
+        List: {},
+        Paragraph: {},
+        Switch: {},
+        MultipleSelector: {},
+        NumberInput: {},
         ...lowdefy?._internal?.blocks,
+      },
+      blockMetas: {
+        TextInput: { category: 'input', valueType: 'string' },
+        Box: { category: 'container' },
+        Button: { category: 'display' },
+        List: { category: 'list', valueType: 'array' },
+        Paragraph: { category: 'display' },
+        Switch: { category: 'input', valueType: 'boolean' },
+        MultipleSelector: { category: 'input', valueType: 'array' },
+        NumberInput: { category: 'input', valueType: 'number' },
+        ...lowdefy?._internal?.blockMetas,
       },
     },
   };

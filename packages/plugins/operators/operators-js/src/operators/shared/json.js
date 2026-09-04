@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -23,7 +23,12 @@ function parse(input) {
 }
 
 function stringify(input, options) {
-  return serializer.serializeToString(input, { space: 2, isoStringDates: true, ...options });
+  return serializer.serializeToString(input, {
+    space: 2,
+    isoStringDates: true,
+    skipMarkers: true,
+    ...options,
+  });
 }
 
 const functions = { parse, stringify };
@@ -43,5 +48,7 @@ function _json({ params, location, methodName }) {
     params,
   });
 }
+
+_json.dynamic = false;
 
 export default _json;

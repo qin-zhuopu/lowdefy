@@ -1,7 +1,7 @@
 /* eslint-disable no-param-reassign */
 
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -19,6 +19,16 @@
 import { execSync } from 'child_process';
 import { type } from '@lowdefy/helpers';
 
+function computeGitSha() {
+  const fromEnv = process.env.LOWDEFY_GIT_SHA?.trim();
+  if (fromEnv) return fromEnv;
+  try {
+    return execSync('git rev-parse HEAD').toString().trim();
+  } catch (_) {
+    return null;
+  }
+}
+
 function buildApp({ components }) {
   if (type.isNone(components.app)) {
     components.app = {};
@@ -35,11 +45,15 @@ function buildApp({ components }) {
   if (type.isNone(components.app.html.appendHead)) {
     components.app.html.appendHead = '';
   }
-  try {
-    components.app.git_sha = execSync('git rev-parse HEAD').toString().trim();
-  } catch (_) {
-    //pass
-  }
+  components.appMeta = {
+    slug: components.slug ?? null,
+    name: components.name ?? null,
+    version: components.version ?? null,
+    description: components.description ?? null,
+    license: components.license ?? null,
+    lowdefyVersion: components.lowdefy ?? null,
+    gitSha: computeGitSha(),
+  };
   return components;
 }
 

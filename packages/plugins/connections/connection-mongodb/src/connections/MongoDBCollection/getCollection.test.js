@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */
-import { MongoClient, Collection } from 'mongodb';
+import { Collection, MongoClient } from 'mongodb';
 
 import getCollection from './getCollection.js';
 
@@ -25,10 +25,10 @@ test('get collection', async () => {
     databaseName: 'test',
     collection: 'getCollection',
   };
-  const res = await getCollection({ connection });
-  expect(res.client).toBeInstanceOf(MongoClient);
-  expect(res.collection).toBeInstanceOf(Collection);
-  await res.client.close();
+  const { client, collection, logCollection } = await getCollection({ connection });
+  expect(client).toBeInstanceOf(MongoClient);
+  expect(collection).toBeInstanceOf(Collection);
+  expect(logCollection).toBe(undefined);
 });
 
 test('get collection, no databaseName, uses databaseUri', async () => {
@@ -36,13 +36,26 @@ test('get collection, no databaseName, uses databaseUri', async () => {
     databaseUri,
     collection: 'getCollection',
   };
-  const res = await getCollection({ connection });
-  expect(res.client).toBeInstanceOf(MongoClient);
-  expect(res.collection).toBeInstanceOf(Collection);
-  await res.client.close();
+  const { collection } = await getCollection({ connection });
+  expect(collection).toBeInstanceOf(Collection);
 });
 
-test('invalid databaseUri', async () => {
+test('get collection with changeLog returns logCollection', async () => {
+  const connection = {
+    databaseUri,
+    databaseName: 'test',
+    collection: 'getCollection',
+    changeLog: {
+      collection: 'getCollectionLog',
+    },
+  };
+  const { collection, logCollection } = await getCollection({ connection });
+  expect(collection).toBeInstanceOf(Collection);
+  expect(logCollection).toBeInstanceOf(Collection);
+  expect(logCollection.collectionName).toBe('getCollectionLog');
+});
+
+test('invalid databaseUri scheme', async () => {
   const connection = {
     databaseUri: 'databaseUri',
     databaseName: 'test',

@@ -1,0 +1,11 @@
+name: Events
+description: Event logging module
+
+connections:
+  - id: event-store
+    type: AxiosHttp
+    properties:
+      baseURL: http://localhost:8080
+
+api:
+  - _ref: api/log-event.yaml

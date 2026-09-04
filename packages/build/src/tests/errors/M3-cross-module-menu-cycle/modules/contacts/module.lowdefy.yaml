@@ -1,0 +1,11 @@
+name: Contacts
+
+dependencies:
+  - id: companies
+
+menus:
+  - _ref: menus.yaml
+
+pages:
+  - id: contact-list
+    type: Box

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,23 +16,27 @@
 
 import React, { useState } from 'react';
 import { DatePicker } from 'antd';
-import moment from 'moment';
-import { blockDefaultProps } from '@lowdefy/block-utils';
-import { type } from '@lowdefy/helpers';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc.js';
+import { getLocaleDateFormat, type } from '@lowdefy/helpers';
 
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import Label from '../Label/Label.js';
+import withTheme from '../withTheme.js';
 import disabledDate from '../../disabledDate.js';
 
-const MonthPicker = DatePicker.MonthPicker;
+dayjs.extend(utc);
 
 const MonthSelector = ({
   blockId,
+  classNames = {},
   components: { Icon },
   events,
   loading,
   methods,
   properties,
   required,
+  styles = {},
   validation,
   value,
 }) => {
@@ -40,46 +44,55 @@ const MonthSelector = ({
   return (
     <Label
       blockId={blockId}
+      methods={methods}
+      classNames={classNames}
       components={{ Icon }}
       events={events}
       properties={{ title: properties.title, size: properties.size, ...properties.label }}
       required={required}
+      styles={styles}
       validation={validation}
       content={{
         content: () => (
-          <div className={methods.makeCssClass({ width: '100%' })}>
+          <div style={{ width: '100%' }}>
             <div id={`${blockId}_${elementId}_popup`} />
-            <MonthPicker
+            <DatePicker
               id={`${blockId}_input`}
+              picker="month"
               allowClear={properties.allowClear !== false}
               autoFocus={properties.autoFocus}
-              bordered={properties.bordered}
-              className={methods.makeCssClass([{ width: '100%' }, properties.inputStyle])}
+              variant={properties.bordered === false ? 'borderless' : properties.variant}
+              className={classNames.element}
+              style={{ width: '100%', ...styles.element }}
               disabled={properties.disabled || loading}
               disabledDate={disabledDate(properties.disabledDates)}
-              format={properties.format ?? 'YYYY-MM'}
+              format={
+                properties.format ??
+                getLocaleDateFormat(methods.getLocale?.(), 'month') ??
+                'YYYY-MM'
+              }
               getPopupContainer={() => document.getElementById(`${blockId}_${elementId}_popup`)}
-              placeholder={properties.placeholder ?? 'Select Month'}
+              placeholder={properties.placeholder}
               size={properties.size}
               status={validation.status}
-              value={type.isDate(value) ? moment.utc(value).startOf('month') : null}
+              value={type.isDate(value) ? dayjs.utc(value).startOf('month') : null}
               suffixIcon={
                 <Icon
                   blockId={`${blockId}_suffixIcon`}
+                  classNames={{ element: classNames.suffixIcon }}
                   events={events}
                   properties={properties.suffixIcon ?? 'AiOutlineCalendar'}
+                  styles={{ element: styles.suffixIcon }}
                 />
               }
               onChange={(newVal) => {
-                methods.setValue(
-                  !newVal
-                    ? null
-                    : moment
-                        .utc(newVal.add(newVal.utcOffset(), 'minutes'))
-                        .startOf('month')
-                        .toDate()
-                );
-                methods.triggerEvent({ name: 'onChange' });
+                // Wrap with our dayjs — antd v6's internal dayjs may lack the utc plugin.
+                const d = newVal ? dayjs(newVal) : null;
+                const val = !d
+                  ? null
+                  : dayjs.utc(d.add(d.utcOffset(), 'minutes')).startOf('month').toDate();
+                methods.setValue(val);
+                methods.triggerEvent({ name: 'onChange', event: { value: val } });
               }}
             />
           </div>
@@ -89,12 +102,4 @@ const MonthSelector = ({
   );
 };
 
-MonthSelector.defaultProps = blockDefaultProps;
-MonthSelector.meta = {
-  valueType: 'date',
-  category: 'input',
-  icons: [...Label.meta.icons, 'AiOutlineCalendar'],
-  styles: ['blocks/MonthSelector/style.less'],
-};
-
-export default MonthSelector;
+export default withTheme('DatePicker', withBlockDefaults(MonthSelector));

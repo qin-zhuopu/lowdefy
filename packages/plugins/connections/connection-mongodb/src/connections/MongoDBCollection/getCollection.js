@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,32 +14,28 @@
   limitations under the License.
 */
 
-import { MongoClient } from 'mongodb';
 import { type } from '@lowdefy/helpers';
 
+import getClient from './getClient.js';
+
 async function getCollection({ connection }) {
-  const { collection, databaseName, databaseUri, options } = connection;
+  const { changeLog, collection, databaseName, databaseUri, options } = connection;
   if (!type.isString(databaseUri)) {
     throw new Error('Database URI must be a string');
   }
-  const client = new MongoClient(databaseUri, options);
-  await client.connect();
-  try {
-    if (!type.isString(databaseName) && !type.isNone(databaseName)) {
-      throw new Error('Database name must be a string');
-    }
-    const db = client.db(databaseName);
-    if (!type.isString(collection)) {
-      throw new Error('Collection name must be a string');
-    }
-    return {
-      client,
-      collection: db.collection(collection),
-    };
-  } catch (error) {
-    await client.close();
-    throw error;
+  if (!type.isString(databaseName) && !type.isNone(databaseName)) {
+    throw new Error('Database name must be a string');
   }
+  if (!type.isString(collection)) {
+    throw new Error('Collection name must be a string');
+  }
+  const client = await getClient({ databaseUri, options });
+  const db = client.db(databaseName);
+  return {
+    client,
+    collection: db.collection(collection),
+    logCollection: changeLog?.collection ? db.collection(changeLog.collection) : undefined,
+  };
 }
 
 export default getCollection;

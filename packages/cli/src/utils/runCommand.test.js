@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -27,6 +27,12 @@ jest.unstable_mockModule('./startUp', () => ({
 const options = { option: true };
 const command = { command: true, name: () => 'test' };
 const cliVersion = 'cliVersion';
+
+const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {});
+
+afterEach(() => {
+  mockExit.mockClear();
+});
 
 test('runCommand with synchronous function', async () => {
   const { default: runCommand } = await import('./runCommand.js');
@@ -106,6 +112,7 @@ test('Catch error synchronous function', async () => {
       ],
     ]
   `);
+  expect(mockExit).toHaveBeenCalledWith(1);
 });
 
 test('Catch error asynchronous function', async () => {
@@ -130,4 +137,5 @@ test('Catch error asynchronous function', async () => {
       ],
     ]
   `);
+  expect(mockExit).toHaveBeenCalledWith(1);
 });

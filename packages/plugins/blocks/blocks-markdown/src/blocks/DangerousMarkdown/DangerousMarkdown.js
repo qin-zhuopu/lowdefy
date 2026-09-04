@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,11 +16,14 @@
 
 import React from 'react';
 import DOMPurify from 'dompurify';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 import ReactMarkdown from 'react-markdown';
 
 import gfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+
+import markdownStyles from '../../style.module.css';
+import codeblockStyles from '../../codeblock.module.css';
 
 class DangerousMarkdown extends React.Component {
   constructor(props) {
@@ -30,11 +33,11 @@ class DangerousMarkdown extends React.Component {
   }
 
   render() {
-    const { blockId, properties, methods } = this.props;
+    const { blockId, classNames, properties, styles } = this.props;
     return (
-      <div id={blockId} className={methods.makeCssClass(properties.style)}>
+      <div id={blockId} className={classNames?.element} style={styles?.element}>
         <ReactMarkdown
-          className="markdown-body markdown-default-code"
+          className={`${markdownStyles['markdown-body']} ${codeblockStyles['markdown-default-code']}`}
           remarkPlugins={[gfm]}
           rehypePlugins={[rehypeRaw]}
           skipHtml={false}
@@ -46,11 +49,4 @@ class DangerousMarkdown extends React.Component {
   }
 }
 
-DangerousMarkdown.defaultProps = blockDefaultProps;
-DangerousMarkdown.meta = {
-  category: 'container',
-  icons: [],
-  styles: ['codeblock.less'],
-};
-
-export default DangerousMarkdown;
+export default withBlockDefaults(DangerousMarkdown);

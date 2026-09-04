@@ -1,0 +1,23 @@
+name: Module A
+
+dependencies:
+  - id: mod-b
+
+components:
+  - id: comp-a
+    type: Component
+    component:
+      id: a-box
+      type: Box
+      blocks:
+        - _ref:
+            module: mod-b
+            component: comp-b
+
+pages:
+  - id: page-a
+    type: Box
+    blocks:
+      - _ref:
+          module: mod-b
+          component: comp-b

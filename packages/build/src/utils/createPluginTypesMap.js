@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -32,6 +32,14 @@ function createPluginTypesMap({ packageName, packageTypes, typePrefix = '', type
   createTypeDefinitions({
     typeNames: packageTypes.actions,
     store: typesMap.actions,
+    packageName,
+    typePrefix,
+    version,
+  });
+
+  createTypeDefinitions({
+    typeNames: packageTypes.agents,
+    store: typesMap.agents,
     packageName,
     typePrefix,
     version,
@@ -109,19 +117,15 @@ function createPluginTypesMap({ packageName, packageTypes, typePrefix = '', type
     version,
   });
 
-  if (type.isObject(packageTypes.styles)) {
-    Object.entries(packageTypes.styles).forEach(([blockType, styles]) => {
-      if (blockType === 'default') {
-        typesMap.styles.packages[packageName] = styles;
-      } else {
-        typesMap.styles.blocks[`${typePrefix}${blockType}`] = styles;
-      }
-    });
-  }
-
   if (type.isObject(packageTypes.icons)) {
     Object.entries(packageTypes.icons).forEach(([blockType, icons]) => {
       typesMap.icons[`${typePrefix}${blockType}`] = icons;
+    });
+  }
+
+  if (type.isObject(packageTypes.blockMetas)) {
+    Object.entries(packageTypes.blockMetas).forEach(([blockType, meta]) => {
+      typesMap.blockMetas[`${typePrefix}${blockType}`] = meta;
     });
   }
 }

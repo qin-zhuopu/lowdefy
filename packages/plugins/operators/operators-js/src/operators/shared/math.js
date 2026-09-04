@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -42,8 +42,9 @@ const meta = {
   log2: { singleArg: true, validTypes: ['number'] },
   max: { spreadArgs: true, validTypes: ['array'] },
   min: { spreadArgs: true, validTypes: ['array'] },
+  mod: { namedArgs: ['dividend', 'divisor'], validTypes: ['object', 'array'] },
   pow: { namedArgs: ['base', 'exponent'], validTypes: ['object', 'array'] },
-  random: { noArgs: true },
+  random: { noArgs: true, dynamic: true },
   round: { singleArg: true, validTypes: ['number'] },
   sign: { singleArg: true, validTypes: ['number'] },
   sin: { singleArg: true, validTypes: ['number'] },
@@ -62,9 +63,12 @@ const meta = {
   SQRT2: { property: true },
 };
 
+const functions = Object.create(Math);
+functions.mod = (a, b) => a % b;
+
 function _math({ params, location, methodName }) {
   return runClass({
-    functions: Math,
+    functions,
     location,
     meta,
     methodName,
@@ -72,5 +76,8 @@ function _math({ params, location, methodName }) {
     params,
   });
 }
+
+_math.dynamic = false;
+_math.meta = meta;
 
 export default _math;

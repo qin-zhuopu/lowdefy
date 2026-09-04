@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,23 +15,24 @@
 */
 
 import { type } from '@lowdefy/helpers';
+import { ConfigError } from '@lowdefy/errors';
 
 import buildBlock from './buildBlock.js';
 
 function buildSubBlocks(block, pageContext) {
-  if (type.isObject(block.areas)) {
-    Object.keys(block.areas).forEach((key) => {
-      if (type.isNone(block.areas[key].blocks)) {
-        block.areas[key].blocks = [];
+  if (type.isObject(block.slots)) {
+    Object.keys(block.slots).forEach((key) => {
+      if (type.isNone(block.slots[key].blocks)) {
+        block.slots[key].blocks = [];
       }
-      if (!type.isArray(block.areas[key].blocks)) {
-        throw new Error(
-          `Expected blocks to be an array at ${block.blockId} in area ${key} on page ${
-            pageContext.pageId
-          }. Received ${JSON.stringify(block.areas[key].blocks)}`
+      if (!type.isArray(block.slots[key].blocks)) {
+        throw new ConfigError(
+          `Expected blocks to be an array at ${block.blockId} in slot ${key} on page ${pageContext.pageId}.`,
+          { received: block.slots[key].blocks, configKey: block.slots[key]['~k'] ?? block['~k'] }
         );
       }
-      block.areas[key].blocks.map((blk) => buildBlock(blk, pageContext));
+      const slotConfigKey = block.slots[key].blocks['~k'] ?? block.slots[key]['~k'] ?? block['~k'];
+      block.slots[key].blocks.map((blk) => buildBlock(blk, pageContext, slotConfigKey));
     });
   }
 }

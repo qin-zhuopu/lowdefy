@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ test('Roles, 1 page per role', () => {
         },
       },
     },
+    pages: [{ id: 'page1' }, { id: 'page2' }],
   };
   const res = getPageRoles({ components });
   expect(res).toEqual({
@@ -56,11 +57,75 @@ test('Multiple roles on a page', () => {
         },
       },
     },
+    pages: [{ id: 'page1' }, { id: 'page2' }, { id: 'page3' }],
   };
   const res = getPageRoles({ components });
   expect(res).toEqual({
     page1: ['role1'],
     page2: ['role1', 'role2'],
     page3: ['role2'],
+  });
+});
+
+test('Wildcard pattern matches multiple pages', () => {
+  const components = {
+    auth: {
+      pages: {
+        roles: {
+          admin: ['team-users/*'],
+        },
+      },
+    },
+    pages: [
+      { id: 'team-users/users-list' },
+      { id: 'team-users/user-edit' },
+      { id: 'home' },
+    ],
+  };
+  const res = getPageRoles({ components });
+  expect(res).toEqual({
+    'team-users/users-list': ['admin'],
+    'team-users/user-edit': ['admin'],
+  });
+});
+
+test('Mixed exact and wildcard patterns in roles', () => {
+  const components = {
+    auth: {
+      pages: {
+        roles: {
+          admin: ['team-users/*', 'settings'],
+          viewer: ['home'],
+        },
+      },
+    },
+    pages: [
+      { id: 'team-users/users-list' },
+      { id: 'settings' },
+      { id: 'home' },
+    ],
+  };
+  const res = getPageRoles({ components });
+  expect(res).toEqual({
+    'team-users/users-list': ['admin'],
+    settings: ['admin'],
+    home: ['viewer'],
+  });
+});
+
+test('Wildcard * does not match across slashes', () => {
+  const components = {
+    auth: {
+      pages: {
+        roles: {
+          admin: ['team-users/*'],
+        },
+      },
+    },
+    pages: [{ id: 'team-users/sub/deep' }, { id: 'team-users/list' }],
+  };
+  const res = getPageRoles({ components });
+  expect(res).toEqual({
+    'team-users/list': ['admin'],
   });
 });

@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -15,10 +15,11 @@
 */
 
 import React from 'react';
-import classNames from 'classnames';
 import { omit, type } from '@lowdefy/helpers';
 import Icon from '@ant-design/icons';
-import { blockDefaultProps, ErrorBoundary, makeCssClass } from '@lowdefy/block-utils';
+import { cn, withBlockDefaults, ErrorBoundary } from '@lowdefy/block-utils';
+
+import iconStyles from './style.module.css';
 
 const lowdefyProps = [
   'actionLog',
@@ -33,6 +34,7 @@ const lowdefyProps = [
   'registerEvent',
   'registerMethod',
   'schemaErrors',
+  'styles',
   'validation',
 ];
 
@@ -40,20 +42,37 @@ const createIcon = (Icons) => {
   const AiOutlineLoading3Quarters = Icons['AiOutlineLoading3Quarters'];
   const AiOutlineExclamationCircle = Icons['AiOutlineExclamationCircle'];
 
-  const IconBlock = ({ blockId, events, methods, onClick, properties, ...props }) => {
+  const formatTitle = (title) => {
+    if (!title || !type.isString(title)) {
+      return '';
+    }
+    let spacedTitle = title.replace(/([A-Z])/g, ' $1').trim();
+    return spacedTitle.substring(spacedTitle.indexOf(' ') + 1);
+  };
+
+  const IconBlock = ({
+    blockId,
+    classNames = {},
+    events,
+    methods,
+    onClick,
+    properties,
+    styles = {},
+    ...props
+  }) => {
     const propertiesObj = type.isString(properties) ? { name: properties } : properties;
     const spin =
       (propertiesObj.spin || events.onClick?.loading) && !propertiesObj.disableLoadingIcon;
     const iconProps = {
       id: blockId,
-      className: classNames({
-        [makeCssClass([{ cursor: (onClick || events.onClick) && 'pointer' }, propertiesObj.style])]:
-          true,
-        'icon-spin': spin,
-      }),
+      className: cn(classNames.element, { [iconStyles['icon-spin']]: spin }),
+      style: {
+        cursor: onClick || events.onClick ? 'pointer' : undefined,
+        ...styles.element,
+      },
       rotate: propertiesObj.rotate,
       color: propertiesObj.color,
-      title: propertiesObj.name,
+      title: propertiesObj.title ?? formatTitle(propertiesObj.name),
       size: propertiesObj.size,
       // twoToneColor: propertiesObj.color, // TODO: track https://github.com/react-icons/react-icons/issues/508
       ...omit(props, lowdefyProps),
@@ -90,8 +109,7 @@ const createIcon = (Icons) => {
     );
   };
   const AntIcon = (all) => <Icon component={() => <IconBlock {...all} />} />;
-  AntIcon.defaultProps = blockDefaultProps;
-  return AntIcon;
+  return withBlockDefaults(AntIcon);
 };
 
 export default createIcon;

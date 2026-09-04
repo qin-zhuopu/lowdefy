@@ -1,0 +1,12 @@
+id: main
+type: Box
+blocks:
+  - id: trigger
+    type: Button
+    events:
+      onClick:
+        - id: call-nowhere
+          type: CallAPI
+          params:
+            endpointId:
+              _module.endpointId: nonexistent-endpoint

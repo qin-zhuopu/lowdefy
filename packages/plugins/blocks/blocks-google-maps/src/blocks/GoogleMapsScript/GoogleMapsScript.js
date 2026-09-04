@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 import React from 'react';
 import { LoadScriptNext } from '@react-google-maps/api';
-import { blockDefaultProps } from '@lowdefy/block-utils';
+import { withBlockDefaults } from '@lowdefy/block-utils';
 
 class GoogleMapsScript extends React.Component {
   constructor(props) {
@@ -41,11 +41,9 @@ class GoogleMapsScript extends React.Component {
   }
 }
 
-GoogleMapsScript.defaultProps = blockDefaultProps;
 GoogleMapsScript.meta = {
   category: 'container',
   icons: [],
-  styles: [],
 };
 
-export default GoogleMapsScript;
+export default withBlockDefaults(GoogleMapsScript);

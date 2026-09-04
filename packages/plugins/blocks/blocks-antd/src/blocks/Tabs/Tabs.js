@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -14,9 +14,12 @@
   limitations under the License.
 */
 
-import React, { useState, useEffect } from 'react';
-import { blockDefaultProps, renderHtml } from '@lowdefy/block-utils';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { renderHtml, withBlockDefaults } from '@lowdefy/block-utils';
 import { Tabs } from 'antd';
+
+import withTheme from '../withTheme.js';
+import useItemShortcuts from '../useItemShortcuts.js';
 
 const getTabs = ({ content, properties }) => {
   let tabs = properties.tabs;
@@ -29,7 +32,16 @@ const getTabs = ({ content, properties }) => {
   return tabs.filter((tab) => tab.key !== properties.extraAreaKey);
 };
 
-const TabsBlock = ({ blockId, components: { Icon }, events, content, methods, properties }) => {
+function TabsBlock({
+  blockId,
+  classNames = {},
+  components: { Icon, ShortcutBadge },
+  events,
+  content,
+  methods,
+  properties,
+  styles = {},
+}) {
   const tabs = getTabs({ content, properties });
   const additionalProps = {};
   if (properties.extraAreaKey) {
@@ -38,42 +50,73 @@ const TabsBlock = ({ blockId, components: { Icon }, events, content, methods, pr
   }
 
   const [key, setKey] = useState(properties.defaultActiveKey ?? tabs[0].key);
+
+  // Read latest tabs inside the stable handler without re-binding listeners.
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
+  // Fires the generic onChange plus, if the now-active tab declares one, its
+  // own dynamically-named event. Stable identity so shortcut listeners and the
+  // registered method don't re-bind on every render.
+  const fireTabChange = useCallback(
+    (activeKey) => {
+      setKey(activeKey);
+      methods.triggerEvent({ name: 'onChange', event: { activeKey } });
+      const activeTab = tabsRef.current.find((tab) => tab.key === activeKey);
+      if (activeTab?.eventName) {
+        methods.triggerEvent({ name: activeTab.eventName, event: { key: activeKey } });
+      }
+    },
+    [methods]
+  );
+
   useEffect(() => {
     methods.registerMethod('setActiveKey', ({ activeKey }) => {
       if (activeKey !== key) {
-        setKey(activeKey);
-        methods.triggerEvent({ name: 'onChange', event: { activeKey } });
+        fireTabChange(activeKey);
       }
     });
   });
+
+  const shortcutItems = tabs
+    .filter((tab) => tab.shortcut)
+    .map((tab) => ({ key: tab.key, shortcut: tab.shortcut, disabled: tab.disabled }));
+  useItemShortcuts({ items: shortcutItems, onMatch: fireTabChange });
 
   return (
     <Tabs
       activeKey={key}
       animated={properties.animated !== undefined ? properties.animated : true}
       id={blockId}
-      onChange={(activeKey) => {
-        setKey(activeKey);
-        methods.triggerEvent({ name: 'onChange', event: { activeKey } });
-      }}
+      onChange={(activeKey) => fireTabChange(activeKey)}
       size={properties.size ?? 'default'}
-      tabBarStyle={methods.makeCssClass(properties.tabBarStyle, true)}
-      tabPosition={properties.tabPosition ?? 'top'}
+      tabPlacement={properties.tabPlacement ?? 'top'}
       type={properties.tabType ?? 'line'}
-      onTabScroll={({ direction }) =>
-        methods.triggerEvent({ name: 'onTabScroll', event: { direction } })
-      }
-      onTabClick={(key) => {
-        methods.triggerEvent({ name: 'onTabClick', event: { key } });
+      className={classNames.element}
+      classNames={{
+        tabBar: classNames.tabBar,
+        tabPane: classNames.tabPane,
+        inkBar: classNames.inkBar,
       }}
+      style={styles.element}
+      styles={{ tabBar: styles.tabBar }}
       items={tabs.map((tab) => ({
         id: `${blockId}_${tab.key}`,
         key: tab.key,
         disabled: tab.disabled,
         label: (
-          <span className={methods.makeCssClass(tab.titleStyle)}>
-            {tab.icon && <Icon blockId={`${blockId}_icon`} events={events} properties={tab.icon} />}
+          <span style={tab.titleStyle}>
+            {tab.icon && (
+              <Icon
+                blockId={`${blockId}_icon`}
+                classNames={{ element: classNames.icon }}
+                events={events}
+                properties={tab.icon}
+                styles={{ element: styles.icon }}
+              />
+            )}
             {tab.title ? renderHtml({ html: tab.title, methods }) : tab.key}
+            <ShortcutBadge shortcut={tab.shortcut} />
           </span>
         ),
         children: content[tab.key] && content[tab.key](),
@@ -81,13 +124,6 @@ const TabsBlock = ({ blockId, components: { Icon }, events, content, methods, pr
       {...additionalProps}
     />
   );
-};
+}
 
-TabsBlock.defaultProps = blockDefaultProps;
-TabsBlock.meta = {
-  category: 'container',
-  icons: [],
-  styles: ['blocks/Tabs/style.less'],
-};
-
-export default TabsBlock;
+export default withTheme('Tabs', withBlockDefaults(TabsBlock));

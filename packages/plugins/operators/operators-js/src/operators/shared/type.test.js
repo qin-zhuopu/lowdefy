@@ -1,5 +1,5 @@
 /*
-  Copyright 2020-2024 Lowdefy, Inc
+  Copyright 2020-2026 Lowdefy, Inc
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
@@ -59,16 +59,14 @@ test('_type with null key', () => {
   expect(_type({ params: { type: 'boolean', key: null }, location, state })).toEqual(false);
 });
 test('_type null', () => {
-  expect(() => _type({ params: null, location })).toThrow(
-    'Operator Error: _type.type must be a string. Received: null at location.'
-  );
+  expect(() => _type({ params: null, location })).toThrow('_type.type must be a string.');
 });
 test('_type with non-string on', () => {
   expect(_type({ params: { type: 'number', on: 5 }, location })).toEqual(true);
 });
 test('_type with unknown type', () => {
   expect(() => _type({ params: { type: 'strings' }, location })).toThrow(
-    'Operator Error: "strings" is not a valid _type test. Received: {"type":"strings"} at location.'
+    '"strings" is not a valid _type test.'
   );
 });
 test('_type date on string date fail', () => {
@@ -103,9 +101,31 @@ test('_type none', () => {
   expect(_type({ params: { type: 'none' }, location, state })).toEqual(true);
 });
 
+test('_type with a reserved key returns false and does not throw', () => {
+  expect(_type({ params: { type: 'string', key: '__proto__' }, location, state })).toEqual(false);
+});
+test('_type undefined with a reserved key returns true and does not throw', () => {
+  expect(_type({ params: { type: 'undefined', key: '__proto__' }, location, state })).toEqual(true);
+});
+test('_type with a reserved location returns false and does not throw', () => {
+  expect(_type({ params: { type: 'string' }, location: 'a.constructor.b', state })).toEqual(false);
+});
+test('_type propagates an error that is not a ReservedKeyError', () => {
+  const throwingState = {};
+  Object.defineProperty(throwingState, 'boom', {
+    enumerable: true,
+    get: () => {
+      throw new Error('read failed');
+    },
+  });
+  expect(() =>
+    _type({ params: { type: 'string', key: 'boom' }, location, state: throwingState })
+  ).toThrow('read failed');
+});
+
 test('_type date with on packed date pass and calls ServerParser', () => {
   const input = { _type: { type: 'date', on: { _date: Date.now() } } };
-  const parser = new ServerParser({ operators, payload: {}, secrets: {}, user: {} });
-  const res = parser.parse({ input, location });
+  const parser = new ServerParser({ operators, secrets: {}, user: {} });
+  const res = parser.parse({ input, location, payload: {} });
   expect(res.output).toEqual(true);
 });

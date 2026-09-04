@@ -1,0 +1,9 @@
+name: Contacts
+description: Contact management module
+
+dependencies:
+  - id: layout
+    description: Shared layout components
+
+pages:
+  - _ref: pages/contact-list.yaml
