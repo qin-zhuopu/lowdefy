@@ -12,12 +12,33 @@ requests:
     properties:
       executionId:
         _payload: executionId
+  # Incremental log endpoint. afterSeq is the number of log lines already held
+  # in the logLines state array. Because the backend writes log seq values
+  # contiguously (1, 2, 3, ...) per execution, the count of lines already
+  # received equals the highest seq seen, so this feeds the GetLogs cursor and
+  # only new lines are returned each poll.
   - id: pollLogs
     type: GetLogs
     connectionId: runner
     payload:
       executionId:
         _url_query: executionId
+      afterSeq:
+        _array.length:
+          _state: logLines
+    properties:
+      executionId:
+        _payload: executionId
+      afterSeq:
+        _payload: afterSeq
+  # Full log reload used by the manual Refresh button (afterSeq 0).
+  - id: reloadLogs
+    type: GetLogs
+    connectionId: runner
+    payload:
+      executionId:
+        _url_query: executionId
+      afterSeq: 0
     properties:
       executionId:
         _payload: executionId
@@ -45,6 +66,10 @@ events:
     - id: initGetExecution
       type: Request
       params: getExecution
+    - id: initResetLogs
+      type: SetState
+      params:
+        logLines: []
     - id: initGetLogs
       type: Request
       params: pollLogs
@@ -52,16 +77,26 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
   # Near real-time console streaming (user hard requirement).
-  # Lowdefy events are linear action lists with no native loop, so the poll
-  # loop is unrolled: 60 iterations of [getExecution, pollLogs, SetState, Wait 1s].
-  # Each action is guarded with skip so that once the execution reaches a
-  # terminal status (success/failed/cancelled) the rest of the loop no-ops.
-  # The console List block is driven by the "logLines" state array; each poll
-  # re-fetches the full log via pollLogs and SetState refreshes logLines, so new
-  # lines appear live while the execution runs. onInit does the initial load; a
-  # manual Refresh button (toolbar) re-runs the same requests as a baseline.
+  # Lowdefy events are linear action lists with no native loop and there is no
+  # clean self-re-triggering event primitive, so the poll loop is UNROLLED into
+  # 90 iterations of [getExecution, pollLogs(afterSeq from state), SetState
+  # (APPEND new lines), Wait 1s]. Each action is guarded with skip so that once
+  # the execution reaches a terminal status the rest of the loop no-ops.
+  #
+  # INCREMENTAL: pollLogs sends afterSeq = current logLines length, so GetLogs
+  # returns only lines with seq greater than what the client already has, and
+  # SetState APPENDS them (_array.concat) rather than replacing. The per-poll
+  # payload is the delta, not the whole log.
+  #
+  # CEILING: 90 iterations at 1s ~= 90s of unattended auto-streaming.
+  # Lowdefy config cannot express a self-re-arming loop, so this is a finite (if
+  # generous) ceiling; after it elapses the always-available manual Refresh
+  # button continues streaming from the last seq. Raising the ceiling is just a
+  # matter of regenerating with a larger ITERATIONS.
   onMount:
     - id: pollStatus_1
       type: Request
@@ -95,7 +130,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -154,7 +191,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -213,7 +252,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -272,7 +313,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -331,7 +374,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -390,7 +435,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -449,7 +496,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -508,7 +557,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -567,7 +618,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -626,7 +679,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -685,7 +740,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -744,7 +801,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -803,7 +862,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -862,7 +923,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -921,7 +984,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -980,7 +1045,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1039,7 +1106,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1098,7 +1167,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1157,7 +1228,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1216,7 +1289,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1275,7 +1350,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1334,7 +1411,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1393,7 +1472,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1452,7 +1533,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1511,7 +1594,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1570,7 +1655,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1629,7 +1716,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1688,7 +1777,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1747,7 +1838,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1806,7 +1899,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1865,7 +1960,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1924,7 +2021,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -1983,7 +2082,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2042,7 +2143,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2101,7 +2204,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2160,7 +2265,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2219,7 +2326,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2278,7 +2387,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2337,7 +2448,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2396,7 +2509,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2455,7 +2570,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2514,7 +2631,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2573,7 +2692,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2632,7 +2753,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2691,7 +2814,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2750,7 +2875,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2809,7 +2936,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2868,7 +2997,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2927,7 +3058,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -2986,7 +3119,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3045,7 +3180,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3104,7 +3241,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3163,7 +3302,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3222,7 +3363,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3281,7 +3424,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3340,7 +3485,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3399,7 +3546,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3458,7 +3607,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3517,7 +3668,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3576,7 +3729,9 @@ events:
       type: SetState
       params:
         logLines:
-          _request: pollLogs.lines
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
       skip:
         _or:
           - _eq:
@@ -3589,6 +3744,1836 @@ events:
               - _request: getExecution.status
               - cancelled
     - id: pollWait_60
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_61
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_61
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_61
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_61
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_62
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_62
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_62
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_62
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_63
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_63
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_63
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_63
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_64
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_64
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_64
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_64
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_65
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_65
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_65
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_65
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_66
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_66
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_66
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_66
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_67
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_67
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_67
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_67
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_68
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_68
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_68
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_68
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_69
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_69
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_69
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_69
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_70
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_70
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_70
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_70
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_71
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_71
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_71
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_71
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_72
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_72
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_72
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_72
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_73
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_73
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_73
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_73
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_74
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_74
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_74
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_74
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_75
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_75
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_75
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_75
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_76
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_76
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_76
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_76
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_77
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_77
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_77
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_77
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_78
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_78
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_78
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_78
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_79
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_79
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_79
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_79
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_80
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_80
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_80
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_80
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_81
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_81
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_81
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_81
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_82
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_82
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_82
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_82
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_83
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_83
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_83
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_83
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_84
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_84
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_84
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_84
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_85
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_85
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_85
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_85
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_86
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_86
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_86
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_86
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_87
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_87
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_87
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_87
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_88
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_88
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_88
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_88
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_89
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_89
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_89
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_89
+      type: Wait
+      params:
+        ms: 1000
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollStatus_90
+      type: Request
+      params: getExecution
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollLogs_90
+      type: Request
+      params: pollLogs
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollSet_90
+      type: SetState
+      params:
+        logLines:
+          _array.concat:
+            - _state: logLines
+            - _request: pollLogs.lines
+      skip:
+        _or:
+          - _eq:
+              - _request: getExecution.status
+              - success
+          - _eq:
+              - _request: getExecution.status
+              - failed
+          - _eq:
+              - _request: getExecution.status
+              - cancelled
+    - id: pollWait_90
       type: Wait
       params:
         ms: 1000
@@ -3697,14 +5682,18 @@ blocks:
             - id: manualStatus
               type: Request
               params: getExecution
+            - id: manualResetLogs
+              type: SetState
+              params:
+                logLines: []
             - id: manualLogs
               type: Request
-              params: pollLogs
+              params: reloadLogs
             - id: manualSetLogs
               type: SetState
               params:
                 logLines:
-                  _request: pollLogs.lines
+                  _request: reloadLogs.lines
       - id: cancelExecBtn
         type: Button
         layout:
@@ -3730,14 +5719,18 @@ blocks:
             - id: refreshStatusAfterCancel
               type: Request
               params: getExecution
+            - id: resetLogsAfterCancel
+              type: SetState
+              params:
+                logLines: []
             - id: refreshLogsAfterCancel
               type: Request
-              params: pollLogs
+              params: reloadLogs
             - id: setLogsAfterCancel
               type: SetState
               params:
                 logLines:
-                  _request: pollLogs.lines
+                  _request: reloadLogs.lines
             - id: cancelExecMsg
               type: DisplayMessage
               params:

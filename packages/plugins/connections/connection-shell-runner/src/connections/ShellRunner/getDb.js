@@ -14,6 +14,7 @@
   limitations under the License.
 */
 
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -93,6 +94,10 @@ function getDb({ connection }) {
   if (databases.has(dbPath)) {
     return databases.get(dbPath);
   }
+  // Ensure the parent directory exists so a pinned dbPath (e.g. a stable
+  // repo-relative location that survives the wiped dev server cwd) works on a
+  // fresh checkout without a manual mkdir.
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new Database(dbPath);
   initializeSchema(db);
   reconcileOrphans(db);

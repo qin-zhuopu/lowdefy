@@ -68,7 +68,13 @@ function startExecution({ db, execution, job }) {
 
   let child;
   try {
-    child = spawn('bash', ['-c', job.command], { stdio: ['ignore', 'pipe', 'pipe'] });
+    // detached: true puts the child in its own process group so that commands
+    // which fork sub-processes (e.g. `sleep`) can be reaped as a group on
+    // cancel. CancelExecution kills the negative pid (the whole group).
+    child = spawn('bash', ['-c', job.command], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    });
   } catch (error) {
     finalizeError({ db, executionId: execution.id, jobId: job.id, seqRef, message: error.message });
     return;

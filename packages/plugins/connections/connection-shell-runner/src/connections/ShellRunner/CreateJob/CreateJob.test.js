@@ -55,6 +55,22 @@ test('CreateJob inserts a job and ListJobs returns it', async () => {
   expect(jobs[0]).toMatchObject({ id: job.id, name: 'Build', command: 'echo hi' });
 });
 
+test('CreateJob creates the db parent directory if it does not exist', async () => {
+  const dir = path.resolve(os.tmpdir(), `lowdefy-shell-mkdir-${crypto.randomUUID()}`);
+  const nestedConnection = { dbPath: path.resolve(dir, 'nested', 'jenkins.sqlite') };
+  expect(fs.existsSync(dir)).toBe(false);
+  try {
+    const job = await CreateJob({
+      request: { name: 'Build', command: 'echo hi' },
+      connection: nestedConnection,
+    });
+    expect(typeof job.id).toBe('string');
+    expect(fs.existsSync(nestedConnection.dbPath)).toBe(true);
+  } finally {
+    fs.rmSync(dir, { force: true, recursive: true });
+  }
+});
+
 test('CreateJob throws on missing name', async () => {
   await expect(CreateJob({ request: { command: 'echo hi' }, connection })).rejects.toThrow(
     'CreateJob request property "name" should be a non-empty string.'

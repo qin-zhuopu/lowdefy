@@ -22,6 +22,24 @@ import schema from './schema.js';
 
 const KILL_GRACE_MS = 2000;
 
+// Kills the child's whole process group (negative pid) so forked sub-processes
+// are reaped too. Falls back to killing just the child if the group kill fails
+// (e.g. the child already exited, or detachment was not honoured).
+function killChildGroup({ child, signal }) {
+  if (type.isNone(child.pid)) {
+    return;
+  }
+  try {
+    process.kill(-child.pid, signal);
+  } catch (error) {
+    try {
+      child.kill(signal);
+    } catch (innerError) {
+      // The process is already gone; nothing to kill.
+    }
+  }
+}
+
 function appendLine({ db, executionId, line }) {
   const maxSeqRow = db
     .prepare(`SELECT COALESCE(MAX(seq), 0) AS maxSeq FROM logs WHERE execution_id = ?`)
@@ -57,12 +75,15 @@ async function CancelExecution({ request, connection }) {
 
   const child = runners.get(executionId);
   if (child) {
-    child.kill('SIGTERM');
+    // The child was spawned detached, so it leads its own process group. Kill
+    // the whole group (negative pid) so forked sub-processes (e.g. `sleep`) are
+    // terminated too, not just the bash parent.
+    killChildGroup({ child, signal: 'SIGTERM' });
     const killTimer = setTimeout(() => {
       if (runners.has(executionId)) {
         const liveChild = runners.get(executionId);
         if (liveChild) {
-          liveChild.kill('SIGKILL');
+          killChildGroup({ child: liveChild, signal: 'SIGKILL' });
         }
       }
     }, KILL_GRACE_MS);
@@ -70,9 +91,18 @@ async function CancelExecution({ request, connection }) {
     if (typeof killTimer.unref === 'function') {
       killTimer.unref();
     }
+    // IMPORTANT: do NOT dispatch the next queued execution here. The killed
+    // child is still alive until the OS reaps it (up to KILL_GRACE_MS), and
+    // dispatching inline would let the next execution's real bash process start
+    // while the dying one is still running, violating strict per-job serial
+    // ordering. The child's own 'exit' handler (runners.js) is the single
+    // dispatch point; it already preserves the 'cancelled' status.
+    return { id: executionId, status: 'cancelled' };
   }
 
-  // Start the next queued execution for this job.
+  // No live child means the execution was 'queued' and never started, so there
+  // is no exit handler to dispatch the next execution. Dispatch here so the
+  // queue keeps draining.
   dispatchNext({ db, jobId: execution.job_id });
 
   return { id: executionId, status: 'cancelled' };
