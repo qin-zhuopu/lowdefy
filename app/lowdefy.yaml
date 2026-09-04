@@ -13,9 +13,11 @@ connections:
       # framework rejects requests whose meta.checkWrite is true unless the
       # connection sets write: true (see api checkConnectionWrite).
       write: true
-      # Absolute path so job/execution/log data persists across dev-server rebuilds
-      # (the isolated _server/dev working directory is wiped on each rebuild).
-      dbPath: /projects/sandbox/lowdefy/.lowdefy-jenkins/jenkins.sqlite
+      # dbPath is intentionally not pinned here so the SQLite location stays
+      # portable across environments. getDb.js resolves the location from the
+      # LOWDEFY_JENKINS_DB env var (set to /data/jenkins.sqlite in the container /
+      # Render deploy), and otherwise falls back to a stable file in the system
+      # temp directory for local dev. getDb mkdir -p's the parent directory.
 
 menus:
   - id: default

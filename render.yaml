@@ -1,0 +1,28 @@
+# Render Blueprint for the Lowdefy CI ("Jenkins-like") app.
+#
+# One-click-ish deploy:
+#   1. Push this repo to GitHub (branch feat/connection-shell-runner or main).
+#   2. In Render: New + > Blueprint, connect the repo, pick this render.yaml.
+#   3. Render builds the Dockerfile and starts the service.
+#
+# Notes:
+#   * env: docker => Render builds the repo-root Dockerfile.
+#   * plan: free => free web service (ephemeral disk; data is lost on
+#     restart/redeploy/15-min-idle sleep, which is accepted for this app).
+#   * Render injects PORT; the container starts `pnpm app:start --port $PORT`
+#     and next start binds 0.0.0.0:$PORT.
+services:
+  - type: web
+    name: lowdefy-ci
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Root path returns the app shell (HTTP 200), used as the health check.
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      # Ephemeral SQLite location inside the container. Matches the Dockerfile
+      # default; getDb.js creates the parent directory automatically.
+      - key: LOWDEFY_JENKINS_DB
+        value: /data/jenkins.sqlite
